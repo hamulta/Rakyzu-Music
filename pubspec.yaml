@@ -38,6 +38,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   hive_generator: ^2.0.1
+  http: ^1.2.1
   riverpod_generator: ^2.4.0
   riverpod_lint: ^2.3.10
 
