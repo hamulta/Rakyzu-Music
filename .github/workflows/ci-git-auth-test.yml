@@ -21,6 +21,8 @@ jobs:
       - name: Configure git credential helper (GH_PAT)
         run: |
           git config --global credential.helper store
+          git config --global user.name "Rakyzu Music CI"
+          git config --global user.email "ci@rakyzu.music"
           printf 'https://x-access-token:%s@github.com\n' "${{ secrets.GH_PAT }}" > "$HOME/.git-credentials"
           chmod 600 "$HOME/.git-credentials"
 
