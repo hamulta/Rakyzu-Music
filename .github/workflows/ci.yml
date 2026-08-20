@@ -124,6 +124,9 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Patch app_links gradle workaround
+        run: bash tool/patch_app_links.sh
+
       - name: Build APK
         run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=CLOUDFLARE_WORKER_URL=${{ secrets.CLOUDFLARE_WORKER_URL }}
 
