@@ -88,6 +88,11 @@ class _SongListScreenState extends ConsumerState<SongListScreen> {
                       tooltip: 'Tambah Lagu',
                       onPressed: () => context.go(AppRoutes.catalogSongAdd),
                     ),
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.doc_append),
+                      tooltip: 'Bulk Upload',
+                      onPressed: () => context.go(AppRoutes.catalogBulkUpload),
+                    ),
                   ],
                 ),
                 GlassSearchBar(

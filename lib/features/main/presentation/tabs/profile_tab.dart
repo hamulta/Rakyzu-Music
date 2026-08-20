@@ -73,6 +73,12 @@ class ProfileTab extends ConsumerWidget {
                   label: 'Manajemen Katalog',
                   onTap: () => context.go(AppRoutes.catalogManagement),
                 ),
+              if (role?.canManageCatalog ?? false)
+                _SettingsRow(
+                  icon: CupertinoIcons.chart_bar,
+                  label: 'Admin Dashboard',
+                  onTap: () => context.go(AppRoutes.admin),
+                ),
               const _SettingsRow(
                 icon: CupertinoIcons.settings,
                 label: 'Settings',

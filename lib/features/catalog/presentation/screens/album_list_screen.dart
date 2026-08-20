@@ -133,6 +133,12 @@ class _AlbumListScreenState extends ConsumerState<AlbumListScreen> {
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _AlbumTile(
                               album: album,
+                              onTap: () => context.go(
+                                AppRoutes.catalogAlbumDetail.replaceFirst(
+                                  ':id',
+                                  album.id,
+                                ),
+                              ),
                               onEdit: () => context.go(
                                 AppRoutes.catalogAlbumEdit.replaceFirst(
                                   ':id',
@@ -159,11 +165,13 @@ class _AlbumListScreenState extends ConsumerState<AlbumListScreen> {
 class _AlbumTile extends StatelessWidget {
   const _AlbumTile({
     required this.album,
+    required this.onTap,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Album album;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -183,6 +191,7 @@ class _AlbumTile extends StatelessWidget {
     return GlassCard(
       borderRadius: 16,
       padding: const EdgeInsets.all(12),
+      onTap: onTap,
       child: Row(
         children: [
           SignedImage(
