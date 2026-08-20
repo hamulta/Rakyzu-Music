@@ -92,7 +92,8 @@ class _DevGalleryScreenState extends State<DevGalleryScreen> {
                     isPrimary: false,
                     height: 40,
                     onPressed: () => setState(
-                        () => _miniPlayerVisible = !_miniPlayerVisible,),
+                      () => _miniPlayerVisible = !_miniPlayerVisible,
+                    ),
                   ),
                 ),
               ],

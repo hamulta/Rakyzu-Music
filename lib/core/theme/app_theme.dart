@@ -245,7 +245,9 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.darkBase,
       fontFamily: _fontFamilyFallback,
       textTheme: _buildTextTheme(
-          AppColors.darkTextPrimary, AppColors.darkTextSecondary,),
+        AppColors.darkTextPrimary,
+        AppColors.darkTextSecondary,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,

@@ -139,7 +139,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         suffix: GestureDetector(
                           onTap: () => setState(
-                              () => _obscurePassword = !_obscurePassword,),
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                           child: Icon(
                             _obscurePassword
                                 ? CupertinoIcons.eye

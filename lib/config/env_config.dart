@@ -17,8 +17,10 @@ class EnvConfig {
       _get('CLOUDFLARE_R2_ACCESS_KEY_ID', '');
   static String get cloudflareR2SecretAccessKey =>
       _get('CLOUDFLARE_R2_SECRET_ACCESS_KEY', '');
-  static String get cloudflareR2Endpoint => _get('CLOUDFLARE_R2_ENDPOINT',
-      'https://<account-id>.r2.cloudflarestorage.com',);
+  static String get cloudflareR2Endpoint => _get(
+        'CLOUDFLARE_R2_ENDPOINT',
+        'https://<account-id>.r2.cloudflarestorage.com',
+      );
   static String get cloudflareR2Bucket =>
       _get('CLOUDFLARE_R2_BUCKET', 'rakyzu-music');
   static String get cloudflareWorkerUrl => _get('CLOUDFLARE_WORKER_URL', '');

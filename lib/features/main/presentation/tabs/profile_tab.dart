@@ -129,8 +129,8 @@ class _SettingsRow extends StatelessWidget {
             Icon(icon, color: AppColors.azureMistDeep, size: 20),
             const SizedBox(width: 12),
             Expanded(
-                child:
-                    Text(label, style: Theme.of(context).textTheme.bodyLarge),),
+              child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+            ),
             const Icon(
               CupertinoIcons.chevron_right,
               color: AppColors.textSecondary,

@@ -43,7 +43,8 @@ class HomeTab extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const _PlaceholderBanner(
-                  title: 'Your daily mix akan muncul di sini',),
+                title: 'Your daily mix akan muncul di sini',
+              ),
               const SizedBox(height: 24),
               Text(
                 'Recently Played',

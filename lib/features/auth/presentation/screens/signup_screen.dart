@@ -144,7 +144,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         icon: CupertinoIcons.lock_fill,
                         obscureText: _obscurePassword,
                         onSuffixTap: () => setState(
-                            () => _obscurePassword = !_obscurePassword,),
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                         suffixIcon: _obscurePassword
                             ? CupertinoIcons.eye
                             : CupertinoIcons.eye_slash,
