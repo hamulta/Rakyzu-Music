@@ -35,8 +35,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            signedAudioUrlProvider.overrideWith((ref, key) =>
-                Future.error('Should not be called for null audioKey')),
+            signedAudioUrlProvider.overrideWith(
+              (ref, key) =>
+                  Future.error('Should not be called for null audioKey'),
+            ),
           ],
           child: const MaterialApp(
             home: Scaffold(

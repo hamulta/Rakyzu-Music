@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/glass_bottom_nav_bar.dart';
 import '../../../core/widgets/glass_mini_player.dart';
+import '../../player/providers/audio_handler_provider.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/library_tab.dart';
 import 'tabs/premium_tab.dart';
@@ -51,6 +52,9 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Trigger lazy initialization of audio handler untuk background playback.
+    ref.watch(audioHandlerProvider);
+
     return CupertinoTabScaffold(
       tabBar: _buildTabBar(),
       tabBuilder: (context, index) {

@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../catalog/data/r2_storage_service.dart';
 import '../../catalog/models/song.dart';
+import 'audio_handler.dart';
 
 /// Repeat mode untuk pemutar.
 enum RepeatMode { off, all, one }
@@ -86,6 +88,10 @@ class PlayerController extends StateNotifier<PlaybackState> {
   final R2StorageService _r2Storage;
   final AudioPlayer _player = AudioPlayer();
 
+  /// Audio handler untuk background playback (audio_service).
+  /// Di-set via `setAudioHandler()` setelah AudioService.init() selesai.
+  RakyzuAudioHandler? _audioHandler;
+
   /// Subscribe ke streams AudioPlayer.
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
@@ -99,6 +105,40 @@ class PlayerController extends StateNotifier<PlaybackState> {
   final Map<String, _CachedUrl> _urlCache = {};
 
   AudioPlayer get player => _player;
+
+  /// Set audio handler untuk background playback.
+  /// Panggil setelah AudioService.init() di main.dart.
+  // ignore: use_setters_to_change_properties
+  void setAudioHandler(RakyzuAudioHandler handler) {
+    _audioHandler = handler;
+  }
+
+  /// Sinkronkan queue + current track ke AudioHandler untuk notification/lock screen.
+  void _syncToAudioHandler() {
+    if (_audioHandler == null) return;
+
+    // Sync queue.
+    final mediaItems = state.queue.map(_songToMediaItem).toList();
+    _audioHandler!.updateQueueFromPlayer(mediaItems);
+
+    // Sync current track.
+    if (state.currentTrack != null) {
+      _audioHandler!
+          .updateMediaItemFromPlayer(_songToMediaItem(state.currentTrack!));
+    }
+  }
+
+  MediaItem _songToMediaItem(Song song) {
+    return MediaItem(
+      id: song.audioUrl ?? 'unknown',
+      title: song.title,
+      artist: song.artistName ?? 'Unknown Artist',
+      album: song.albumTitle ?? '',
+      duration: state.duration,
+      artUri:
+          song.coverUrl != null ? Uri.parse('https://${song.coverUrl}') : null,
+    );
+  }
 
   void _init() {
     _positionSub = _player.positionStream.listen((pos) {
@@ -151,6 +191,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
         isLoading: false,
       );
       _startRefreshTimer(song.audioUrl!);
+      _syncToAudioHandler();
     } on Object catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -179,6 +220,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
         isLoading: false,
       );
       _startRefreshTimer(target.audioUrl!);
+      _syncToAudioHandler();
     } on Object catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -409,6 +451,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
         isLoading: false,
       );
       _startRefreshTimer(track.audioUrl!);
+      _syncToAudioHandler();
     } on Object catch (e) {
       state = state.copyWith(
         isLoading: false,
