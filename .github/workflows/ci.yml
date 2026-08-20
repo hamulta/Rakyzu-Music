@@ -161,10 +161,10 @@ jobs:
           pod install
 
       - name: Build IPA
-        run: flutter build ipa --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=CLOUDFLARE_WORKER_URL=${{ secrets.CLOUDFLARE_WORKER_URL }}
+        run: flutter build ios --release --no-codesign --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=CLOUDFLARE_WORKER_URL=${{ secrets.CLOUDFLARE_WORKER_URL }}
 
-      - name: Upload IPA artifact
+      - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-ipa
-          path: build/ios/ipa/*.ipa
+          name: app-release-ios
+          path: build/ios/iphoneos/*.app
