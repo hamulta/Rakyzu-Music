@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [develop, main]
 
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: read
+  checks: read
+
 jobs:
   analyze:
     name: Analyze & Format
