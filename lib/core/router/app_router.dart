@@ -10,6 +10,8 @@ import '../../features/catalog/presentation/screens/album_list_screen.dart';
 import '../../features/catalog/presentation/screens/artist_form_screen.dart';
 import '../../features/catalog/presentation/screens/artist_list_screen.dart';
 import '../../features/catalog/presentation/screens/catalog_management_home_screen.dart';
+import '../../features/catalog/presentation/screens/song_form_screen.dart';
+import '../../features/catalog/presentation/screens/song_list_screen.dart';
 import '../../features/main/presentation/main_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../constants/app_routes.dart';
@@ -88,6 +90,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id'];
           return AlbumFormScreen(albumId: id);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.catalogSongs,
+        name: AppRoutes.catalogSongsName,
+        builder: (context, state) => const SongListScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.catalogSongAdd,
+        name: AppRoutes.catalogSongAddName,
+        builder: (context, state) => const SongFormScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.catalogSongEdit,
+        name: AppRoutes.catalogSongEditName,
+        builder: (context, state) {
+          final id = state.pathParameters['id'];
+          return SongFormScreen(songId: id);
         },
       ),
     ],
