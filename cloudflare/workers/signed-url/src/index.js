@@ -8,6 +8,7 @@
  *
  * Security:
  *  - Requires the caller to be an authenticated Supabase user (JWT verified)
+ *  - JWTs are verified against Supabase's JWKS (ES256) or legacy JWT secret (HS256)
  *  - Returns short-lived URLs (default 3600s for GET, 900s for PUT)
  *  - Never exposes the bucket directly
  *
@@ -17,6 +18,8 @@
 const R2_ENDPOINT = 'https://{account_id}.r2.cloudflarestorage.com';
 const SERVICE = 's3';
 const REGION = 'auto';
+const JWKS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+let jwksCache = { keys: null, fetchedAt: 0 };
 
 export default {
   async fetch(request, env, ctx) {
@@ -48,17 +51,24 @@ export default {
       return json({ error: 'Missing Authorization header' }, 401);
     }
 
-    const verified = await verifySupabaseJwt(token, env.SUPABASE_JWT_SECRET);
-    if (!verified) {
+    try {
+      const verified = await verifySupabaseJwt(token, env);
+      if (!verified) {
+        return json({ error: 'Invalid or expired token' }, 401);
+      }
+
+      // Route: GET /signed-url
+      if (path === '/signed-url') {
+        return handleSignedUrl(url, env, verified);
+      }
+
+      return json({ error: 'Not found' }, 404);
+    } catch (err) {
+      if (err && err.status === 503) {
+        return json({ error: err.message || 'Verification keys unavailable' }, 503);
+      }
       return json({ error: 'Invalid or expired token' }, 401);
     }
-
-    // Route: GET /signed-url
-    if (path === '/signed-url') {
-      return handleSignedUrl(url, env, verified);
-    }
-
-    return json({ error: 'Not found' }, 404);
   },
 };
 
@@ -192,22 +202,79 @@ function encodeRfc3986Path(str) {
 }
 
 /**
- * Verify a Supabase JWT using the signing secret (JWT secret from Supabase).
- * Uses Web Crypto to avoid external dependencies in the worker.
+ * Verify a Supabase JWT.
+ *
+ * Modern Supabase signs user access tokens with ES256 (ECDSA P-256) using a
+ * per-project signing key exposed via JWKS at
+ *   {SUPABASE_URL}/auth/v1/.well-known/jwks.json
+ * Legacy tokens (and static anon/service keys) use HS256 signed with the
+ * per-project JWT secret.
+ *
+ * No dev fallback exists: an unverifiable token is always rejected.
  */
-async function verifySupabaseJwt(token, secret) {
-  if (!secret) {
-    // Development fallback: allow when no secret configured (sandbox only).
-    return { dev: true, role: 'staff', sub: 'dev-user' };
+async function verifySupabaseJwt(token, env) {
+  const [headerB64, payloadB64, signatureB64] = token.split('.');
+  if (!headerB64 || !payloadB64 || !signatureB64) return null;
+
+  const header = JSON.parse(base64UrlDecode(headerB64));
+  const payload = JSON.parse(base64UrlDecode(payloadB64));
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < now) return null;
+
+  const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+  const signature = base64UrlDecodeToBytes(signatureB64);
+  const alg = header.alg || '';
+
+  if (alg === 'ES256') {
+    const ok = await verifyEs256(header.kid, data, signature, env);
+    if (!ok) return null;
+  } else if (alg === 'HS256') {
+    if (!env.SUPABASE_JWT_SECRET) {
+      const err = new Error('SUPABASE_JWT_SECRET not configured for HS256 verification');
+      err.status = 503;
+      throw err;
+    }
+    const ok = await verifyHs256(env.SUPABASE_JWT_SECRET, data, signature);
+    if (!ok) return null;
+  } else {
+    return null;
   }
+
+  return {
+    sub: payload.sub,
+    role: payload.role || 'free',
+    email: payload.email,
+  };
+}
+
+/** Verify an ES256 JWS signature using the key from Supabase's JWKS. */
+async function verifyEs256(kid, data, signature, env) {
+  const jwks = await getJwks(env);
+  const key = jwks.keys.find((k) => k.kid === kid && k.kty === 'EC' && k.crv === 'P-256');
+  if (!key) return false;
+
   try {
-    const [headerB64, payloadB64, signatureB64] = token.split('.');
-    if (!headerB64 || !payloadB64 || !signatureB64) return null;
+    const publicKey = await crypto.subtle.importKey(
+      'jwk',
+      { kty: 'EC', crv: 'P-256', x: key.x, y: key.y, ext: true },
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['verify'],
+    );
+    return await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      publicKey,
+      signature,
+      data,
+    );
+  } catch (e) {
+    return false;
+  }
+}
 
-    const payload = JSON.parse(base64UrlDecode(payloadB64));
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) return null;
-
+/** Verify an HS256 JWS signature with the legacy shared secret. */
+async function verifyHs256(secret, data, signature) {
+  try {
     const key = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(secret),
@@ -215,18 +282,48 @@ async function verifySupabaseJwt(token, secret) {
       false,
       ['verify'],
     );
-    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-    const sigBytes = base64UrlDecodeToBytes(signatureB64);
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, data);
-    if (!valid) return null;
-
-    return {
-      sub: payload.sub,
-      role: payload.role || 'free',
-      email: payload.email,
-    };
+    return await crypto.subtle.verify('HMAC', key, signature, data);
   } catch (e) {
-    return null;
+    return false;
+  }
+}
+
+/** Fetch Supabase JWKS with a short in-memory TTL cache. */
+async function getJwks(env) {
+  const url =
+    env.SUPABASE_JWT_JWKS_URL ||
+    `${(env.SUPABASE_URL || '').replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`;
+
+  if (!url.startsWith('https://')) {
+    const err = new Error('SUPABASE_JWT_JWKS_URL (or SUPABASE_URL) is not configured');
+    err.status = 503;
+    throw err;
+  }
+
+  if (jwksCache.keys && Date.now() - jwksCache.fetchedAt < JWKS_CACHE_TTL_MS) {
+    return jwksCache.keys;
+  }
+
+  try {
+    const res = await fetch(url, { cf: { cacheTtl: 300, cacheEverything: true } });
+    if (!res.ok) {
+      const err = new Error(`Failed to fetch JWKS (HTTP ${res.status})`);
+      err.status = 503;
+      throw err;
+    }
+    const body = await res.json();
+    if (!Array.isArray(body.keys) || body.keys.length === 0) {
+      const err = new Error('JWKS response has no keys');
+      err.status = 503;
+      throw err;
+    }
+    jwksCache = { keys: body, fetchedAt: Date.now() };
+    return body;
+  } catch (e) {
+    if (e && e.status === 503) throw e;
+    const err = new Error('JWKS fetch failed');
+    err.status = 503;
+    throw err;
   }
 }
 

@@ -8,14 +8,16 @@ ALLOWED_ORIGINS = "*"
 ACCOUNT_ID = "d8f07e05408877ec59c5b8dfaf91a55f"
 R2_ENDPOINT = "https://d8f07e05408877ec59c5b8dfaf91a55f.r2.cloudflarestorage.com"
 R2_BUCKET_NAME = "rakyzu-music"
+SUPABASE_URL = "https://tkryesvnaocysmpstbtj.supabase.co"
 
 # R2 bucket binding
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "rakyzu-music"
 
-# Secrets (set via `wrangler secret put`):
-# R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, SUPABASE_JWT_SECRET
+# Secrets (set via `wrangler secret put`, never commit plaintext):
+# R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+# SUPABASE_JWT_SECRET (legacy HS256 tokens ONLY - modern ES256 uses public JWKS)
 
 # Dev config
 [dev]
