@@ -36,7 +36,12 @@ begin
     ('33333333-3333-3333-3333-333333333333', 'staff_tester', 'staff@test.rakyzu', 'Staff Tester', 'staff'),
     ('44444444-4444-4444-4444-444444444444', 'admin_tester', 'admin@test.rakyzu', 'Admin Tester', 'admin'),
     ('55555555-5555-5555-5555-555555555555', 'owner_tester', 'owner@test.rakyzu', 'Owner Tester', 'owner')
-  on conflict (id) do nothing;
+  -- Trigger handle_new_user sudah membuat baris role 'free'; timpa role sesuai skenario
+  on conflict (id) do update set
+    username = excluded.username,
+    email = excluded.email,
+    full_name = excluded.full_name,
+    role = excluded.role;
 end $$;
 
 -- data dimiliki staff (3333...) dan admin (4444...)
