@@ -1,0 +1,19 @@
+name = "rakyzu-signed-url"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+# Environment variables
+[vars]
+ALLOWED_ORIGINS = "*"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "rakyzu-music"
+
+# Secrets (set via `wrangler secret put`):
+# R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, SUPABASE_JWT_SECRET
+
+# Dev config
+[dev]
+port = 8787
