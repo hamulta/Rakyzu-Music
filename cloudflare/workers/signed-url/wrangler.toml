@@ -17,6 +17,7 @@ bucket_name = "rakyzu-music"
 
 # Secrets (set via `wrangler secret put`, never commit plaintext):
 # R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+# SUPABASE_SERVICE_ROLE_KEY (role lookup otoritatif untuk izin upload)
 # SUPABASE_JWT_SECRET (legacy HS256 tokens ONLY - modern ES256 uses public JWKS)
 
 # Dev config

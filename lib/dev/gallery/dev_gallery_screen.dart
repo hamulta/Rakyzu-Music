@@ -8,6 +8,7 @@ import '../../core/widgets/glass_button.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/glass_mini_player.dart';
 import '../../core/widgets/glass_search_bar.dart';
+import '../../core/widgets/signed_audio_player.dart';
 
 /// Internal development gallery to preview all Glassmorphism widgets.
 /// This screen can be removed before the v1.0.0 release.
@@ -100,6 +101,9 @@ class _DevGalleryScreenState extends State<DevGalleryScreen> {
             ),
             const SizedBox(height: 12),
             GlassMiniPlayer(isVisible: _miniPlayerVisible),
+            const SizedBox(height: 24),
+            const _SectionLabel('SignedAudioPlayer'),
+            const SignedAudioPlayer(audioKey: null, title: 'Demo'),
             const SizedBox(height: 24),
             const _SectionLabel('GlassBottomNavBar'),
             const _NavPreview(),
