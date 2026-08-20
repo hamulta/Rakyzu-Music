@@ -171,6 +171,12 @@ final signedImageUrlProvider =
   return ref.watch(r2StorageServiceProvider).getReadUrl(key);
 });
 
+/// Signed URL untuk file audio (cached sementara oleh FutureProvider).
+final signedAudioUrlProvider =
+    FutureProvider.family<String, String>((ref, key) {
+  return ref.watch(r2StorageServiceProvider).getReadUrl(key);
+});
+
 /// Helper: parse pesan error dari response worker/dio.
 String storageErrorMessage(Object error) {
   if (error is StorageException) {
