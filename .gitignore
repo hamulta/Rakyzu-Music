@@ -40,6 +40,10 @@ migrate_working_dir/
 .env.local
 .env.*.local
 
+# Node
+node_modules/
+.wrangler/
+
 # IDE
 *.swp
 *.swo
