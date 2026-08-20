@@ -5,6 +5,8 @@ import '../../dev/gallery/dev_gallery_screen.dart';
 import '../../features/auth/presentation/auth_wrapper.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
+import '../../features/catalog/presentation/screens/album_form_screen.dart';
+import '../../features/catalog/presentation/screens/album_list_screen.dart';
 import '../../features/catalog/presentation/screens/artist_form_screen.dart';
 import '../../features/catalog/presentation/screens/artist_list_screen.dart';
 import '../../features/catalog/presentation/screens/catalog_management_home_screen.dart';
@@ -68,6 +70,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id'];
           return ArtistFormScreen(artistId: id);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.catalogAlbums,
+        name: AppRoutes.catalogAlbumsName,
+        builder: (context, state) => const AlbumListScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.catalogAlbumAdd,
+        name: AppRoutes.catalogAlbumAddName,
+        builder: (context, state) => const AlbumFormScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.catalogAlbumEdit,
+        name: AppRoutes.catalogAlbumEditName,
+        builder: (context, state) {
+          final id = state.pathParameters['id'];
+          return AlbumFormScreen(albumId: id);
         },
       ),
     ],
