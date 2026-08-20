@@ -74,7 +74,6 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   Widget _buildTabContent(int index) {
-    // Placeholder mini player slot above the bottom nav in the main shell.
     final tabContent = switch (index) {
       0 => const HomeTab(),
       1 => const SearchTab(),
@@ -87,7 +86,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Column(
       children: [
         Expanded(child: tabContent),
-        const GlassMiniPlayer(isVisible: false),
+        const GlassMiniPlayer(
+          onTapFullPlayer: null, // TODO(v0.3.3): navigate to full player.
+        ),
       ],
     );
   }
