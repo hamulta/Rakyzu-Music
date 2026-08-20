@@ -3,12 +3,16 @@
  * Generates short-lived presigned URLs for Cloudflare R2 access.
  *
  * Endpoints:
- *   GET /signed-url?key=<object-key>&action=put|get&expires=<seconds>
+ *   GET /signed-url?key=<object-key>&action=put|get&expires=<seconds>[&size=<bytes>]
  *     -> { signedUrl, expiresIn }
  *
  * Security:
  *  - Requires the caller to be an authenticated Supabase user (JWT verified)
  *  - JWTs are verified against Supabase's JWKS (ES256) or legacy JWT secret (HS256)
+ *  - Role app (staff/admin/owner) dibaca otoritatif dari tabel `users` via
+ *    service_role key (claim `role` JWT selalu "authenticated")
+ *  - PUT divalidasi: tipe file (audio/: mp3,m4a,aac,flac,wav; images/: jpg,jpeg,png,webp,svg)
+ *    dan ukuran (audio max 200MB, gambar max 120MB) via query param `size`
  *  - Returns short-lived URLs (default 3600s for GET, 900s for PUT)
  *  - Never exposes the bucket directly
  *
@@ -20,6 +24,13 @@ const SERVICE = 's3';
 const REGION = 'auto';
 const JWKS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 let jwksCache = { keys: null, fetchedAt: 0 };
+
+// --- Upload validation (client-side dan worker harus sama) ---
+const AUDIO_EXTENSIONS = new Set(['mp3', 'm4a', 'aac', 'flac', 'wav']);
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'svg']);
+const MAX_AUDIO_BYTES = 200 * 1024 * 1024; // 200 MB per track
+const MAX_IMAGE_BYTES = 120 * 1024 * 1024; // 120 MB per gambar
+const UPLOAD_ROLES = ['staff', 'admin', 'owner'];
 
 export default {
   async fetch(request, env, ctx) {
@@ -85,11 +96,17 @@ async function handleSignedUrl(url, env, user) {
     return json({ error: 'Missing "key" query param' }, 400);
   }
 
-  // Restrict uploads to staff/admin/owner roles
+  // Restrict uploads to staff/admin/owner.
+  // Claim `role` pada JWT Supabase selalu "authenticated", jadi role app asli
+  // diambil secara otoritatif dari tabel `users` via service_role key.
   if (action === 'put') {
-    const allowedRoles = ['staff', 'admin', 'owner'];
-    const role = user.role || (user.dev ? 'staff' : 'free');
-    if (!allowedRoles.includes(role)) {
+    const size = parseInt(url.searchParams.get('size') || '0', 10) || 0;
+    const invalid = validateUpload(key, size);
+    if (invalid) {
+      return json({ error: invalid }, 400);
+    }
+    const role = await getUserRole(env, user.sub);
+    if (!UPLOAD_ROLES.includes(role)) {
       return json({ error: 'Forbidden: only staff/admin/owner can upload' }, 403);
     }
   }
@@ -113,6 +130,71 @@ async function handleSignedUrl(url, env, user) {
     key,
     bucket: env.R2_BUCKET_NAME,
   });
+}
+
+/**
+ * Validasi tipe & ukuran file upload berdasarkan prefix object key.
+ *   audio/{id}.mp3     -> mp3/m4a/aac/flac/wav, max 200MB
+ *   images/{id}.jpg    -> jpg/jpeg/png/webp/svg, max 120MB
+ * Mengembalikan string error bila tidak valid, atau null bila valid.
+ */
+function validateUpload(key, size) {
+  const lower = key.toLowerCase();
+  const ext = lower.slice(lower.lastIndexOf('.') + 1);
+  const isAudio = lower.startsWith('audio/') && AUDIO_EXTENSIONS.has(ext);
+  const isImage = lower.startsWith('images/') && IMAGE_EXTENSIONS.has(ext);
+
+  if (!isAudio && !isImage) {
+    return 'Unsupported file type: gunakan audio/ untuk audio dan images/ untuk gambar';
+  }
+
+  if (size <= 0) {
+    return 'Missing "size" query param (ukuran file dalam bytes)';
+  }
+
+  const maxBytes = isAudio ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES;
+  if (size > maxBytes) {
+    const mb = maxBytes / (1024 * 1024);
+    return `File too large: max ${mb}MB`;
+  }
+  return null;
+}
+
+/**
+ * Ambil role app user secara otoritatif dari tabel `users`.
+ * Diperlukan karena JWT Supabase selalu berisi claim role "authenticated",
+ * bukan role aplikasi (free/premium/staff/admin/owner).
+ */
+async function getUserRole(env, sub) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    const err = new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
+    err.status = 503;
+    throw err;
+  }
+  if (!sub) {
+    const err = new Error('Missing user id');
+    err.status = 401;
+    throw err;
+  }
+
+  const base = (env.SUPABASE_URL || '').replace(/\/$/, '');
+  const url = `${base}/rest/v1/users?select=role&id=eq.${encodeURIComponent(sub)}`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const err = new Error(`Role lookup failed (HTTP ${res.status})`);
+    err.status = 503;
+    throw err;
+  }
+
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length > 0 ? rows[0].role : null;
 }
 
 /**
