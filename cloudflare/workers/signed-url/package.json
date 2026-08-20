@@ -1,0 +1,14 @@
+{
+  "name": "rakyzu-signed-url",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Rakyzu Music signed URL generator for Cloudflare R2",
+  "main": "src/index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^3.60.0"
+  }
+}
