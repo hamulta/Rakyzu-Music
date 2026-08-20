@@ -17,6 +17,18 @@ class AppRoutes {
   static const String main = '/main';
   static const String mainName = 'main';
 
+  static const String catalogManagement = '/catalog-management';
+  static const String catalogManagementName = 'catalog-management';
+
+  static const String catalogArtists = '/catalog-management/artists';
+  static const String catalogArtistsName = 'catalog-artists';
+
+  static const String catalogArtistAdd = '/catalog-management/artists/add';
+  static const String catalogArtistAddName = 'catalog-artist-add';
+
+  static const String catalogArtistEdit = '/catalog-management/artists/:id/edit';
+  static const String catalogArtistEditName = 'catalog-artist-edit';
+
   static const String devGallery = '/dev/widget-gallery';
   static const String devGalleryName = 'dev-widget-gallery';
 }

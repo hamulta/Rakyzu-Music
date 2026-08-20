@@ -1,10 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../shared/providers/supabase_providers.dart';
+import '../../../catalog/providers/role_provider.dart';
 
 class ProfileTab extends ConsumerWidget {
   const ProfileTab({super.key});
@@ -14,6 +17,8 @@ class ProfileTab extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.watch(currentUserProvider);
     final email = user?.email ?? 'user@rakyzu.music';
+    final role = ref.watch(currentAppRoleProvider).valueOrNull;
+    final roleLabel = _roleLabel(role?.value);
 
     return Scaffold(
       body: DecoratedBox(
@@ -55,13 +60,19 @@ class ProfileTab extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Free User',
+                      roleLabel,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
+              if (role?.canManageCatalog ?? false)
+                _SettingsRow(
+                  icon: CupertinoIcons.music_albums,
+                  label: 'Manajemen Katalog',
+                  onTap: () => context.go(AppRoutes.catalogManagement),
+                ),
               const _SettingsRow(
                 icon: CupertinoIcons.settings,
                 label: 'Settings',
@@ -112,10 +123,11 @@ class ProfileTab extends ConsumerWidget {
 }
 
 class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({required this.icon, required this.label});
+  const _SettingsRow({required this.icon, required this.label, this.onTap});
 
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +136,7 @@ class _SettingsRow extends StatelessWidget {
       child: GlassCard(
         borderRadius: 16,
         padding: const EdgeInsets.all(16),
+        onTap: onTap,
         child: Row(
           children: [
             Icon(icon, color: AppColors.azureMistDeep, size: 20),
@@ -141,4 +154,14 @@ class _SettingsRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _roleLabel(String? role) {
+  return switch (role) {
+    'premium' => 'Premium User',
+    'staff' => 'Staff',
+    'admin' => 'Admin',
+    'owner' => 'Owner',
+    _ => 'Free User',
+  };
 }
