@@ -12,6 +12,7 @@ import '../../../../core/widgets/glass_search_bar.dart';
 import '../../../../core/widgets/signed_image.dart';
 import '../../models/artist.dart';
 import '../../providers/catalog_providers.dart';
+import '../widgets/catalog_access_guard.dart';
 
 /// Daftar artis + pencarian + aksi tambah/edit/hapus (staff/admin/owner).
 class ArtistListScreen extends ConsumerStatefulWidget {
@@ -64,88 +65,90 @@ class _ArtistListScreenState extends ConsumerState<ArtistListScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final artistsState = ref.watch(artistsControllerProvider);
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? AppColors.darkBackgroundGradient
-              : AppColors.lightBackgroundGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              GlassAppBar(
-                title: const Text('Artis'),
-                leading: IconButton(
-                  icon: const Icon(CupertinoIcons.chevron_left),
-                  onPressed: () => context.go(AppRoutes.catalogManagement),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.add),
-                    tooltip: 'Tambah Artis',
-                    onPressed: () => context.go(AppRoutes.catalogArtistAdd),
+    return CatalogAccessGuard(
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? AppColors.darkBackgroundGradient
+                : AppColors.lightBackgroundGradient,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                GlassAppBar(
+                  title: const Text('Artis'),
+                  leading: IconButton(
+                    icon: const Icon(CupertinoIcons.chevron_left),
+                    onPressed: () => context.go(AppRoutes.catalogManagement),
                   ),
-                ],
-              ),
-              GlassSearchBar(
-                hintText: 'Cari artis...',
-                onChanged: (value) {
-                  ref
-                      .read(artistsControllerProvider.notifier)
-                      .load(search: value);
-                },
-              ),
-              Expanded(
-                child: artistsState.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('$error', textAlign: TextAlign.center),
-                          const SizedBox(height: 16),
-                          GlassButton(
-                            label: 'Coba Lagi',
-                            onPressed: () => ref
-                                .read(artistsControllerProvider.notifier)
-                                .refresh(),
-                          ),
-                        ],
-                      ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.add),
+                      tooltip: 'Tambah Artis',
+                      onPressed: () => context.go(AppRoutes.catalogArtistAdd),
                     ),
-                  ),
-                  data: (artists) {
-                    if (artists.isEmpty) {
-                      return const _EmptyState();
-                    }
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                      itemCount: artists.length,
-                      itemBuilder: (context, index) {
-                        final artist = artists[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ArtistTile(
-                            artist: artist,
-                            onEdit: () => context.go(
-                              AppRoutes.catalogArtistEdit.replaceFirst(
-                                ':id',
-                                artist.id,
-                              ),
-                            ),
-                            onDelete: () => _confirmDelete(artist),
-                          ),
-                        );
-                      },
-                    );
+                  ],
+                ),
+                GlassSearchBar(
+                  hintText: 'Cari artis...',
+                  onChanged: (value) {
+                    ref
+                        .read(artistsControllerProvider.notifier)
+                        .load(search: value);
                   },
                 ),
-              ),
-            ],
+                Expanded(
+                  child: artistsState.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, _) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('$error', textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            GlassButton(
+                              label: 'Coba Lagi',
+                              onPressed: () => ref
+                                  .read(artistsControllerProvider.notifier)
+                                  .refresh(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    data: (artists) {
+                      if (artists.isEmpty) {
+                        return const _EmptyState();
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                        itemCount: artists.length,
+                        itemBuilder: (context, index) {
+                          final artist = artists[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _ArtistTile(
+                              artist: artist,
+                              onEdit: () => context.go(
+                                AppRoutes.catalogArtistEdit.replaceFirst(
+                                  ':id',
+                                  artist.id,
+                                ),
+                              ),
+                              onDelete: () => _confirmDelete(artist),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -16,6 +16,7 @@ import '../../data/r2_storage_service.dart';
 import '../../data/upload_limits.dart';
 import '../../providers/catalog_providers.dart';
 import '../../providers/role_provider.dart';
+import '../widgets/catalog_access_guard.dart';
 
 /// Form tambah/edit artis (staff/admin/owner).
 /// - Tambah: nama wajib, bio opsional, foto profil opsional.
@@ -162,96 +163,99 @@ class _ArtistFormScreenState extends ConsumerState<ArtistFormScreen> {
     final role = ref.watch(currentAppRoleProvider).valueOrNull;
     final canToggleVerified = role?.isAdminOrOwner ?? false;
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? AppColors.darkBackgroundGradient
-              : AppColors.lightBackgroundGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              GlassAppBar(
-                title: Text(_isEdit ? 'Edit Artis' : 'Tambah Artis'),
-                leading: IconButton(
-                  icon: const Icon(CupertinoIcons.chevron_left),
-                  onPressed: () => context.go(AppRoutes.catalogArtists),
+    return CatalogAccessGuard(
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? AppColors.darkBackgroundGradient
+                : AppColors.lightBackgroundGradient,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                GlassAppBar(
+                  title: Text(_isEdit ? 'Edit Artis' : 'Tambah Artis'),
+                  leading: IconButton(
+                    icon: const Icon(CupertinoIcons.chevron_left),
+                    onPressed: () => context.go(AppRoutes.catalogArtists),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              GlassCard(
-                                borderRadius: 16,
-                                child: Column(
-                                  children: [
-                                    _buildImagePicker(),
-                                    const SizedBox(height: 16),
-                                    _buildTextField(
-                                      controller: _nameController,
-                                      label: 'Nama Artis *',
-                                      icon: CupertinoIcons.person_fill,
-                                      validator: (value) {
-                                        if (value == null ||
-                                            value.trim().isEmpty) {
-                                          return 'Nama artis wajib diisi';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildTextField(
-                                      controller: _bioController,
-                                      label: 'Bio',
-                                      icon: CupertinoIcons.text_alignleft,
-                                      maxLines: 4,
-                                    ),
-                                    if (canToggleVerified) ...[
-                                      const SizedBox(height: 14),
-                                      SwitchListTile(
-                                        value: _isVerified,
-                                        onChanged: (value) =>
-                                            setState(() => _isVerified = value),
-                                        title: const Text('Verified Artist'),
-                                        subtitle: const Text(
-                                          'Hanya admin/owner yang bisa mengubah',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                        activeColor: AppColors.azureMistDeep,
-                                        contentPadding: EdgeInsets.zero,
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                GlassCard(
+                                  borderRadius: 16,
+                                  child: Column(
+                                    children: [
+                                      _buildImagePicker(),
+                                      const SizedBox(height: 16),
+                                      _buildTextField(
+                                        controller: _nameController,
+                                        label: 'Nama Artis *',
+                                        icon: CupertinoIcons.person_fill,
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Nama artis wajib diisi';
+                                          }
+                                          return null;
+                                        },
                                       ),
+                                      const SizedBox(height: 14),
+                                      _buildTextField(
+                                        controller: _bioController,
+                                        label: 'Bio',
+                                        icon: CupertinoIcons.text_alignleft,
+                                        maxLines: 4,
+                                      ),
+                                      if (canToggleVerified) ...[
+                                        const SizedBox(height: 14),
+                                        SwitchListTile(
+                                          value: _isVerified,
+                                          onChanged: (value) => setState(
+                                            () => _isVerified = value,
+                                          ),
+                                          title: const Text('Verified Artist'),
+                                          subtitle: const Text(
+                                            'Hanya admin/owner yang bisa mengubah',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          activeColor: AppColors.azureMistDeep,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 24),
-                              GlassButton(
-                                label: _isEdit
-                                    ? 'Simpan Perubahan'
-                                    : 'Simpan Artis',
-                                icon: _isEdit
-                                    ? CupertinoIcons.check_mark
-                                    : CupertinoIcons.person_add,
-                                isPrimary: true,
-                                loading: _saving,
-                                onPressed: _saving ? null : _save,
-                              ),
-                            ],
+                                const SizedBox(height: 24),
+                                GlassButton(
+                                  label: _isEdit
+                                      ? 'Simpan Perubahan'
+                                      : 'Simpan Artis',
+                                  icon: _isEdit
+                                      ? CupertinoIcons.check_mark
+                                      : CupertinoIcons.person_add,
+                                  isPrimary: true,
+                                  loading: _saving,
+                                  onPressed: _saving ? null : _save,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

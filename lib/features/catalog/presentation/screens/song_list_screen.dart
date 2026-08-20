@@ -12,6 +12,7 @@ import '../../../../core/widgets/glass_search_bar.dart';
 import '../../../../core/widgets/signed_image.dart';
 import '../../models/song.dart';
 import '../../providers/catalog_providers.dart';
+import '../widgets/catalog_access_guard.dart';
 
 /// Daftar lagu + pencarian + aksi tambah/edit/hapus (staff/admin/owner).
 class SongListScreen extends ConsumerStatefulWidget {
@@ -64,88 +65,90 @@ class _SongListScreenState extends ConsumerState<SongListScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final songsState = ref.watch(songsControllerProvider);
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? AppColors.darkBackgroundGradient
-              : AppColors.lightBackgroundGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              GlassAppBar(
-                title: const Text('Lagu'),
-                leading: IconButton(
-                  icon: const Icon(CupertinoIcons.chevron_left),
-                  onPressed: () => context.go(AppRoutes.catalogManagement),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.add),
-                    tooltip: 'Tambah Lagu',
-                    onPressed: () => context.go(AppRoutes.catalogSongAdd),
+    return CatalogAccessGuard(
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? AppColors.darkBackgroundGradient
+                : AppColors.lightBackgroundGradient,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                GlassAppBar(
+                  title: const Text('Lagu'),
+                  leading: IconButton(
+                    icon: const Icon(CupertinoIcons.chevron_left),
+                    onPressed: () => context.go(AppRoutes.catalogManagement),
                   ),
-                ],
-              ),
-              GlassSearchBar(
-                hintText: 'Cari lagu...',
-                onChanged: (value) {
-                  ref
-                      .read(songsControllerProvider.notifier)
-                      .load(search: value);
-                },
-              ),
-              Expanded(
-                child: songsState.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('$error', textAlign: TextAlign.center),
-                          const SizedBox(height: 16),
-                          GlassButton(
-                            label: 'Coba Lagi',
-                            onPressed: () => ref
-                                .read(songsControllerProvider.notifier)
-                                .refresh(),
-                          ),
-                        ],
-                      ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.add),
+                      tooltip: 'Tambah Lagu',
+                      onPressed: () => context.go(AppRoutes.catalogSongAdd),
                     ),
-                  ),
-                  data: (songs) {
-                    if (songs.isEmpty) {
-                      return const _EmptyState();
-                    }
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                      itemCount: songs.length,
-                      itemBuilder: (context, index) {
-                        final song = songs[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _SongTile(
-                            song: song,
-                            onEdit: () => context.go(
-                              AppRoutes.catalogSongEdit.replaceFirst(
-                                ':id',
-                                song.id,
-                              ),
-                            ),
-                            onDelete: () => _confirmDelete(song),
-                          ),
-                        );
-                      },
-                    );
+                  ],
+                ),
+                GlassSearchBar(
+                  hintText: 'Cari lagu...',
+                  onChanged: (value) {
+                    ref
+                        .read(songsControllerProvider.notifier)
+                        .load(search: value);
                   },
                 ),
-              ),
-            ],
+                Expanded(
+                  child: songsState.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, _) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('$error', textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            GlassButton(
+                              label: 'Coba Lagi',
+                              onPressed: () => ref
+                                  .read(songsControllerProvider.notifier)
+                                  .refresh(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    data: (songs) {
+                      if (songs.isEmpty) {
+                        return const _EmptyState();
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                        itemCount: songs.length,
+                        itemBuilder: (context, index) {
+                          final song = songs[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _SongTile(
+                              song: song,
+                              onEdit: () => context.go(
+                                AppRoutes.catalogSongEdit.replaceFirst(
+                                  ':id',
+                                  song.id,
+                                ),
+                              ),
+                              onDelete: () => _confirmDelete(song),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

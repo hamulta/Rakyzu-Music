@@ -16,6 +16,7 @@ import '../../data/r2_storage_service.dart';
 import '../../data/upload_limits.dart';
 import '../../models/artist.dart';
 import '../../providers/catalog_providers.dart';
+import '../widgets/catalog_access_guard.dart';
 
 /// Form tambah/edit album (staff/admin/owner).
 /// - Tambah: judul & artis wajib, genre/rilis/sampul opsional.
@@ -195,81 +196,83 @@ class _AlbumFormScreenState extends ConsumerState<AlbumFormScreen> {
     final artists =
         ref.watch(artistsControllerProvider).valueOrNull ?? const [];
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? AppColors.darkBackgroundGradient
-              : AppColors.lightBackgroundGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              GlassAppBar(
-                title: Text(_isEdit ? 'Edit Album' : 'Tambah Album'),
-                leading: IconButton(
-                  icon: const Icon(CupertinoIcons.chevron_left),
-                  onPressed: () => context.go(AppRoutes.catalogAlbums),
+    return CatalogAccessGuard(
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? AppColors.darkBackgroundGradient
+                : AppColors.lightBackgroundGradient,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                GlassAppBar(
+                  title: Text(_isEdit ? 'Edit Album' : 'Tambah Album'),
+                  leading: IconButton(
+                    icon: const Icon(CupertinoIcons.chevron_left),
+                    onPressed: () => context.go(AppRoutes.catalogAlbums),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              GlassCard(
-                                borderRadius: 16,
-                                child: Column(
-                                  children: [
-                                    _buildCoverPicker(),
-                                    const SizedBox(height: 16),
-                                    _buildTextField(
-                                      controller: _titleController,
-                                      label: 'Judul Album *',
-                                      icon: CupertinoIcons.music_albums,
-                                      validator: (value) {
-                                        if (value == null ||
-                                            value.trim().isEmpty) {
-                                          return 'Judul album wajib diisi';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildArtistDropdown(artists),
-                                    const SizedBox(height: 14),
-                                    _buildTextField(
-                                      controller: _genreController,
-                                      label: 'Genre',
-                                      icon: CupertinoIcons.tag,
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildReleaseDateField(),
-                                  ],
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                GlassCard(
+                                  borderRadius: 16,
+                                  child: Column(
+                                    children: [
+                                      _buildCoverPicker(),
+                                      const SizedBox(height: 16),
+                                      _buildTextField(
+                                        controller: _titleController,
+                                        label: 'Judul Album *',
+                                        icon: CupertinoIcons.music_albums,
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Judul album wajib diisi';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildArtistDropdown(artists),
+                                      const SizedBox(height: 14),
+                                      _buildTextField(
+                                        controller: _genreController,
+                                        label: 'Genre',
+                                        icon: CupertinoIcons.tag,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildReleaseDateField(),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 24),
-                              GlassButton(
-                                label: _isEdit
-                                    ? 'Simpan Perubahan'
-                                    : 'Simpan Album',
-                                icon: _isEdit
-                                    ? CupertinoIcons.check_mark
-                                    : CupertinoIcons.music_albums,
-                                isPrimary: true,
-                                loading: _saving,
-                                onPressed: _saving ? null : _save,
-                              ),
-                            ],
+                                const SizedBox(height: 24),
+                                GlassButton(
+                                  label: _isEdit
+                                      ? 'Simpan Perubahan'
+                                      : 'Simpan Album',
+                                  icon: _isEdit
+                                      ? CupertinoIcons.check_mark
+                                      : CupertinoIcons.music_albums,
+                                  isPrimary: true,
+                                  loading: _saving,
+                                  onPressed: _saving ? null : _save,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

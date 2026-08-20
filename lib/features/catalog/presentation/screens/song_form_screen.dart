@@ -19,6 +19,7 @@ import '../../data/upload_limits.dart';
 import '../../models/album.dart';
 import '../../models/artist.dart';
 import '../../providers/catalog_providers.dart';
+import '../widgets/catalog_access_guard.dart';
 
 /// Form tambah/edit lagu (staff/admin/owner).
 /// - Tambah: judul, album & artis wajib; audio wajib (upload ke R2).
@@ -260,90 +261,92 @@ class _SongFormScreenState extends ConsumerState<SongFormScreen> {
         ref.watch(artistsControllerProvider).valueOrNull ?? const [];
     final albums = ref.watch(albumsControllerProvider).valueOrNull ?? const [];
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? AppColors.darkBackgroundGradient
-              : AppColors.lightBackgroundGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              GlassAppBar(
-                title: Text(_isEdit ? 'Edit Lagu' : 'Tambah Lagu'),
-                leading: IconButton(
-                  icon: const Icon(CupertinoIcons.chevron_left),
-                  onPressed: () => context.go(AppRoutes.catalogSongs),
+    return CatalogAccessGuard(
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? AppColors.darkBackgroundGradient
+                : AppColors.lightBackgroundGradient,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                GlassAppBar(
+                  title: Text(_isEdit ? 'Edit Lagu' : 'Tambah Lagu'),
+                  leading: IconButton(
+                    icon: const Icon(CupertinoIcons.chevron_left),
+                    onPressed: () => context.go(AppRoutes.catalogSongs),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              GlassCard(
-                                borderRadius: 16,
-                                child: Column(
-                                  children: [
-                                    _buildAudioSection(),
-                                    const SizedBox(height: 16),
-                                    _buildTextField(
-                                      controller: _titleController,
-                                      label: 'Judul Lagu *',
-                                      icon: CupertinoIcons.music_note,
-                                      validator: (value) {
-                                        if (value == null ||
-                                            value.trim().isEmpty) {
-                                          return 'Judul lagu wajib diisi';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildAlbumDropdown(albums),
-                                    const SizedBox(height: 14),
-                                    _buildArtistDropdown(artists),
-                                    const SizedBox(height: 14),
-                                    _buildTextField(
-                                      controller: _trackController,
-                                      label: 'Nomor Track',
-                                      icon: CupertinoIcons.number,
-                                      keyboardType: TextInputType.number,
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildTextField(
-                                      controller: _genreController,
-                                      label: 'Genre',
-                                      icon: CupertinoIcons.tag,
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildCoverPicker(),
-                                  ],
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                GlassCard(
+                                  borderRadius: 16,
+                                  child: Column(
+                                    children: [
+                                      _buildAudioSection(),
+                                      const SizedBox(height: 16),
+                                      _buildTextField(
+                                        controller: _titleController,
+                                        label: 'Judul Lagu *',
+                                        icon: CupertinoIcons.music_note,
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Judul lagu wajib diisi';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildAlbumDropdown(albums),
+                                      const SizedBox(height: 14),
+                                      _buildArtistDropdown(artists),
+                                      const SizedBox(height: 14),
+                                      _buildTextField(
+                                        controller: _trackController,
+                                        label: 'Nomor Track',
+                                        icon: CupertinoIcons.number,
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildTextField(
+                                        controller: _genreController,
+                                        label: 'Genre',
+                                        icon: CupertinoIcons.tag,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildCoverPicker(),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 24),
-                              GlassButton(
-                                label: _isEdit
-                                    ? 'Simpan Perubahan'
-                                    : 'Simpan Lagu',
-                                icon: _isEdit
-                                    ? CupertinoIcons.check_mark
-                                    : CupertinoIcons.music_note,
-                                isPrimary: true,
-                                loading: _saving,
-                                onPressed: _saving ? null : _save,
-                              ),
-                            ],
+                                const SizedBox(height: 24),
+                                GlassButton(
+                                  label: _isEdit
+                                      ? 'Simpan Perubahan'
+                                      : 'Simpan Lagu',
+                                  icon: _isEdit
+                                      ? CupertinoIcons.check_mark
+                                      : CupertinoIcons.music_note,
+                                  isPrimary: true,
+                                  loading: _saving,
+                                  onPressed: _saving ? null : _save,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
