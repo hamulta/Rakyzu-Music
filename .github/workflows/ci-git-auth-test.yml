@@ -1,0 +1,50 @@
+name: Git Auth Simulation
+
+# Simulasi push/tag dari CI menggunakan PAT yang disimpan sebagai repository
+# secret `GH_PAT` (permanent git credential helper, bukan token manual).
+# Dijalankan manual via Actions tab -> "Run workflow".
+# Membuat tag uji, mem-push-nya, memverifikasi di remote, lalu menghapusnya.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push-and-tag:
+    name: Push & Tag via GH_PAT
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git credential helper (GH_PAT)
+        run: |
+          git config --global credential.helper store
+          git config --global user.name "Rakyzu Music CI"
+          git config --global user.email "ci@rakyzu.music"
+          printf 'https://x-access-token:%s@github.com\n' "${{ secrets.GH_PAT }}" > "$HOME/.git-credentials"
+          chmod 600 "$HOME/.git-credentials"
+
+      - name: Create and push test tag
+        id: tag
+        run: |
+          set -euo pipefail
+          TAG="ci-git-auth-$(date +%s)"
+          git tag -a "$TAG" -m "CI git auth simulation"
+          git push origin "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Pushed tag: $TAG"
+
+      - name: Verify tag exists on remote
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          git ls-remote --tags origin "$TAG" | grep -q "refs/tags/$TAG" \
+            && echo "OK: tag $TAG terkonfirmasi di remote" \
+            || (echo "FAIL: tag tidak ditemukan di remote"; exit 1)
+
+      - name: Clean up test tag
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          git push origin --delete "$TAG"
+          echo "Deleted test tag: $TAG"
