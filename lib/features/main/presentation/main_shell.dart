@@ -1,8 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/app_routes.dart';
 import '../../../core/widgets/glass_bottom_nav_bar.dart';
 import '../../../core/widgets/glass_mini_player.dart';
+import '../../player/providers/audio_handler_provider.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/library_tab.dart';
 import 'tabs/premium_tab.dart';
@@ -51,6 +54,9 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Trigger lazy initialization of audio handler untuk background playback.
+    ref.watch(audioHandlerProvider);
+
     return CupertinoTabScaffold(
       tabBar: _buildTabBar(),
       tabBuilder: (context, index) {
@@ -70,7 +76,6 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   Widget _buildTabContent(int index) {
-    // Placeholder mini player slot above the bottom nav in the main shell.
     final tabContent = switch (index) {
       0 => const HomeTab(),
       1 => const SearchTab(),
@@ -83,7 +88,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Column(
       children: [
         Expanded(child: tabContent),
-        const GlassMiniPlayer(isVisible: false),
+        GlassMiniPlayer(
+          onTapFullPlayer: () => context.push(AppRoutes.fullPlayer),
+        ),
       ],
     );
   }

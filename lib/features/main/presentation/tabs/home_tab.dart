@@ -2,15 +2,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/providers/audio_player_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/signed_image.dart';
-import '../../../catalog/data/r2_storage_service.dart';
 import '../../../catalog/models/album.dart';
 import '../../../catalog/models/artist.dart';
 import '../../../catalog/models/song.dart';
 import '../../../catalog/providers/catalog_providers.dart';
+import '../../../player/providers/player_provider.dart';
 
 /// Home feed publik — menampilkan konten katalog (artis, album, lagu terbaru)
 /// untuk semua user. Streaming dimulai lewat tombol play (signed URL).
@@ -214,8 +213,8 @@ class _SongRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final audioKey = song.audioUrl;
-    final isActive = ref.watch(activeAudioKeyProvider) == audioKey;
+    final playerState = ref.watch(playerControllerProvider);
+    final isActive = playerState.currentTrack?.id == song.id;
 
     return GlassCard(
       borderRadius: 14,
@@ -283,18 +282,28 @@ class _PlayToggle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final playerState = ref.watch(playerControllerProvider);
+    final isCurrentlyPlaying = isActive && playerState.isPlaying;
+
     return IconButton.filled(
-      onPressed: () => _toggle(context, ref),
+      onPressed: () => _toggle(context, ref, isCurrentlyPlaying),
       style: IconButton.styleFrom(
         backgroundColor: AppColors.azureMistDeep,
         foregroundColor: Colors.white,
       ),
-      icon:
-          Icon(isActive ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill),
+      icon: Icon(
+        isCurrentlyPlaying
+            ? CupertinoIcons.pause_fill
+            : CupertinoIcons.play_fill,
+      ),
     );
   }
 
-  Future<void> _toggle(BuildContext context, WidgetRef ref) async {
+  Future<void> _toggle(
+    BuildContext context,
+    WidgetRef ref,
+    bool isCurrentlyPlaying,
+  ) async {
     final audioKey = song.audioUrl;
     if (audioKey == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -302,25 +311,22 @@ class _PlayToggle extends ConsumerWidget {
       );
       return;
     }
-    final player = ref.read(audioPlayerProvider);
 
-    if (ref.read(activeAudioKeyProvider) == audioKey) {
-      if (player.playing) {
-        await player.pause();
-      } else {
-        await player.play();
-      }
+    final controller = ref.read(playerControllerProvider.notifier);
+
+    // Jika sudah aktif, toggle play/pause.
+    if (isActive) {
+      await controller.togglePlay();
       return;
     }
 
-    final url = await ref.read(signedAudioUrlProvider(audioKey).future);
-    final ok = await playAudioSource(ref, url);
-    if (ok) {
-      ref.read(activeAudioKeyProvider.notifier).state = audioKey;
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal memutar audio.')),
-      );
+    // Play lagu baru — ambil semua songs dari controller untuk queue.
+    final songs = ref.read(songsControllerProvider).valueOrNull ?? [];
+    if (songs.isNotEmpty) {
+      final idx = songs.indexWhere((s) => s.id == song.id);
+      await controller.playFromQueue(songs, startIndex: idx >= 0 ? idx : 0);
+    } else {
+      await controller.playSingle(song);
     }
   }
 }

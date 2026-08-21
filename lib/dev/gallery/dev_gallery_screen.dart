@@ -6,7 +6,6 @@ import '../../core/widgets/glass_app_bar.dart';
 import '../../core/widgets/glass_bottom_nav_bar.dart';
 import '../../core/widgets/glass_button.dart';
 import '../../core/widgets/glass_card.dart';
-import '../../core/widgets/glass_mini_player.dart';
 import '../../core/widgets/glass_search_bar.dart';
 import '../../core/widgets/signed_audio_player.dart';
 
@@ -20,8 +19,6 @@ class DevGalleryScreen extends StatefulWidget {
 }
 
 class _DevGalleryScreenState extends State<DevGalleryScreen> {
-  bool _miniPlayerVisible = true;
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -83,24 +80,6 @@ class _DevGalleryScreenState extends State<DevGalleryScreen> {
             const SizedBox(height: 24),
             const _SectionLabel('GlassSearchBar'),
             const GlassSearchBar(),
-            const SizedBox(height: 24),
-            const _SectionLabel('GlassMiniPlayer'),
-            Row(
-              children: [
-                Expanded(
-                  child: GlassButton(
-                    label: _miniPlayerVisible ? 'Hide' : 'Show',
-                    isPrimary: false,
-                    height: 40,
-                    onPressed: () => setState(
-                      () => _miniPlayerVisible = !_miniPlayerVisible,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            GlassMiniPlayer(isVisible: _miniPlayerVisible),
             const SizedBox(height: 24),
             const _SectionLabel('SignedAudioPlayer'),
             const SignedAudioPlayer(audioKey: null, title: 'Demo'),

@@ -59,4 +59,7 @@ class AppRoutes {
 
   static const String devGallery = '/dev/widget-gallery';
   static const String devGalleryName = 'dev-widget-gallery';
+
+  static const String fullPlayer = '/player';
+  static const String fullPlayerName = 'full-player';
 }
