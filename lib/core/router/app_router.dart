@@ -17,6 +17,7 @@ import '../../features/catalog/presentation/screens/catalog_management_home_scre
 import '../../features/catalog/presentation/screens/song_form_screen.dart';
 import '../../features/catalog/presentation/screens/song_list_screen.dart';
 import '../../features/catalog/presentation/widgets/catalog_access_guard.dart';
+import '../../features/discovery/presentation/pages/artist_detail_page.dart';
 import '../../features/discovery/presentation/pages/genre_browse_page.dart';
 import '../../features/discovery/presentation/pages/genre_detail_page.dart';
 import '../../features/main/presentation/main_shell.dart';
@@ -171,6 +172,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final name = Uri.decodeComponent(state.pathParameters['name'] ?? '');
           return GenreDetailPage(genreName: name);
+        },
+      ),
+      GoRoute(
+        path: '/artist/:id',
+        name: 'artist-detail',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ArtistDetailPage(artistId: id);
         },
       ),
     ],

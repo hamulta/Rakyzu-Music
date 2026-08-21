@@ -297,3 +297,35 @@ final songsByGenreProvider =
   final repo = ref.watch(catalogRepositoryProvider);
   return repo.getSongsByGenre(genre);
 });
+
+// ---------------------------------------------------------------------------
+// ARTIST DETAIL
+// ---------------------------------------------------------------------------
+
+/// Follower count for an artist — takes artistId as argument.
+final artistFollowerCountProvider =
+    FutureProvider.family<int, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getArtistFollowerCount(artistId);
+});
+
+/// Whether current user follows an artist — takes artistId as argument.
+final isFollowingArtistProvider =
+    FutureProvider.family<bool, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.isFollowingArtist(artistId);
+});
+
+/// Top tracks for an artist — takes artistId as argument.
+final artistTopTracksProvider =
+    FutureProvider.family<List<Song>, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getArtistTopTracks(artistId);
+});
+
+/// Albums by an artist — takes artistId as argument.
+final artistAlbumsProvider =
+    FutureProvider.family<List<Album>, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getArtistAlbums(artistId);
+});

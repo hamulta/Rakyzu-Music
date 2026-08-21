@@ -91,6 +91,94 @@ class CatalogRepository {
     }
   }
 
+  /// Get follower count for an artist.
+  Future<int> getArtistFollowerCount(String artistId) async {
+    try {
+      final rows = await _supabase
+          .from('follows')
+          .select('user_id')
+          .eq('artist_id', artistId);
+      return rows.length;
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Check if current user follows this artist.
+  Future<bool> isFollowingArtist(String artistId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return false;
+      final rows = await _supabase
+          .from('follows')
+          .select('user_id')
+          .eq('artist_id', artistId)
+          .eq('user_id', userId);
+      return rows.isNotEmpty;
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Follow an artist.
+  Future<void> followArtist(String artistId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      await _supabase.from('follows').insert({
+        'user_id': userId,
+        'artist_id': artistId,
+      });
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Unfollow an artist.
+  Future<void> unfollowArtist(String artistId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      await _supabase
+          .from('follows')
+          .delete()
+          .eq('artist_id', artistId)
+          .eq('user_id', userId);
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Get top tracks for an artist (by play_count).
+  Future<List<Song>> getArtistTopTracks(String artistId,
+      {int limit = 10}) async {
+    try {
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .eq('artist_id', artistId)
+          .order('play_count', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Get albums by an artist.
+  Future<List<Album>> getArtistAlbums(String artistId) async {
+    try {
+      final rows = await _supabase
+          .from('albums')
+          .select('*, artist:artists(name), songs(count)')
+          .eq('artist_id', artistId)
+          .order('created_at', ascending: false);
+      return rows.map((row) => Album.fromJson(_mapAlbumRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // ALBUMS
   // ---------------------------------------------------------------------------
