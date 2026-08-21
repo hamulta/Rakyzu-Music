@@ -39,6 +39,8 @@ import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/premium/presentation/pages/premium_upgrade_placeholder_page.dart';
 import '../../features/subscription/presentation/pages/checkout_page.dart';
 import '../../features/subscription/presentation/pages/transaction_history_page.dart';
+import '../../features/legal/presentation/pages/privacy_policy_page.dart';
+import '../../features/legal/presentation/pages/terms_of_service_page.dart';
 import '../constants/app_routes.dart';
 import '../models/app_role.dart';
 
@@ -304,6 +306,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path: '/profile/transactions',
           name: 'transactions',
           builder: (context, state) => const TransactionHistoryPage()),
+      GoRoute(
+          path: '/privacy',
+          name: 'privacy',
+          builder: (context, state) => const PrivacyPolicyPage()),
+      GoRoute(
+          path: '/terms',
+          name: 'terms',
+          builder: (context, state) => const TermsOfServicePage()),
     ],
   );
 });

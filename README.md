@@ -27,6 +27,10 @@ wrangler secret put R2_SECRET_ACCESS_KEY
 
 Worker menolak `401` untuk token tidak valid/kadaluarsa dan `403` untuk upload oleh role non-staff (`staff`/`admin`/`owner` saja).
 
+## Initial Setup — Bootstrap Owner Pertama
+
+> Trigger `prevent_role_escalation` mencegah self-promote dari dalam app. Satu-satunya cara membuat Owner pertama adalah via Supabase Dashboard: buat user via Signup, lalu di **Table Editor → public.users → edit `role` → `owner`**. Lihat `docs/BOOTSTRAP_OWNER.md` untuk langkah lengkap.
+
 ## Development
 
 ```bash
