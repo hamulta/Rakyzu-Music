@@ -403,11 +403,13 @@ class CatalogRepository {
     String? albumId,
     String? artistId,
     String? genre,
+    bool includeUnpublished = false,
   }) async {
     try {
       var query = _supabase.from('songs').select(
             '*, album:albums(title), artist:artists(name)',
           );
+      if (!includeUnpublished) query = query.eq('is_published', true);
       final keyword = search?.trim();
       if (keyword != null && keyword.isNotEmpty) {
         query = query.ilike('title', '%$keyword%');
@@ -563,6 +565,14 @@ class CatalogRepository {
   Future<void> deleteSong(String id) async {
     try {
       await _supabase.from('songs').delete().eq('id', id);
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  Future<void> setSongPublished(String id, bool isPublished) async {
+    try {
+      await _supabase.from('songs').update({'is_published': isPublished}).eq('id', id);
     } catch (e) {
       throw CatalogException.from(e);
     }

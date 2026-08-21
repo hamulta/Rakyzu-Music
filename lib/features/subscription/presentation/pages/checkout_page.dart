@@ -32,7 +32,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               if (!_handled) {
                 _handled = true;
                 // Simple heuristic: if url contains transaction_status=settlement -> success
-                String outcome = 'pending';
+                var outcome = 'pending';
                 if (url.contains('settlement') || url.contains('capture')) outcome = 'success';
                 if (url.contains('deny') || url.contains('failure') || url.contains('cancel')) outcome = 'failure';
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -43,7 +43,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             }
             return NavigationDecision.navigate;
           },
-        ))
+        ),)
         ..loadRequest(Uri.parse(widget.redirectUrl!));
     }
   }
@@ -78,7 +78,7 @@ class CheckoutResultPage extends StatelessWidget {
             Text(isSuccess ? 'Premium akan aktif setelah webhook memverifikasi.' : isPending ? 'Selesaikan pembayaran di Midtrans.' : 'Coba lagi atau pilih metode lain.', textAlign: TextAlign.center),
             const SizedBox(height: 20),
             ElevatedButton(onPressed: () => context.go('/main'), child: const Text('Back to Home')),
-          ]),
+          ],),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/subscription_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../admin/providers/admin_providers.dart';
 import '../../../subscription/providers/subscription_provider.dart';
 
 /// Full Upgrade to Premium page — replace placeholder v0.6.5.
@@ -40,6 +41,9 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pricing = ref.watch(adminPricingProvider);
+    final monthlyPrice = pricing.valueOrNull?.firstWhere((e)=> e['name']=='monthly', orElse:()=> {'price_idr': SubscriptionConfig.monthlyPriceIdr})['price_idr'] as int? ?? SubscriptionConfig.monthlyPriceIdr;
+    final yearlyPrice = pricing.valueOrNull?.firstWhere((e)=> e['name']=='yearly', orElse:()=> {'price_idr': SubscriptionConfig.yearlyPriceIdr})['price_idr'] as int? ?? SubscriptionConfig.yearlyPriceIdr;
     const benefits = [
       ['Feature', 'Free', 'Premium'],
       ['Ad-free listening', '✕', '✓'],
@@ -63,12 +67,12 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
                   const SizedBox(height: 12),
                   Text('Your Sound, Without Limits.', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800), textAlign: TextAlign.center),
                   const SizedBox(height: 16),
-                  // Plan selector
+                  // Plan selector — now data-driven dari pricing_plans
                   Row(children: [
-                    Expanded(child: _PlanCard(label: 'Monthly', price: SubscriptionConfig.formatIdr(SubscriptionConfig.monthlyPriceIdr) + '/bulan', selected: _plan == 'monthly', onTap: () => setState(() => _plan = 'monthly'))),
+                    Expanded(child: _PlanCard(label: 'Monthly', price: '${SubscriptionConfig.formatIdr(monthlyPrice)}/bulan', selected: _plan == 'monthly', onTap: () => setState(() => _plan = 'monthly'))),
                     const SizedBox(width: 12),
-                    Expanded(child: _PlanCard(label: 'Yearly', price: SubscriptionConfig.formatIdr(SubscriptionConfig.yearlyPriceIdr) + '/tahun\nHemat 24%', selected: _plan == 'yearly', onTap: () => setState(() => _plan = 'yearly'))),
-                  ]),
+                    Expanded(child: _PlanCard(label: 'Yearly', price: '${SubscriptionConfig.formatIdr(yearlyPrice)}/tahun\nHemat 24%', selected: _plan == 'yearly', onTap: () => setState(() => _plan = 'yearly'))),
+                  ],),
                   const SizedBox(height: 16),
                   // Benefit table
                   Table(
@@ -76,7 +80,7 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
                     children: benefits.map((row) => TableRow(children: row.map((c) => Padding(padding: const EdgeInsets.all(8), child: Text(c, style: TextStyle(fontWeight: row == benefits.first ? FontWeight.w700 : FontWeight.w400, fontSize: 12), textAlign: TextAlign.center))).toList())).toList(),
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(width: double.infinity, child: CupertinoButton.filled(onPressed: _loading ? null : _checkout, child: _loading ? const CupertinoActivityIndicator(color: Colors.white) : Text('Continue — ${SubscriptionConfig.formatIdr(_plan == 'monthly' ? SubscriptionConfig.monthlyPriceIdr : SubscriptionConfig.yearlyPriceIdr)}'))),
+                  SizedBox(width: double.infinity, child: CupertinoButton.filled(onPressed: _loading ? null : _checkout, child: _loading ? const CupertinoActivityIndicator(color: Colors.white) : Text('Continue — ${SubscriptionConfig.formatIdr(_plan == 'monthly' ? monthlyPrice : yearlyPrice)}'))),
                   const SizedBox(height: 8),
                   Text('Midtrans Sandbox — no real charge', style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center),
                   const SizedBox(height: 12),
@@ -104,9 +108,9 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
                           }
                         },
                       ),
-                    ]);
-                  }),
-                ]),
+                    ],);
+                  },),
+                ],),
               ),
               const SizedBox(height: 12),
               TextButton(onPressed: () => context.push('/profile/transactions'), child: const Text('View transaction history')),
