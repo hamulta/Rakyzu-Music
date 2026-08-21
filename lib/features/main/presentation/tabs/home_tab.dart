@@ -29,6 +29,7 @@ class HomeTab extends ConsumerWidget {
         ref.watch(newReleaseSongsProvider).valueOrNull ?? [];
     final recommendedSongs =
         ref.watch(recommendedSongsProvider).valueOrNull ?? [];
+    final recentlyPlayed = ref.watch(recentlyPlayedProvider).valueOrNull ?? [];
 
     final verifiedArtists =
         artists.where((a) => a.isVerified).toList().take(6).toList();
@@ -98,6 +99,17 @@ class HomeTab extends ConsumerWidget {
                 _FeedSection<Song>(
                   title: 'Made For You',
                   items: recommendedSongs,
+                  height: 180,
+                  itemBuilder: (song) => _SongCard(song: song),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // Recently Played — from play_history.
+              if (recentlyPlayed.isNotEmpty) ...[
+                _FeedSection<Song>(
+                  title: 'Recently Played',
+                  items: recentlyPlayed,
                   height: 180,
                   itemBuilder: (song) => _SongCard(song: song),
                 ),

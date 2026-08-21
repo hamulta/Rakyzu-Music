@@ -367,3 +367,13 @@ final recommendedSongsProvider = FutureProvider<List<Song>>((ref) async {
 
   return filtered.take(20).toList();
 });
+
+// ---------------------------------------------------------------------------
+// RECENTLY PLAYED
+// ---------------------------------------------------------------------------
+
+/// Recently played songs for current user (deduplicated, most recent first).
+final recentlyPlayedProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getRecentlyPlayedSongs(limit: 20);
+});

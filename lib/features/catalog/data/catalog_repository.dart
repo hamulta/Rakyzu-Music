@@ -540,6 +540,79 @@ class CatalogRepository {
     }
   }
 
+  /// Get recently played songs (deduplicated, most recent first).
+  Future<List<Song>> getRecentlyPlayedSongs({int limit = 20}) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return const [];
+
+      // Get recent play_history entries (with dedup by song_id).
+      final rows = await _supabase.rpc('get_recently_played', params: {
+        'p_user_id': userId,
+        'p_limit': limit,
+      });
+
+      if (rows is List && rows.isNotEmpty) {
+        return rows.map((row) {
+          // The RPC returns song data joined.
+          return Song.fromJson({
+            'id': row['song_id'],
+            'title': row['title'],
+            'album_id': row['album_id'],
+            'artist_id': row['artist_id'],
+            'duration_seconds': row['duration_seconds'],
+            'audio_url': row['audio_url'],
+            'cover_url': row['cover_url'],
+            'genre': row['genre'],
+            'play_count': row['play_count'],
+            'created_at': row['created_at'],
+            'album_title': row['album_title'],
+            'artist_name': row['artist_name'],
+          });
+        }).toList();
+      }
+
+      // Fallback: manual dedup if RPC doesn't exist.
+      final historyRows = await _supabase
+          .from('play_history')
+          .select('song_id, played_at')
+          .eq('user_id', userId)
+          .order('played_at', ascending: false)
+          .limit(limit * 2); // Get more to account for dedup.
+
+      // Deduplicate song_ids (keep first occurrence = most recent).
+      final seen = <String>{};
+      final uniqueIds = <String>[];
+      for (final row in historyRows) {
+        final songId = row['song_id'] as String;
+        if (seen.add(songId)) {
+          uniqueIds.add(songId);
+        }
+      }
+
+      if (uniqueIds.isEmpty) return const [];
+
+      // Fetch songs by IDs.
+      final songRows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .inFilter('id', uniqueIds.take(limit).toList());
+
+      // Maintain order from play_history.
+      final songMap = {
+        for (final row in songRows)
+          row['id'] as String: Song.fromJson(_mapSongRow(row))
+      };
+      return uniqueIds
+          .take(limit)
+          .where(songMap.containsKey)
+          .map((id) => songMap[id]!)
+          .toList();
+    } catch (e) {
+      return const [];
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // SEARCH — multi-table
   // ---------------------------------------------------------------------------
