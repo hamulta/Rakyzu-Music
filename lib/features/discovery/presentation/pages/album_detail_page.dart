@@ -9,7 +9,7 @@ import '../../../catalog/models/song.dart';
 import '../../../catalog/providers/catalog_providers.dart';
 import '../../../player/providers/player_provider.dart';
 
-/// Album detail page — cover, info, tracklist, play all/shuffle.
+/// Album detail page — cover, info, tracklist, play all/shuffle + reorder.
 class AlbumDetailPage extends ConsumerWidget {
   const AlbumDetailPage({super.key, required this.albumId});
 
@@ -190,33 +190,36 @@ class AlbumDetailPage extends ConsumerWidget {
                 ),
               ),
 
-              // Track list.
+              // Track list — drag-drop reorder (staff/admin/owner).
               tracksAsync.when(
                 data: (tracks) {
                   if (tracks.isEmpty) return const SliverToBoxAdapter();
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) => Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 4,
-                        ),
-                        child: _TrackTile(
-                          song: tracks[index],
-                          index: index,
-                          allTracks: tracks,
-                        ),
-                      ),
-                      childCount: tracks.length,
+                  return SliverReorderableList(
+                    itemCount: tracks.length,
+                    onReorder: (oldIndex, newIndex) async {
+                      if (newIndex > oldIndex) newIndex -= 1;
+                      final reordered = List<Song>.from(tracks);
+                      final moved = reordered.removeAt(oldIndex);
+                      reordered.insert(newIndex, moved);
+                      try {
+                        await ref.read(catalogRepositoryProvider).reorderAlbumTracks(
+                              albumId,
+                              reordered.asMap().entries.map((e) => (id: e.value.id, trackNumber: e.key + 1)).toList(),
+                            );
+                        ref.invalidate(albumTracksProvider(albumId));
+                      } catch (e) {
+                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reorder failed: $e')));
+                      }
+                    },
+                    itemBuilder: (context, index) => Padding(
+                      key: ValueKey(tracks[index].id),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      child: _TrackTile(song: tracks[index], index: index, allTracks: tracks),
                     ),
                   );
                 },
-                loading: () => const SliverToBoxAdapter(
-                  child: Center(child: CupertinoActivityIndicator()),
-                ),
-                error: (e, _) => SliverToBoxAdapter(
-                  child: Center(child: Text('Error: $e')),
-                ),
+                loading: () => const SliverToBoxAdapter(child: Center(child: CupertinoActivityIndicator())),
+                error: (e, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 100)),

@@ -12,7 +12,6 @@ final adminPricingProvider = FutureProvider<List<Map<String,dynamic>>>((ref)=> r
 final adminAdImpressionsProvider = FutureProvider.family<List<Map<String,dynamic>>, int>((ref, days)=> ref.watch(adminRepositoryProvider).getAdImpressions(days: days));
 
 final adminAllSongsProvider = FutureProvider<List<dynamic>>((ref) async {
-  final repo = ref.watch(adminRepositoryProvider);
   // Use supabase directly to fetch all songs including unpublished for admin view
   final supa = ref.watch(supabaseProvider);
   final rows = await supa.from('songs').select('id,title,artist_id,is_published,artist:artists(name)').order('created_at', ascending:false).limit(100);
