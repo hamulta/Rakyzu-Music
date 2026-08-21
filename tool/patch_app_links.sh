@@ -21,3 +21,17 @@ if grep -q "flutter.compileSdkVersion" "$GRADLE"; then
 else
   echo "app_links build.gradle sudah ter-patch, skip"
 fi
+
+# Workaround Start.io SDK 0.1.6: missing buildFeatures.buildConfig
+STARTAPP_GRADLE="$BASE/startapp_sdk-0.1.6/android/build.gradle"
+if [[ -f "$STARTAPP_GRADLE" ]]; then
+  if ! grep -q "buildFeatures" "$STARTAPP_GRADLE"; then
+    # Insert buildFeatures after android {
+    sed -i '/^android {/a \    buildFeatures {\n        buildConfig true\n    }' "$STARTAPP_GRADLE"
+    echo "Patched $STARTAPP_GRADLE -> buildFeatures.buildConfig true"
+  else
+    echo "startapp_sdk build.gradle sudah ter-patch, skip"
+  fi
+else
+  echo "startapp_sdk build.gradle tidak ditemukan di $STARTAPP_GRADLE (skip)"
+fi
