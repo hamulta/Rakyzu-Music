@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/foundation.dart';
@@ -142,7 +141,9 @@ class OfflineDownloadService {
   Uint8List _xorLegacy(Uint8List data) {
     const xorKey = 0x5A;
     final out = Uint8List(data.length);
-    for (var i = 0; i < data.length; i++) out[i] = data[i] ^ xorKey;
+    for (var i = 0; i < data.length; i++) {
+      out[i] = data[i] ^ xorKey;
+    }
     return out;
   }
 }
