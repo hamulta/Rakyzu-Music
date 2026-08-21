@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,6 +19,7 @@ import '../../features/catalog/presentation/screens/song_list_screen.dart';
 import '../../features/catalog/presentation/widgets/catalog_access_guard.dart';
 import '../../features/main/presentation/main_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../constants/app_routes.dart';
 
 /// Root app router
@@ -132,6 +134,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.adminName,
         builder: (context, state) => const CatalogAccessGuard(
           child: AdminDashboardScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.fullPlayer,
+        name: AppRoutes.fullPlayerName,
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const FullPlayerScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                ),
+              ),
+              child: child,
+            );
+          },
         ),
       ),
     ],
