@@ -24,9 +24,10 @@ class AdsConfig {
   static const String iosAppId = 'ca-app-pub-3940256099942544~1458002511';
 
   /// Interval interstitial: tiap N lagu diputar penuh untuk Free tier.
-  /// N=3 dipilih karena balance: cukup sering untuk monetisasi, tidak terlalu intrusif.
-  /// Spotify free menayangkan audio ad tiap ~3-4 lagu; angka 3 untuk MVP dapat di-tune via remote config nanti.
-  static const int interstitialInterval = 3;
+  /// N=5 keputusan PM (tuning dari N=3 → N=5): N=3 terlalu agresif untuk UX Free.
+  /// Spotify free ~3-4 lagu, tapi untuk MVP Rakyzu dipilih 5 agar retention lebih baik,
+  /// masih memberi monetisasi tanpa mengganggu. Bisa di-tune via remote config nanti.
+  static const int interstitialInterval = 5;
 
   /// Skip limit Free tier.
   static const int freeSkipLimitPerHour = 6;
