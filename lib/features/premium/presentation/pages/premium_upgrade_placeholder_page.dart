@@ -69,10 +69,10 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
                   const SizedBox(height: 16),
                   // Plan selector — now data-driven dari pricing_plans
                   Row(children: [
-                    Expanded(child: _PlanCard(label: 'Monthly', price: SubscriptionConfig.formatIdr(monthlyPrice) + '/bulan', selected: _plan == 'monthly', onTap: () => setState(() => _plan = 'monthly'))),
+                    Expanded(child: _PlanCard(label: 'Monthly', price: '${SubscriptionConfig.formatIdr(monthlyPrice)}/bulan', selected: _plan == 'monthly', onTap: () => setState(() => _plan = 'monthly'))),
                     const SizedBox(width: 12),
-                    Expanded(child: _PlanCard(label: 'Yearly', price: SubscriptionConfig.formatIdr(yearlyPrice) + '/tahun\nHemat 24%', selected: _plan == 'yearly', onTap: () => setState(() => _plan = 'yearly'))),
-                  ]),
+                    Expanded(child: _PlanCard(label: 'Yearly', price: '${SubscriptionConfig.formatIdr(yearlyPrice)}/tahun\nHemat 24%', selected: _plan == 'yearly', onTap: () => setState(() => _plan = 'yearly'))),
+                  ],),
                   const SizedBox(height: 16),
                   // Benefit table
                   Table(
@@ -108,9 +108,9 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
                           }
                         },
                       ),
-                    ]);
-                  }),
-                ]),
+                    ],);
+                  },),
+                ],),
               ),
               const SizedBox(height: 12),
               TextButton(onPressed: () => context.push('/profile/transactions'), child: const Text('View transaction history')),

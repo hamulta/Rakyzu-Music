@@ -3,6 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../dev/gallery/dev_gallery_screen.dart';
+import '../../features/admin/presentation/layout/admin_shell.dart';
+import '../../features/admin/presentation/pages/ad_analytics_page.dart';
+import '../../features/admin/presentation/pages/analytics_page.dart';
+import '../../features/admin/presentation/pages/catalog_admin_page.dart';
+import '../../features/admin/presentation/pages/pricing_page.dart';
+import '../../features/admin/presentation/pages/revenue_page.dart';
+import '../../features/admin/presentation/pages/users_page.dart';
+import '../../features/admin/presentation/widgets/admin_role_guard.dart';
 import '../../features/auth/presentation/auth_wrapper.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
@@ -31,16 +39,8 @@ import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/premium/presentation/pages/premium_upgrade_placeholder_page.dart';
 import '../../features/subscription/presentation/pages/checkout_page.dart';
 import '../../features/subscription/presentation/pages/transaction_history_page.dart';
-import '../../features/admin/presentation/layout/admin_shell.dart';
-import '../../features/admin/presentation/pages/ad_analytics_page.dart';
-import '../../features/admin/presentation/pages/analytics_page.dart';
-import '../../features/admin/presentation/pages/catalog_admin_page.dart';
-import '../../features/admin/presentation/pages/pricing_page.dart';
-import '../../features/admin/presentation/pages/revenue_page.dart';
-import '../../features/admin/presentation/pages/users_page.dart';
-import '../../features/admin/presentation/widgets/admin_role_guard.dart';
-import '../models/app_role.dart';
 import '../constants/app_routes.dart';
+import '../models/app_role.dart';
 
 /// Root app router
 final appRouterProvider = Provider<GoRouter>((ref) {

@@ -26,8 +26,8 @@ class _AdAnalyticsPageState extends ConsumerState<AdAnalyticsPage> {
           GlassCard(padding: const EdgeInsets.all(16), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [Column(children:[const Text('Banner'), Text('$banner', style: const TextStyle(fontWeight: FontWeight.w800, fontSize:20))]), Column(children:[const Text('Interstitial'), Text('$inter', style: const TextStyle(fontWeight: FontWeight.w800, fontSize:20))]), Column(children:[const Text('Total'), Text('${list.length}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize:20))])])),
           const SizedBox(height:16),
           GlassCard(padding: EdgeInsets.zero, child: Column(children: list.take(20).map((e)=> ListTile(leading: Icon(e['ad_type']=='banner'? Icons.image: Icons.video_library), title: Text(e['ad_type'] as String), subtitle: Text('${e['created_at']}'))).toList())),
-        ]);
-      }, loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e')),
-    ]);
+        ],);
+      }, loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e'),),
+    ],);
   }
 }

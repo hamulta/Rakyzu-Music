@@ -12,7 +12,7 @@ class SubscriptionRepository {
     final uid = _uid;
     if (uid == null) return [];
     final rows = await _supabase.from('subscriptions').select().eq('user_id', uid).order('created_at', ascending: false);
-    return rows.map((e) => SubscriptionModel.fromJson(e as Map<String, dynamic>)).toList();
+    return rows.map(SubscriptionModel.fromJson).toList();
   }
 
   Future<SubscriptionModel?> getActiveSubscription() async {
@@ -20,7 +20,7 @@ class SubscriptionRepository {
     if (uid == null) return null;
     final row = await _supabase.from('subscriptions').select().eq('user_id', uid).eq('status', 'active').order('end_date', ascending: false).limit(1).maybeSingle();
     if (row == null) return null;
-    return SubscriptionModel.fromJson(row as Map<String, dynamic>);
+    return SubscriptionModel.fromJson(row);
   }
 
   /// Request snap_token dari Edge Function (server-side, server key tidak di client).

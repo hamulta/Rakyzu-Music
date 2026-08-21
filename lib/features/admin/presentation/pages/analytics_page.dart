@@ -24,6 +24,6 @@ class AnalyticsPage extends ConsumerWidget {
       Row(children: [Text('Top Songs', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)), const Spacer(), IconButton(icon: const Icon(CupertinoIcons.share), onPressed: () async { final data = await ref.read(adminTopSongsProvider.future); final csv = toCsv(data); await Share.share('Top Songs CSV\n$csv'); })]),
       const SizedBox(height:8),
       top.when(data: (list)=> GlassCard(padding: EdgeInsets.zero, child: Column(children: list.asMap().entries.map((e)=> ListTile(leading: Text('#${e.key+1}'), title: Text(e.value['title']??''), subtitle: Text('artist: ${e.value['artist']?['name'] ?? '-'}'), trailing: Text('${e.value['play_count']??0} plays'))).toList())), loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e')),
-    ]);
+    ],);
   }
 }

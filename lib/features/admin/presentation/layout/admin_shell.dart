@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/models/app_role.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../catalog/providers/role_provider.dart';
 
@@ -35,11 +34,11 @@ class AdminShell extends ConsumerWidget {
             _nav(context, Icons.ads_click, 'Ad Analytics', '/admin/ads', enabled: canAnalytics),
             const Divider(height:32),
             ListTile(leading: const Icon(CupertinoIcons.back), title: const Text('Back to App'), onTap: ()=> context.go('/main')),
-          ])),
+          ],),),
         ),
         const VerticalDivider(width:1),
         Expanded(child: DecoratedBox(decoration: BoxDecoration(gradient: isDark? AppColors.darkBackgroundGradient: AppColors.lightBackgroundGradient), child: child)),
-      ]),
+      ],),
     );
   }
   Widget _nav(BuildContext ctx, IconData icon, String label, String route, {required bool enabled}) {

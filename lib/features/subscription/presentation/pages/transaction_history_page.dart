@@ -40,7 +40,7 @@ class TransactionHistoryPage extends ConsumerWidget {
                             const SizedBox(width: 12),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${s.planType} • $price', style: const TextStyle(fontWeight: FontWeight.w700)), Text(d, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)), Text('Status: ${s.status}', style: const TextStyle(fontSize: 12))])),
                             Text(s.transactionId?.substring(0, 8) ?? '-', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                          ]),
+                          ],),
                         ),
                       );
                     },
@@ -50,7 +50,7 @@ class TransactionHistoryPage extends ConsumerWidget {
                 error: (e, _) => Center(child: Text('Error: $e')),
               ),
             ),
-          ]),
+          ],),
         ),
       ),
     );

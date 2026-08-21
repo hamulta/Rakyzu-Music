@@ -32,9 +32,9 @@ class _PricingPageState extends ConsumerState<PricingPage> {
           const SizedBox(height:12),
           TextField(controller: _yearly, decoration: const InputDecoration(labelText: 'Yearly Price IDR'), keyboardType: TextInputType.number),
           const SizedBox(height:16),
-          SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _saving? null: () async { setState(()=> _saving=true); try{ final repo=ref.read(adminRepositoryProvider); await repo.updatePricing('monthly', int.parse(_monthly.text.replaceAll(RegExp(r'[^0-9]'), ''))); await repo.updatePricing('yearly', int.parse(_yearly.text.replaceAll(RegExp(r'[^0-9]'), ''))); ref.invalidate(adminPricingProvider); if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pricing updated'))); }catch(e){ if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'))); } finally{ if(mounted) setState(()=> _saving=false); } }, child: _saving? const CupertinoActivityIndicator(): const Text('Save (Owner only)'))),
-        ]));
-      }, loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e')),
-    ]);
+          SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _saving? null: () async { setState(()=> _saving=true); try{ final repo=ref.read(adminRepositoryProvider); await repo.updatePricing('monthly', int.parse(_monthly.text.replaceAll(RegExp('[^0-9]'), ''))); await repo.updatePricing('yearly', int.parse(_yearly.text.replaceAll(RegExp('[^0-9]'), ''))); ref.invalidate(adminPricingProvider); if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pricing updated'))); }catch(e){ if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'))); } finally{ if(mounted) setState(()=> _saving=false); } }, child: _saving? const CupertinoActivityIndicator(): const Text('Save (Owner only)'))),
+        ],),);
+      }, loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e'),),
+    ],);
   }
 }

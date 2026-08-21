@@ -1,9 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../providers/admin_providers.dart';
-import '../../../../core/theme/app_colors.dart';
 
 class RevenuePage extends ConsumerWidget {
   const RevenuePage({super.key});
@@ -21,9 +22,9 @@ class RevenuePage extends ConsumerWidget {
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Monthly'), Text('${m['monthly']}')]),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Yearly'), Text('${m['yearly']}')]),
           const Divider(),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('MRR (est.)'), Text('Rp ${m['mrr']}', style: TextStyle(fontWeight:FontWeight.w600))]),
-        ])),
-      ]), loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e')),
-    ]);
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('MRR (est.)'), Text('Rp ${m['mrr']}', style: const TextStyle(fontWeight:FontWeight.w600))]),
+        ],),),
+      ],), loading: ()=> const CupertinoActivityIndicator(), error: (e,_ )=> Text('Error $e'),),
+    ],);
   }
 }

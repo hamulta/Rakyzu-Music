@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'subscription_provider.dart';
+
 import '../../../shared/providers/supabase_providers.dart';
+import 'subscription_provider.dart';
 
 /// Cek expiry saat app dibuka: jika active subscription sudah lewat end_date,
 /// panggil edge function check-expired atau cukup invalidate.

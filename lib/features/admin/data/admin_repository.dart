@@ -15,8 +15,10 @@ class AdminRepository {
     // aggregate songs.play_count fallback to count play_history
     try {
       final rows = await _supabase.from('songs').select('play_count');
-      int sum = 0;
-      for (final r in rows) sum += ((r as Map)['play_count'] as int? ?? 0);
+      var sum = 0;
+      for (final r in rows) {
+        sum += (r as Map)['play_count'] as int? ?? 0;
+      }
       if (sum > 0) return sum;
     } catch (_) {}
     final rows = await _supabase.from('play_history').select('id');
@@ -46,15 +48,16 @@ class AdminRepository {
 
   Future<Map<String, dynamic>> getRevenueStats() async {
     final rows = await _supabase.from('subscriptions').select('plan_type,status').eq('status','active');
-    int totalRevenue = 0;
-    int monthly = 0, yearly=0;
+    var totalRevenue = 0;
+    var monthly = 0;
+    var yearly=0;
     for (final r in rows as List) {
       final m = r as Map<String,dynamic>;
       final plan = m['plan_type'] as String;
       if (plan == 'monthly') { totalRevenue += 49000; monthly++; } else if (plan == 'yearly'){ totalRevenue += 449000; yearly++; }
     }
     final mrr = monthly*49000 + yearly*449000 ~/12;
-    return {'totalRevenue': totalRevenue, 'activeCount': (rows).length, 'monthly': monthly, 'yearly': yearly, 'mrr': mrr};
+    return {'totalRevenue': totalRevenue, 'activeCount': rows.length, 'monthly': monthly, 'yearly': yearly, 'mrr': mrr};
   }
 
   Future<List<Map<String,dynamic>>> getPricingPlans() async {

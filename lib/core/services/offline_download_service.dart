@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +25,7 @@ class OfflineDownloadService {
     return File('${dir.path}/$songId.bin');
   }
 
-  Future<bool> isDownloaded(String songId) async => await (await _fileFor(songId)).exists();
+  Future<bool> isDownloaded(String songId) async => (await _fileFor(songId)).exists();
 
   Future<List<String>> getDownloadedIds() async {
     try {
@@ -41,7 +40,7 @@ class OfflineDownloadService {
   Future<int> getStorageUsageBytes() async {
     final dir = await _dir();
     if (!await dir.exists()) return 0;
-    int total = 0;
+    var total = 0;
     await for (final f in dir.list()) {
       if (f is File) total += await f.length();
     }
@@ -88,7 +87,9 @@ class OfflineDownloadService {
 
   Uint8List _xor(Uint8List data) {
     final out = Uint8List(data.length);
-    for (var i = 0; i < data.length; i++) out[i] = data[i] ^ _xorKey;
+    for (var i = 0; i < data.length; i++) {
+      out[i] = data[i] ^ _xorKey;
+    }
     return out;
   }
 }
