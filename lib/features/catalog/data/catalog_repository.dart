@@ -331,6 +331,20 @@ class CatalogRepository {
     }
   }
 
+  /// Get songs for an album, ordered by track_number.
+  Future<List<Song>> getAlbumTracks(String albumId) async {
+    try {
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .eq('album_id', albumId)
+          .order('track_number');
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
   /// Albums ordered by created_at descending (new releases).
   Future<List<Album>> getNewReleaseAlbums({int limit = 10}) async {
     try {

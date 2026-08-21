@@ -329,3 +329,14 @@ final artistAlbumsProvider =
   final repo = ref.watch(catalogRepositoryProvider);
   return repo.getArtistAlbums(artistId);
 });
+
+// ---------------------------------------------------------------------------
+// ALBUM DETAIL
+// ---------------------------------------------------------------------------
+
+/// Tracks in an album — takes albumId as argument.
+final albumTracksProvider =
+    FutureProvider.family<List<Song>, String>((ref, albumId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getAlbumTracks(albumId);
+});
