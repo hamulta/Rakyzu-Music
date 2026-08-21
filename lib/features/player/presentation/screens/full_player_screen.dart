@@ -2,8 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/ads/ads_gate_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/signed_image.dart';
+import '../../../../core/widgets/upsell_prompt.dart';
 import '../../providers/player_controller.dart';
 import '../../providers/player_provider.dart';
 
@@ -178,11 +180,54 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
     bool isDark,
   ) {
     final controller = ref.read(playerControllerProvider.notifier);
+    final gate = ref.watch(adsGateProvider);
+    final isLimitReached = gate.shouldEnforceSkipLimit && controller.isSkipLimitReached;
+
+    Future<void> handleSkip(Future<void> Function() action) async {
+      if (gate.shouldEnforceSkipLimit) {
+        if (controller.isSkipLimitReached) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Skip limit 6/jam tercapai. Reset dalam ${controller.skipTimeUntilReset.inMinutes} menit. Upgrade untuk unlimited.'),
+              action: SnackBarAction(
+                label: 'Upgrade',
+                onPressed: () => _showUpsell(context, 'skip'),
+              ),
+            ),
+          );
+          return;
+        }
+        final allowed = controller.tryConsumeSkip();
+        if (!allowed) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Skip limit tercapai. Coba lagi nanti.')),
+          );
+          return;
+        }
+      }
+      await action();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
+          // Skip-limit hint for free.
+          if (gate.shouldEnforceSkipLimit)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                isLimitReached
+                    ? 'Skip limit reached — ${controller.skipTimeUntilReset.inMinutes}m reset'
+                    : 'Skips left: ${controller.skipRemaining}/6 per hour',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isLimitReached ? AppColors.accentWarning : AppColors.textSecondary,
+                ),
+              ),
+            ),
           // Progress text.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -212,10 +257,11 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
-                onPressed: controller.skipPrevious,
-                icon: const Icon(
+                onPressed: isLimitReached ? null : () => handleSkip(controller.skipPrevious),
+                icon: Icon(
                   CupertinoIcons.backward_fill,
                   size: 32,
+                  color: isLimitReached ? AppColors.textSecondary.withOpacity(0.35) : null,
                 ),
               ),
               _PlayPauseButton(
@@ -224,16 +270,25 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                 onPressed: controller.togglePlay,
               ),
               IconButton(
-                onPressed: controller.skipNext,
-                icon: const Icon(
+                onPressed: isLimitReached ? null : () => handleSkip(controller.skipNext),
+                icon: Icon(
                   CupertinoIcons.forward_fill,
                   size: 32,
+                  color: isLimitReached ? AppColors.textSecondary.withOpacity(0.35) : null,
                 ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  void _showUpsell(BuildContext context, String reason) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => UpsellPrompt(reason: reason),
     );
   }
 

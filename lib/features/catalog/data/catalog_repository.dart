@@ -287,14 +287,14 @@ class CatalogRepository {
   // ---------------------------------------------------------------------------
 
   Future<List<Map<String, dynamic>>> getPlayHistoryDetailed(
-      {int limit = 50}) async {
+      {int limit = 50,}) async {
     try {
       final uid = _supabase.auth.currentUser?.id;
       if (uid == null) return [];
       final rows = await _supabase
           .from('play_history')
           .select(
-              'id, played_at, song:songs(*, album:albums(title), artist:artists(name))')
+              'id, played_at, song:songs(*, album:albums(title), artist:artists(name))',)
           .eq('user_id', uid)
           .order('played_at', ascending: false)
           .limit(limit);

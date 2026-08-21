@@ -39,7 +39,7 @@ Future<Playlist> createPlaylistAndRefresh(
       name: name,
       description: description,
       coverUrl: coverUrl,
-      isPublic: isPublic);
+      isPublic: isPublic,);
   ref.invalidate(myPlaylistsProvider);
   return pl;
 }

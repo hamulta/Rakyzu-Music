@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ads/interstitial_manager.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/ad_banner.dart';
 import '../../../core/widgets/glass_bottom_nav_bar.dart';
 import '../../../core/widgets/glass_mini_player.dart';
 import '../../player/providers/audio_handler_provider.dart';
@@ -56,6 +58,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     // Trigger lazy initialization of audio handler untuk background playback.
     ref.watch(audioHandlerProvider);
+    // 0.6.1: observer interstitial tiap N songs (free only, tidak ganggu queue).
+    ref.watch(interstitialManagerProvider);
 
     return CupertinoTabScaffold(
       tabBar: _buildTabBar(),
@@ -88,6 +92,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Column(
       children: [
         Expanded(child: tabContent),
+        const AdBanner(),
         GlassMiniPlayer(
           onTapFullPlayer: () => context.push(AppRoutes.fullPlayer),
         ),

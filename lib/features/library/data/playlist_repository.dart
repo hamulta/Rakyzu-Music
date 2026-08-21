@@ -34,7 +34,7 @@ class PlaylistRepository {
   }
 
   Future<List<Playlist>> getPublicPlaylists(
-      {int limit = 20, String? search}) async {
+      {int limit = 20, String? search,}) async {
     try {
       var query = _supabase
           .from('playlists')
@@ -74,8 +74,9 @@ class PlaylistRepository {
   }) async {
     try {
       final uid = _uid;
-      if (uid == null)
+      if (uid == null) {
         throw const CatalogException('Harus login untuk membuat playlist.');
+      }
       final row = await _supabase
           .from('playlists')
           .insert({
@@ -106,16 +107,19 @@ class PlaylistRepository {
     try {
       final updates = <String, dynamic>{};
       if (name != null) updates['name'] = name.trim();
-      if (description != null)
+      if (description != null) {
         updates['description'] =
             description.trim().isEmpty ? null : description.trim();
-      if (coverUrl != null)
+      }
+      if (coverUrl != null) {
         updates['cover_url'] = coverUrl.trim().isEmpty ? null : coverUrl.trim();
+      }
       if (isPublic != null) updates['is_public'] = isPublic;
       if (updates.isEmpty) {
         final existing = await getPlaylist(id);
-        if (existing == null)
+        if (existing == null) {
           throw const CatalogException('Playlist tidak ditemukan.');
+        }
         return existing;
       }
       final row = await _supabase
@@ -148,7 +152,7 @@ class PlaylistRepository {
       final rows = await _supabase
           .from('playlist_songs')
           .select(
-              'position, song:songs(*, album:albums(title), artist:artists(name))')
+              'position, song:songs(*, album:albums(title), artist:artists(name))',)
           .eq('playlist_id', playlistId)
           .order('position');
       final songs = <Song>[];
@@ -212,7 +216,7 @@ class PlaylistRepository {
   }
 
   Future<void> reorderPlaylistSongs(
-      String playlistId, List<String> orderedSongIds) async {
+      String playlistId, List<String> orderedSongIds,) async {
     try {
       // Update position per song. Use upsert to ensure atomic per-row.
       for (var i = 0; i < orderedSongIds.length; i++) {

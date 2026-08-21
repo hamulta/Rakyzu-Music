@@ -20,7 +20,7 @@ class FollowingPage extends ConsumerWidget {
         decoration: BoxDecoration(
             gradient: isDark
                 ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient),
+                : AppColors.lightBackgroundGradient,),
         child: SafeArea(
           child: Column(
             children: [
@@ -30,21 +30,22 @@ class FollowingPage extends ConsumerWidget {
                   children: [
                     IconButton(
                         onPressed: () => context.pop(),
-                        icon: const Icon(CupertinoIcons.back)),
+                        icon: const Icon(CupertinoIcons.back),),
                     Text('Following',
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                            ?.copyWith(fontWeight: FontWeight.w700),),
                   ],
                 ),
               ),
               Expanded(
                 child: followedAsync.when(
                   data: (list) {
-                    if (list.isEmpty)
+                    if (list.isEmpty) {
                       return const Center(
-                          child: Text('Not following anyone yet'));
+                          child: Text('Not following anyone yet'),);
+                    }
                     return ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: list.length,
@@ -63,14 +64,14 @@ class FollowingPage extends ConsumerWidget {
                                       width: 48,
                                       height: 48,
                                       fallbackIcon:
-                                          CupertinoIcons.person_fill)),
+                                          CupertinoIcons.person_fill,),),
                               const SizedBox(width: 12),
                               Expanded(
                                   child: Text(a.name,
                                       style: const TextStyle(
-                                          fontWeight: FontWeight.w600))),
+                                          fontWeight: FontWeight.w600,),),),
                               const Icon(CupertinoIcons.chevron_right,
-                                  size: 16, color: AppColors.textSecondary),
+                                  size: 16, color: AppColors.textSecondary,),
                             ],
                           ),
                         );

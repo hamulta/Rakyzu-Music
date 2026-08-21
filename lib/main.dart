@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/env_config.dart';
+import 'core/ads/ad_impression_logger.dart';
+import 'core/ads/ads_service.dart';
 import 'core/providers/app_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -19,6 +21,11 @@ Future<void> main() async {
     url: EnvConfig.supabaseUrl,
     publishableKey: EnvConfig.supabaseAnonKey,
   );
+
+  // Init Ads (0.6.x) — non-blocking, test IDs, kIsWeb guarded.
+  await AdImpressionLogger.instance.init();
+  AdsService.instance.onAdImpression = AdImpressionLogger.instance.log;
+  await AdsService.instance.initialize();
 
   runApp(
     const ProviderScope(
