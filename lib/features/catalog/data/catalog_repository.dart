@@ -363,6 +363,82 @@ class CatalogRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // SEARCH — multi-table
+  // ---------------------------------------------------------------------------
+
+  /// Search songs by title.
+  Future<List<Song>> searchSongs(String query, {int limit = 20}) async {
+    try {
+      final keyword = query.trim();
+      if (keyword.isEmpty) return const [];
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .ilike('title', '%$keyword%')
+          .order('play_count', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Search artists by name.
+  Future<List<Artist>> searchArtists(String query, {int limit = 20}) async {
+    try {
+      final keyword = query.trim();
+      if (keyword.isEmpty) return const [];
+      final rows = await _supabase
+          .from('artists')
+          .select()
+          .ilike('name', '%$keyword%')
+          .order('name')
+          .limit(limit);
+      return rows.map(Artist.fromJson).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Search albums by title.
+  Future<List<Album>> searchAlbums(String query, {int limit = 20}) async {
+    try {
+      final keyword = query.trim();
+      if (keyword.isEmpty) return const [];
+      final rows = await _supabase
+          .from('albums')
+          .select('*, artist:artists(name), songs(count)')
+          .ilike('title', '%$keyword%')
+          .order('title')
+          .limit(limit);
+      return rows.map((row) => Album.fromJson(_mapAlbumRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Search public playlists by name. Private playlists are excluded.
+  Future<List<Map<String, dynamic>>> searchPlaylists(
+    String query, {
+    int limit = 20,
+  }) async {
+    try {
+      final keyword = query.trim();
+      if (keyword.isEmpty) return const [];
+      final rows = await _supabase
+          .from('playlists')
+          .select('id, name, cover_url, user_id, is_public')
+          .ilike('name', '%$keyword%')
+          .eq('is_public', true)
+          .order('name')
+          .limit(limit);
+      return rows;
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // ROLE
   // ---------------------------------------------------------------------------
 
