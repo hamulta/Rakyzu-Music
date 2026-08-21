@@ -554,14 +554,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.3+1"
-  google_mobile_ads:
-    dependency: "direct main"
-    description:
-      name: google_mobile_ads
-      sha256: "0d4a3744b5e8ed1b8be6a1b452d309f811688855a497c6113fc4400f922db603"
-      url: "https://pub.dev"
-    source: hosted
-    version: "5.3.1"
   google_sign_in:
     dependency: "direct main"
     description:
@@ -1255,6 +1247,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.11.1"
+  startapp_sdk:
+    dependency: "direct main"
+    description:
+      name: startapp_sdk
+      sha256: "5597694acd5d5d7ef86e9600464d454e9b2704ba57c37f7f35007075318ca8ab"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.6"
   state_notifier:
     dependency: transitive
     description:
