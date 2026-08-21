@@ -214,6 +214,48 @@ class CatalogRepository {
     }
   }
 
+  /// Songs ordered by play_count descending (trending).
+  Future<List<Song>> getTrendingSongs({int limit = 20}) async {
+    try {
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .order('play_count', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Songs ordered by created_at descending (new releases).
+  Future<List<Song>> getNewReleaseSongs({int limit = 20}) async {
+    try {
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Albums ordered by created_at descending (new releases).
+  Future<List<Album>> getNewReleaseAlbums({int limit = 10}) async {
+    try {
+      final rows = await _supabase
+          .from('albums')
+          .select('*, artist:artists(name), songs(count)')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Album.fromJson(_mapAlbumRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
   Future<Song?> getSong(String id) async {
     try {
       final row = await _supabase

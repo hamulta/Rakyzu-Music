@@ -253,3 +253,30 @@ final songsControllerProvider =
     StateNotifierProvider<SongsController, AsyncValue<List<Song>>>((ref) {
   return SongsController(ref.watch(catalogRepositoryProvider));
 });
+
+// ---------------------------------------------------------------------------
+// TRENDING SONGS
+// ---------------------------------------------------------------------------
+
+final trendingSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getTrendingSongs(limit: 20);
+});
+
+// ---------------------------------------------------------------------------
+// NEW RELEASE SONGS
+// ---------------------------------------------------------------------------
+
+final newReleaseSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getNewReleaseSongs(limit: 20);
+});
+
+// ---------------------------------------------------------------------------
+// NEW RELEASE ALBUMS
+// ---------------------------------------------------------------------------
+
+final newReleaseAlbumsProvider = FutureProvider<List<Album>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getNewReleaseAlbums(limit: 10);
+});
