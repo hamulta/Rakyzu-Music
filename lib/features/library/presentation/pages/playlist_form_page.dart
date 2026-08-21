@@ -45,7 +45,8 @@ class _PlaylistFormPageState extends ConsumerState<PlaylistFormPage> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nama playlist wajib diisi')),);
+        const SnackBar(content: Text('Nama playlist wajib diisi')),
+      );
       return;
     }
     setState(() => _saving = true);
@@ -53,14 +54,17 @@ class _PlaylistFormPageState extends ConsumerState<PlaylistFormPage> {
       final repo = ref.read(playlistRepositoryProvider);
       if (widget.playlistId == null) {
         await repo.createPlaylist(
-            name: name,
-            description: _descCtrl.text.trim(),
-            isPublic: _isPublic,);
+          name: name,
+          description: _descCtrl.text.trim(),
+          isPublic: _isPublic,
+        );
       } else {
-        await repo.updatePlaylist(widget.playlistId!,
-            name: name,
-            description: _descCtrl.text.trim(),
-            isPublic: _isPublic,);
+        await repo.updatePlaylist(
+          widget.playlistId!,
+          name: name,
+          description: _descCtrl.text.trim(),
+          isPublic: _isPublic,
+        );
       }
       ref.invalidate(myPlaylistsProvider);
       if (widget.playlistId != null) {
@@ -88,9 +92,10 @@ class _PlaylistFormPageState extends ConsumerState<PlaylistFormPage> {
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient,),
+          gradient: isDark
+              ? AppColors.darkBackgroundGradient
+              : AppColors.lightBackgroundGradient,
+        ),
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(20),
@@ -98,13 +103,16 @@ class _PlaylistFormPageState extends ConsumerState<PlaylistFormPage> {
               Row(
                 children: [
                   IconButton(
-                      onPressed: () => context.pop(),
-                      icon: const Icon(CupertinoIcons.back),),
-                  Text(isEdit ? 'Edit Playlist' : 'New Playlist',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w700),),
+                    onPressed: () => context.pop(),
+                    icon: const Icon(CupertinoIcons.back),
+                  ),
+                  Text(
+                    isEdit ? 'Edit Playlist' : 'New Playlist',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -113,30 +121,40 @@ class _PlaylistFormPageState extends ConsumerState<PlaylistFormPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Name',
-                        style: TextStyle(fontWeight: FontWeight.w600),),
+                    const Text(
+                      'Name',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     CupertinoTextField(
-                        controller: _nameCtrl,
-                        placeholder: 'My Awesome Playlist',
-                        maxLength: 60,),
+                      controller: _nameCtrl,
+                      placeholder: 'My Awesome Playlist',
+                      maxLength: 60,
+                    ),
                     const SizedBox(height: 16),
-                    const Text('Description (optional)',
-                        style: TextStyle(fontWeight: FontWeight.w600),),
+                    const Text(
+                      'Description (optional)',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     CupertinoTextField(
-                        controller: _descCtrl,
-                        placeholder: 'Describe your playlist',
-                        maxLines: 3,),
+                      controller: _descCtrl,
+                      placeholder: 'Describe your playlist',
+                      maxLines: 3,
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
                         const Expanded(
-                            child: Text('Public',
-                                style: TextStyle(fontWeight: FontWeight.w600),),),
+                          child: Text(
+                            'Public',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
                         CupertinoSwitch(
-                            value: _isPublic,
-                            onChanged: (v) => setState(() => _isPublic = v),),
+                          value: _isPublic,
+                          onChanged: (v) => setState(() => _isPublic = v),
+                        ),
                       ],
                     ),
                     Text(
@@ -144,7 +162,9 @@ class _PlaylistFormPageState extends ConsumerState<PlaylistFormPage> {
                           ? 'Anyone can view & play • appears in search'
                           : 'Only you can view',
                       style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12,),
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),

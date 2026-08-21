@@ -286,15 +286,17 @@ class CatalogRepository {
   // PLAY_HISTORY EXTENDED
   // ---------------------------------------------------------------------------
 
-  Future<List<Map<String, dynamic>>> getPlayHistoryDetailed(
-      {int limit = 50,}) async {
+  Future<List<Map<String, dynamic>>> getPlayHistoryDetailed({
+    int limit = 50,
+  }) async {
     try {
       final uid = _supabase.auth.currentUser?.id;
       if (uid == null) return [];
       final rows = await _supabase
           .from('play_history')
           .select(
-              'id, played_at, song:songs(*, album:albums(title), artist:artists(name))',)
+            'id, played_at, song:songs(*, album:albums(title), artist:artists(name))',
+          )
           .eq('user_id', uid)
           .order('played_at', ascending: false)
           .limit(limit);
@@ -572,7 +574,9 @@ class CatalogRepository {
 
   Future<void> setSongPublished(String id, bool isPublished) async {
     try {
-      await _supabase.from('songs').update({'is_published': isPublished}).eq('id', id);
+      await _supabase
+          .from('songs')
+          .update({'is_published': isPublished}).eq('id', id);
     } catch (e) {
       throw CatalogException.from(e);
     }

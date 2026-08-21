@@ -36,10 +36,11 @@ Future<Playlist> createPlaylistAndRefresh(
 }) async {
   final repo = ref.read(playlistRepositoryProvider);
   final pl = await repo.createPlaylist(
-      name: name,
-      description: description,
-      coverUrl: coverUrl,
-      isPublic: isPublic,);
+    name: name,
+    description: description,
+    coverUrl: coverUrl,
+    isPublic: isPublic,
+  );
   ref.invalidate(myPlaylistsProvider);
   return pl;
 }

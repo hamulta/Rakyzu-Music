@@ -149,7 +149,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return AlbumDetailScreen(albumId: id ?? '');
         },
       ),
-          ShellRoute(
+      ShellRoute(
         builder: (context, state, child) => AdminShell(child: child),
         routes: [
           GoRoute(
@@ -159,27 +159,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/admin/analytics',
-            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: AnalyticsPage()),
+            builder: (context, state) => const AdminRoleGuard(
+                allowed: [AppRole.admin, AppRole.owner],
+                child: AnalyticsPage()),
           ),
           GoRoute(
             path: '/admin/revenue',
-            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: RevenuePage()),
+            builder: (context, state) => const AdminRoleGuard(
+                allowed: [AppRole.admin, AppRole.owner], child: RevenuePage()),
           ),
           GoRoute(
             path: '/admin/users',
-            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: UsersPage()),
+            builder: (context, state) => const AdminRoleGuard(
+                allowed: [AppRole.admin, AppRole.owner], child: UsersPage()),
           ),
           GoRoute(
             path: '/admin/catalog',
-            builder: (context, state) => const CatalogAccessGuard(child: CatalogAdminPage()),
+            builder: (context, state) =>
+                const CatalogAccessGuard(child: CatalogAdminPage()),
           ),
           GoRoute(
             path: '/admin/pricing',
-            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.owner], child: PricingPage()),
+            builder: (context, state) => const AdminRoleGuard(
+                allowed: [AppRole.owner], child: PricingPage()),
           ),
           GoRoute(
             path: '/admin/ads',
-            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: AdAnalyticsPage()),
+            builder: (context, state) => const AdminRoleGuard(
+                allowed: [AppRole.admin, AppRole.owner],
+                child: AdAnalyticsPage()),
           ),
         ],
       ),
@@ -280,15 +288,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'premium-checkout',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          return CheckoutPage(snapToken: extra['snap_token'] as String?, redirectUrl: extra['redirect_url'] as String?, plan: extra['plan'] as String? ?? 'monthly');
+          return CheckoutPage(
+              snapToken: extra['snap_token'] as String?,
+              redirectUrl: extra['redirect_url'] as String?,
+              plan: extra['plan'] as String? ?? 'monthly');
         },
       ),
       GoRoute(
         path: '/checkout/result',
         name: 'checkout-result',
-        builder: (context, state) => CheckoutResultPage(status: state.uri.queryParameters['status'] ?? 'pending'),
+        builder: (context, state) => CheckoutResultPage(
+            status: state.uri.queryParameters['status'] ?? 'pending'),
       ),
-      GoRoute(path: '/profile/transactions', name: 'transactions', builder: (context, state) => const TransactionHistoryPage()),
+      GoRoute(
+          path: '/profile/transactions',
+          name: 'transactions',
+          builder: (context, state) => const TransactionHistoryPage()),
     ],
   );
 });

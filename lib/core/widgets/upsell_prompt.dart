@@ -28,24 +28,34 @@ class UpsellPrompt extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.getBorderGlass(isDark)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.premiumGradient.colors.first.withOpacity(0.15), shape: BoxShape.circle),
-            child: const Icon(CupertinoIcons.star_fill, size: 18, color: Color(0xFFFFA500)),
+            decoration: BoxDecoration(
+                color: AppColors.premiumGradient.colors.first.withOpacity(0.15),
+                shape: BoxShape.circle),
+            child: const Icon(CupertinoIcons.star_fill,
+                size: 18, color: Color(0xFFFFA500)),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12)),
               ],
             ),
           ),
@@ -55,7 +65,11 @@ class UpsellPrompt extends StatelessWidget {
             color: AppColors.azureMistDeep,
             borderRadius: BorderRadius.circular(20),
             onPressed: () => context.push('/premium/upgrade'),
-            child: const Text('Upgrade', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            child: const Text('Upgrade',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
       ),

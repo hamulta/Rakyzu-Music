@@ -10,7 +10,9 @@ class SubscriptionConfig {
   static const String currency = 'IDR';
   static String formatIdr(int v) {
     // Simple IDR formatter without intl dependency in config.
-    final s = v.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    final s = v
+        .toString()
+        .replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
     return 'Rp $s';
   }
 }

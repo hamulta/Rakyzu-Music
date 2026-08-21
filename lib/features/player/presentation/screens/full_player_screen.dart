@@ -181,7 +181,8 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
   ) {
     final controller = ref.read(playerControllerProvider.notifier);
     final gate = ref.watch(adsGateProvider);
-    final isLimitReached = gate.shouldEnforceSkipLimit && controller.isSkipLimitReached;
+    final isLimitReached =
+        gate.shouldEnforceSkipLimit && controller.isSkipLimitReached;
 
     Future<void> handleSkip(Future<void> Function() action) async {
       if (gate.shouldEnforceSkipLimit) {
@@ -189,7 +190,8 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Skip limit 6/jam tercapai. Reset dalam ${controller.skipTimeUntilReset.inMinutes} menit. Upgrade untuk unlimited.'),
+              content: Text(
+                  'Skip limit 6/jam tercapai. Reset dalam ${controller.skipTimeUntilReset.inMinutes} menit. Upgrade untuk unlimited.'),
               action: SnackBarAction(
                 label: 'Upgrade',
                 onPressed: () => _showUpsell(context, 'skip'),
@@ -202,7 +204,8 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
         if (!allowed) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Skip limit tercapai. Coba lagi nanti.')),
+            const SnackBar(
+                content: Text('Skip limit tercapai. Coba lagi nanti.')),
           );
           return;
         }
@@ -224,7 +227,9 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                     : 'Skips left: ${controller.skipRemaining}/6 per hour',
                 style: TextStyle(
                   fontSize: 11,
-                  color: isLimitReached ? AppColors.accentWarning : AppColors.textSecondary,
+                  color: isLimitReached
+                      ? AppColors.accentWarning
+                      : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -257,11 +262,15 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
-                onPressed: isLimitReached ? null : () => handleSkip(controller.skipPrevious),
+                onPressed: isLimitReached
+                    ? null
+                    : () => handleSkip(controller.skipPrevious),
                 icon: Icon(
                   CupertinoIcons.backward_fill,
                   size: 32,
-                  color: isLimitReached ? AppColors.textSecondary.withOpacity(0.35) : null,
+                  color: isLimitReached
+                      ? AppColors.textSecondary.withOpacity(0.35)
+                      : null,
                 ),
               ),
               _PlayPauseButton(
@@ -270,11 +279,15 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                 onPressed: controller.togglePlay,
               ),
               IconButton(
-                onPressed: isLimitReached ? null : () => handleSkip(controller.skipNext),
+                onPressed: isLimitReached
+                    ? null
+                    : () => handleSkip(controller.skipNext),
                 icon: Icon(
                   CupertinoIcons.forward_fill,
                   size: 32,
-                  color: isLimitReached ? AppColors.textSecondary.withOpacity(0.35) : null,
+                  color: isLimitReached
+                      ? AppColors.textSecondary.withOpacity(0.35)
+                      : null,
                 ),
               ),
             ],

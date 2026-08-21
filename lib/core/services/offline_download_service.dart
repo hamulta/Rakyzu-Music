@@ -49,7 +49,8 @@ class OfflineDownloadService {
     return enc.Key(Uint8List.fromList(digest.bytes));
   }
 
-  Future<bool> isDownloaded(String songId) async => (await _fileFor(songId)).exists();
+  Future<bool> isDownloaded(String songId) async =>
+      (await _fileFor(songId)).exists();
 
   Future<List<String>> getDownloadedIds() async {
     try {
