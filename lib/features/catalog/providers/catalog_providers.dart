@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/providers/supabase_providers.dart';
+import '../../onboarding/providers/onboarding_provider.dart';
 import '../data/catalog_repository.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
+import '../models/genre.dart';
 import '../models/song.dart';
 
 /// Singleton repository katalog.
@@ -252,4 +254,165 @@ class SongsController extends StateNotifier<AsyncValue<List<Song>>> {
 final songsControllerProvider =
     StateNotifierProvider<SongsController, AsyncValue<List<Song>>>((ref) {
   return SongsController(ref.watch(catalogRepositoryProvider));
+});
+
+// ---------------------------------------------------------------------------
+// TRENDING SONGS
+// ---------------------------------------------------------------------------
+
+final trendingSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getTrendingSongs(limit: 20);
+});
+
+// ---------------------------------------------------------------------------
+// NEW RELEASE SONGS
+// ---------------------------------------------------------------------------
+
+final newReleaseSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getNewReleaseSongs(limit: 20);
+});
+
+// ---------------------------------------------------------------------------
+// NEW RELEASE ALBUMS
+// ---------------------------------------------------------------------------
+
+final newReleaseAlbumsProvider = FutureProvider<List<Album>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getNewReleaseAlbums(limit: 10);
+});
+
+// ---------------------------------------------------------------------------
+// GENRES
+// ---------------------------------------------------------------------------
+
+final genresProvider = FutureProvider<List<Genre>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getGenres();
+});
+
+/// Songs by genre — takes genre name as argument.
+final songsByGenreProvider =
+    FutureProvider.family<List<Song>, String>((ref, genre) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getSongsByGenre(genre);
+});
+
+// ---------------------------------------------------------------------------
+// ARTIST DETAIL
+// ---------------------------------------------------------------------------
+
+/// Follower count for an artist — takes artistId as argument.
+final artistFollowerCountProvider =
+    FutureProvider.family<int, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getArtistFollowerCount(artistId);
+});
+
+/// Whether current user follows an artist — takes artistId as argument.
+final isFollowingArtistProvider =
+    FutureProvider.family<bool, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.isFollowingArtist(artistId);
+});
+
+/// Top tracks for an artist — takes artistId as argument.
+final artistTopTracksProvider =
+    FutureProvider.family<List<Song>, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getArtistTopTracks(artistId);
+});
+
+/// Albums by an artist — takes artistId as argument.
+final artistAlbumsProvider =
+    FutureProvider.family<List<Album>, String>((ref, artistId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getArtistAlbums(artistId);
+});
+
+// ---------------------------------------------------------------------------
+// ALBUM DETAIL
+// ---------------------------------------------------------------------------
+
+/// Tracks in an album — takes albumId as argument.
+final albumTracksProvider =
+    FutureProvider.family<List<Song>, String>((ref, albumId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getAlbumTracks(albumId);
+});
+
+// ---------------------------------------------------------------------------
+// MADE FOR YOU (genre-based recommendations)
+// ---------------------------------------------------------------------------
+
+/// Recommended songs based on user's preferred genres from onboarding.
+/// Excludes songs the user has already played recently.
+final recommendedSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+
+  // Get user's preferred genres from onboarding.
+  final onboarding = ref.watch(onboardingProvider);
+  final genres = onboarding.selectedGenres;
+
+  // Get recently played song IDs for exclusion.
+  final recentIds = await repo.getRecentlyPlayedSongIds();
+
+  // Get recommended songs.
+  final allRecommended = await repo.getRecommendedSongs(genres, limit: 30);
+
+  // Exclude recently played songs.
+  final filtered =
+      allRecommended.where((s) => !recentIds.contains(s.id)).toList();
+
+  return filtered.take(20).toList();
+});
+
+// ---------------------------------------------------------------------------
+// RECENTLY PLAYED
+// ---------------------------------------------------------------------------
+
+/// Recently played songs for current user (deduplicated, most recent first).
+final recentlyPlayedProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getRecentlyPlayedSongs(limit: 20);
+});
+
+// ---------------------------------------------------------------------------
+// FOLLOWED ARTISTS
+// ---------------------------------------------------------------------------
+
+final followedArtistsProvider = FutureProvider<List<Artist>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getFollowedArtists();
+});
+
+// ---------------------------------------------------------------------------
+// LIKED SONGS
+// ---------------------------------------------------------------------------
+
+final likedSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getLikedSongs();
+});
+
+final isSongLikedProvider =
+    FutureProvider.family<bool, String>((ref, songId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.isSongLiked(songId);
+});
+
+final likedSongsCountProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getLikedSongsCount();
+});
+
+// ---------------------------------------------------------------------------
+// PLAY HISTORY DETAILED
+// ---------------------------------------------------------------------------
+
+final playHistoryDetailedProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getPlayHistoryDetailed(limit: 100);
 });

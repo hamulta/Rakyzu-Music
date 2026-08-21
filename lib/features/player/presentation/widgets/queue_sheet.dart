@@ -32,7 +32,7 @@ class QueueSheet extends ConsumerWidget {
       minChildSize: 0.3,
       maxChildSize: 0.9,
       builder: (context, scrollController) {
-        return Container(
+        return DecoratedBox(
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1A1B2E) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -91,9 +91,7 @@ class QueueSheet extends ConsumerWidget {
                     : ReorderableListView.builder(
                         scrollController: scrollController,
                         itemCount: playerState.queue.length,
-                        onReorder: (oldIndex, newIndex) {
-                          controller.reorderQueue(oldIndex, newIndex);
-                        },
+                        onReorder: controller.reorderQueue,
                         itemBuilder: (context, index) {
                           final song = playerState.queue[index];
                           final isCurrentTrack =

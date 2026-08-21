@@ -21,13 +21,18 @@ class HomeTab extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final artists =
         ref.watch(artistsControllerProvider).valueOrNull ?? const [];
-    final albums = ref.watch(albumsControllerProvider).valueOrNull ?? const [];
     final songs = ref.watch(songsControllerProvider).valueOrNull ?? const [];
+    final trendingSongs = ref.watch(trendingSongsProvider).valueOrNull ?? [];
+    final newReleaseAlbums =
+        ref.watch(newReleaseAlbumsProvider).valueOrNull ?? [];
+    final newReleaseSongs =
+        ref.watch(newReleaseSongsProvider).valueOrNull ?? [];
+    final recommendedSongs =
+        ref.watch(recommendedSongsProvider).valueOrNull ?? [];
+    final recentlyPlayed = ref.watch(recentlyPlayedProvider).valueOrNull ?? [];
 
     final verifiedArtists =
         artists.where((a) => a.isVerified).toList().take(6).toList();
-    final recentSongs = songs.take(10).toList();
-    final recentAlbums = albums.take(6).toList();
 
     return Scaffold(
       body: DecoratedBox(
@@ -55,50 +60,92 @@ class HomeTab extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              if (recentAlbums.isNotEmpty) ...[
-                const _SectionHeader('Album Terbaru'),
-                const SizedBox(height: 12),
-                SizedBox(
+
+              // Trending Now — songs with highest play_count.
+              if (trendingSongs.isNotEmpty) ...[
+                _FeedSection<Song>(
+                  title: 'Trending Now',
+                  items: trendingSongs,
                   height: 180,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: recentAlbums.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) =>
-                        _AlbumCard(album: recentAlbums[index]),
-                  ),
+                  itemBuilder: (song) => _SongCard(song: song),
                 ),
                 const SizedBox(height: 24),
               ],
+
+              // New Releases — albums by created_at desc.
+              if (newReleaseAlbums.isNotEmpty) ...[
+                _FeedSection<Album>(
+                  title: 'New Releases',
+                  items: newReleaseAlbums,
+                  height: 180,
+                  itemBuilder: (album) => _AlbumCard(album: album),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // Verified artists.
               if (verifiedArtists.isNotEmpty) ...[
-                const _SectionHeader('Artis Pilihan'),
-                const SizedBox(height: 12),
-                SizedBox(
+                _FeedSection<Artist>(
+                  title: 'Artis Pilihan',
+                  items: verifiedArtists,
                   height: 120,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: verifiedArtists.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) =>
-                        _ArtistCard(artist: verifiedArtists[index]),
-                  ),
+                  itemBuilder: (artist) => _ArtistCard(artist: artist),
                 ),
                 const SizedBox(height: 24),
               ],
-              const _SectionHeader('Lagu Terbaru'),
-              const SizedBox(height: 12),
-              if (recentSongs.isEmpty)
-                const _EmptyFeed()
-              else
+
+              // Made For You — personalized recommendations.
+              if (recommendedSongs.isNotEmpty) ...[
+                _FeedSection<Song>(
+                  title: 'Made For You',
+                  items: recommendedSongs,
+                  height: 180,
+                  itemBuilder: (song) => _SongCard(song: song),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // Recently Played — from play_history.
+              if (recentlyPlayed.isNotEmpty) ...[
+                _FeedSection<Song>(
+                  title: 'Recently Played',
+                  items: recentlyPlayed,
+                  height: 180,
+                  itemBuilder: (song) => _SongCard(song: song),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // New release songs — vertical list.
+              if (newReleaseSongs.isNotEmpty) ...[
+                const _SectionHeader('Lagu Terbaru'),
+                const SizedBox(height: 12),
                 Column(
                   children: [
-                    for (final song in recentSongs)
+                    for (final song in newReleaseSongs.take(10))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _SongRow(song: song),
                       ),
                   ],
                 ),
+                const SizedBox(height: 24),
+              ],
+
+              // Fallback: all songs if no new releases.
+              if (newReleaseSongs.isEmpty && songs.isNotEmpty) ...[
+                const _SectionHeader('Semua Lagu'),
+                const SizedBox(height: 12),
+                Column(
+                  children: [
+                    for (final song in songs.take(10))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SongRow(song: song),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -106,6 +153,49 @@ class HomeTab extends ConsumerWidget {
     );
   }
 }
+
+// =============================================================================
+// REUSABLE FEED SECTION
+// =============================================================================
+
+/// Generic horizontal scroll section — title + card list.
+class _FeedSection<T> extends StatelessWidget {
+  const _FeedSection({
+    required this.title,
+    required this.items,
+    required this.itemBuilder,
+    this.height = 180,
+  });
+
+  final String title;
+  final List<T> items;
+  final Widget Function(T item) itemBuilder;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: height,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => itemBuilder(items[index]),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// SECTION HEADER
+// =============================================================================
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader(this.title);
@@ -117,6 +207,10 @@ class _SectionHeader extends StatelessWidget {
     return Text(title, style: Theme.of(context).textTheme.titleLarge);
   }
 }
+
+// =============================================================================
+// CARD WIDGETS
+// =============================================================================
 
 class _AlbumCard extends StatelessWidget {
   const _AlbumCard({required this.album});
@@ -156,6 +250,88 @@ class _AlbumCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _SongCard extends ConsumerWidget {
+  const _SongCard({required this.song});
+
+  final Song song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: 140,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SignedImage(
+                  value: song.coverUrl,
+                  width: 140,
+                  height: 140,
+                  fallbackIcon: CupertinoIcons.music_note,
+                ),
+              ),
+              if (song.playCount > 0)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          CupertinoIcons.play_fill,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          _formatCount(song.playCount),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            song.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (song.artistName != null && song.artistName!.isNotEmpty)
+            Text(
+              song.artistName!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
   }
 }
 
@@ -205,6 +381,10 @@ class _ArtistCard extends StatelessWidget {
     );
   }
 }
+
+// =============================================================================
+// SONG ROW (vertical list item)
+// =============================================================================
 
 class _SongRow extends ConsumerWidget {
   const _SongRow({required this.song});
@@ -274,6 +454,10 @@ class _SongRow extends ConsumerWidget {
   }
 }
 
+// =============================================================================
+// PLAY TOGGLE
+// =============================================================================
+
 class _PlayToggle extends ConsumerWidget {
   const _PlayToggle({required this.song, required this.isActive});
 
@@ -314,13 +498,11 @@ class _PlayToggle extends ConsumerWidget {
 
     final controller = ref.read(playerControllerProvider.notifier);
 
-    // Jika sudah aktif, toggle play/pause.
     if (isActive) {
       await controller.togglePlay();
       return;
     }
 
-    // Play lagu baru — ambil semua songs dari controller untuk queue.
     final songs = ref.read(songsControllerProvider).valueOrNull ?? [];
     if (songs.isNotEmpty) {
       final idx = songs.indexWhere((s) => s.id == song.id);
@@ -328,31 +510,5 @@ class _PlayToggle extends ConsumerWidget {
     } else {
       await controller.playSingle(song);
     }
-  }
-}
-
-class _EmptyFeed extends StatelessWidget {
-  const _EmptyFeed();
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-      child: Column(
-        children: [
-          const Icon(
-            CupertinoIcons.music_note,
-            color: AppColors.azureMistDeep,
-            size: 28,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Belum ada lagu. Katalog akan tampil di sini.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ),
-    );
   }
 }
