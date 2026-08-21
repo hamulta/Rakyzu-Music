@@ -30,6 +30,8 @@ import '../../features/main/presentation/main_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/premium/presentation/pages/premium_upgrade_placeholder_page.dart';
+import '../../features/subscription/presentation/pages/checkout_page.dart';
+import '../../features/subscription/presentation/pages/transaction_history_page.dart';
 import '../constants/app_routes.dart';
 
 /// Root app router
@@ -238,6 +240,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'premium-upgrade',
         builder: (context, state) => const PremiumUpgradePlaceholderPage(),
       ),
+      GoRoute(
+        path: '/premium/checkout',
+        name: 'premium-checkout',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return CheckoutPage(snapToken: extra['snap_token'] as String?, redirectUrl: extra['redirect_url'] as String?, plan: extra['plan'] as String? ?? 'monthly');
+        },
+      ),
+      GoRoute(
+        path: '/checkout/result',
+        name: 'checkout-result',
+        builder: (context, state) => CheckoutResultPage(status: state.uri.queryParameters['status'] ?? 'pending'),
+      ),
+      GoRoute(path: '/profile/transactions', name: 'transactions', builder: (context, state) => const TransactionHistoryPage()),
     ],
   );
 });
