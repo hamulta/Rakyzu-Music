@@ -79,6 +79,33 @@ class _PremiumUpgradePlaceholderPageState extends ConsumerState<PremiumUpgradePl
                   SizedBox(width: double.infinity, child: CupertinoButton.filled(onPressed: _loading ? null : _checkout, child: _loading ? const CupertinoActivityIndicator(color: Colors.white) : Text('Continue — ${SubscriptionConfig.formatIdr(_plan == 'monthly' ? SubscriptionConfig.monthlyPriceIdr : SubscriptionConfig.yearlyPriceIdr)}'))),
                   const SizedBox(height: 8),
                   Text('Midtrans Sandbox — no real charge', style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  Consumer(builder: (context, ref, _) {
+                    final active = ref.watch(activeSubscriptionProvider).valueOrNull;
+                    if (active == null) return const SizedBox.shrink();
+                    return Column(children: [
+                      Text('Active: ${active.planType} until ${active.endDate?.toLocal().toString().split(' ').first ?? '-'}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary), textAlign: TextAlign.center),
+                      const SizedBox(height: 8),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        color: AppColors.textSecondary.withOpacity(0.15),
+                        child: const Text('Cancel Auto-Renewal', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        onPressed: () async {
+                          final ok = await showCupertinoDialog<bool>(context: context, builder: (c) => CupertinoAlertDialog(title: const Text('Cancel subscription?'), content: const Text('You will remain Premium until end_date, then downgrade to Free.'), actions: [CupertinoDialogAction(onPressed: () => Navigator.pop(c, false), child: const Text('Keep')), CupertinoDialogAction(isDestructiveAction: true, onPressed: () => Navigator.pop(c, true), child: const Text('Cancel'))]));
+                          if (ok == true) {
+                            try {
+                              await ref.read(subscriptionRepositoryProvider).cancelSubscription(active.id);
+                              ref.invalidate(mySubscriptionsProvider);
+                              ref.invalidate(activeSubscriptionProvider);
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cancelled — remains Premium until expiry')));
+                            } catch (e) {
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                            }
+                          }
+                        },
+                      ),
+                    ]);
+                  }),
                 ]),
               ),
               const SizedBox(height: 12),
