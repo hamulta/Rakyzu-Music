@@ -21,6 +21,11 @@ import '../../features/discovery/presentation/pages/album_detail_page.dart';
 import '../../features/discovery/presentation/pages/artist_detail_page.dart';
 import '../../features/discovery/presentation/pages/genre_browse_page.dart';
 import '../../features/discovery/presentation/pages/genre_detail_page.dart';
+import '../../features/library/presentation/pages/following_page.dart';
+import '../../features/library/presentation/pages/liked_songs_page.dart';
+import '../../features/library/presentation/pages/playlist_detail_page.dart';
+import '../../features/library/presentation/pages/playlist_form_page.dart';
+import '../../features/library/presentation/pages/recently_played_page.dart';
 import '../../features/main/presentation/main_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
@@ -190,6 +195,42 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id'] ?? '';
           return AlbumDetailPage(albumId: id);
         },
+      ),
+      GoRoute(
+        path: '/library/playlist/create',
+        name: 'playlist-create',
+        builder: (context, state) => const PlaylistFormPage(),
+      ),
+      GoRoute(
+        path: '/library/playlist/:id/edit',
+        name: 'playlist-edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return PlaylistFormPage(playlistId: id);
+        },
+      ),
+      GoRoute(
+        path: '/library/playlist/:id',
+        name: 'playlist-detail',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return PlaylistDetailPage(playlistId: id);
+        },
+      ),
+      GoRoute(
+        path: '/library/liked',
+        name: 'liked-songs',
+        builder: (context, state) => const LikedSongsPage(),
+      ),
+      GoRoute(
+        path: '/library/following',
+        name: 'following',
+        builder: (context, state) => const FollowingPage(),
+      ),
+      GoRoute(
+        path: '/library/history',
+        name: 'recent-history',
+        builder: (context, state) => const RecentlyPlayedPage(),
       ),
     ],
   );
