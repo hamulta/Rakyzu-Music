@@ -12,9 +12,23 @@ import '../../../catalog/models/album.dart';
 import '../../../catalog/models/artist.dart';
 import '../../../catalog/models/song.dart';
 import '../../../catalog/providers/catalog_providers.dart';
+import '../../../search/data/search_history_service.dart';
+
+/// Search history service provider (singleton).
+final searchHistoryServiceProvider = Provider<SearchHistoryService>((ref) {
+  return SearchHistoryService();
+});
+
+/// Search history state provider.
+final searchHistoryProvider =
+    FutureProvider.autoDispose<List<String>>((ref) async {
+  final service = ref.watch(searchHistoryServiceProvider);
+  return service.getHistory();
+});
 
 /// Search tab with real-time as-you-type query to Supabase (debounced ~400ms).
 /// Results are displayed in tabs: Songs, Artists, Albums, Playlists.
+/// Search history is shown as suggestion chips when the bar is empty.
 class SearchTab extends ConsumerStatefulWidget {
   const SearchTab({super.key});
 
@@ -77,6 +91,11 @@ class _SearchTabState extends ConsumerState<SearchTab>
 
     setState(() => _isLoading = true);
 
+    // Save to history.
+    final historyService = ref.read(searchHistoryServiceProvider);
+    await historyService.addQuery(query);
+    ref.invalidate(searchHistoryProvider);
+
     final repo = ref.read(catalogRepositoryProvider);
     try {
       final results = await Future.wait([
@@ -99,6 +118,11 @@ class _SearchTabState extends ConsumerState<SearchTab>
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
+  }
+
+  void _onHistoryTap(String query) {
+    _controller.text = query;
+    _onSearchChanged(query);
   }
 
   @override
@@ -181,10 +205,113 @@ class _SearchTabState extends ConsumerState<SearchTab>
     }
 
     if (_query.isEmpty) {
-      return const _GenreGrid();
+      return const _SearchIdleView();
     }
 
     return const _SearchEmptyState();
+  }
+}
+
+// =============================================================================
+// SEARCH IDLE VIEW (genre grid + history chips)
+// =============================================================================
+
+class _SearchIdleView extends ConsumerWidget {
+  const _SearchIdleView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyAsync = ref.watch(searchHistoryProvider);
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        // Search history chips.
+        historyAsync.when(
+          data: (history) {
+            if (history.isEmpty) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(CupertinoIcons.clock,
+                        size: 16, color: AppColors.textSecondary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Recent Searches',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () async {
+                        final service = ref.read(searchHistoryServiceProvider);
+                        await service.clearHistory();
+                        ref.invalidate(searchHistoryProvider);
+                      },
+                      child: const Text(
+                        'Clear',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.azureMistDeep,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final query in history.take(8))
+                      GestureDetector(
+                        onTap: () {
+                          // Find the SearchTabState and call _onHistoryTap.
+                          final state = context
+                              .findAncestorStateOfType<_SearchTabState>();
+                          state?._onHistoryTap(query);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.textSecondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.textSecondary.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Text(
+                            query,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+
+        // Genre grid.
+        Text(
+          'Browse Genres',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 12),
+        const _GenreGrid(),
+      ],
+    );
   }
 }
 
@@ -257,8 +384,9 @@ class _ArtistsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (artists.isEmpty)
+    if (artists.isEmpty) {
       return const _TabEmptyState(message: 'No artists found');
+    }
 
     return GridView.builder(
       padding: const EdgeInsets.all(20),
@@ -282,7 +410,9 @@ class _AlbumsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (albums.isEmpty) return const _TabEmptyState(message: 'No albums found');
+    if (albums.isEmpty) {
+      return const _TabEmptyState(message: 'No albums found');
+    }
 
     return GridView.builder(
       padding: const EdgeInsets.all(20),
@@ -319,7 +449,7 @@ class _PlaylistsTab extends StatelessWidget {
 }
 
 // =============================================================================
-// GENRE GRID (shown when search bar is empty)
+// GENRE GRID
 // =============================================================================
 
 class _GenreGrid extends StatelessWidget {
@@ -339,7 +469,8 @@ class _GenreGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
-      padding: const EdgeInsets.all(20),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 12,
