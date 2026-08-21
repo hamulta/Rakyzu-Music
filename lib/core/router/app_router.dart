@@ -17,6 +17,8 @@ import '../../features/catalog/presentation/screens/catalog_management_home_scre
 import '../../features/catalog/presentation/screens/song_form_screen.dart';
 import '../../features/catalog/presentation/screens/song_list_screen.dart';
 import '../../features/catalog/presentation/widgets/catalog_access_guard.dart';
+import '../../features/discovery/presentation/pages/genre_browse_page.dart';
+import '../../features/discovery/presentation/pages/genre_detail_page.dart';
 import '../../features/main/presentation/main_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
@@ -157,6 +159,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             );
           },
         ),
+      ),
+      GoRoute(
+        path: '/genres',
+        name: 'genres',
+        builder: (context, state) => const GenreBrowsePage(),
+      ),
+      GoRoute(
+        path: '/genres/:name',
+        name: 'genre-detail',
+        builder: (context, state) {
+          final name = Uri.decodeComponent(state.pathParameters['name'] ?? '');
+          return GenreDetailPage(genreName: name);
+        },
       ),
     ],
   );

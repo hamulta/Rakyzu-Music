@@ -4,6 +4,7 @@ import '../../../shared/providers/supabase_providers.dart';
 import '../data/catalog_repository.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
+import '../models/genre.dart';
 import '../models/song.dart';
 
 /// Singleton repository katalog.
@@ -279,4 +280,20 @@ final newReleaseSongsProvider = FutureProvider<List<Song>>((ref) async {
 final newReleaseAlbumsProvider = FutureProvider<List<Album>>((ref) async {
   final repo = ref.watch(catalogRepositoryProvider);
   return repo.getNewReleaseAlbums(limit: 10);
+});
+
+// ---------------------------------------------------------------------------
+// GENRES
+// ---------------------------------------------------------------------------
+
+final genresProvider = FutureProvider<List<Genre>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getGenres();
+});
+
+/// Songs by genre — takes genre name as argument.
+final songsByGenreProvider =
+    FutureProvider.family<List<Song>, String>((ref, genre) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getSongsByGenre(genre);
 });

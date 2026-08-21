@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/album.dart';
 import '../models/artist.dart';
+import '../models/genre.dart';
 import '../models/song.dart';
 import 'catalog_exception.dart';
 
@@ -357,6 +358,34 @@ class CatalogRepository {
                 )
                 .toList(),
           );
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // GENRES
+  // ---------------------------------------------------------------------------
+
+  Future<List<Genre>> getGenres() async {
+    try {
+      final rows = await _supabase.from('genres').select().order('name');
+      return rows.map(Genre.fromJson).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Get songs filtered by genre, ordered by play_count descending.
+  Future<List<Song>> getSongsByGenre(String genre, {int limit = 50}) async {
+    try {
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .ilike('genre', genre)
+          .order('play_count', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
     } catch (e) {
       throw CatalogException.from(e);
     }
