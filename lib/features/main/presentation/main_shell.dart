@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/ad_banner.dart';
 import '../../../core/widgets/glass_bottom_nav_bar.dart';
 import '../../../core/widgets/glass_mini_player.dart';
 import '../../../core/ads/interstitial_manager.dart';
@@ -91,6 +92,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Column(
       children: [
         Expanded(child: tabContent),
+        const AdBanner(),
         GlassMiniPlayer(
           onTapFullPlayer: () => context.push(AppRoutes.fullPlayer),
         ),
