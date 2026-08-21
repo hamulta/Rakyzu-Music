@@ -570,6 +570,14 @@ class CatalogRepository {
     }
   }
 
+  Future<void> setSongPublished(String id, bool isPublished) async {
+    try {
+      await _supabase.from('songs').update({'is_published': isPublished}).eq('id', id);
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
   /// Reorder track dalam satu album (batch update track_number).
   Future<void> reorderAlbumTracks(
     String albumId,
