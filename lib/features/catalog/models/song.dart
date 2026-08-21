@@ -18,6 +18,7 @@ class Song {
     this.trackNumber = 0,
     this.uploadedBy,
     this.createdAt,
+    this.isPublished = true,
   });
 
   factory Song.fromJson(Map<String, dynamic> json) {
@@ -39,6 +40,7 @@ class Song {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
+      isPublished: json['is_published'] as bool? ?? true,
     );
   }
 
@@ -57,6 +59,7 @@ class Song {
   final int trackNumber;
   final String? uploadedBy;
   final DateTime? createdAt;
+  final bool isPublished;
 
   Map<String, dynamic> toJson() {
     return {
@@ -69,6 +72,7 @@ class Song {
       if (genre != null) 'genre': genre,
       if (lyrics != null) 'lyrics': lyrics,
       'track_number': trackNumber,
+      'is_published': isPublished,
       if (uploadedBy != null) 'uploaded_by': uploadedBy,
     };
   }
@@ -83,6 +87,7 @@ class Song {
     String? genre,
     String? lyrics,
     int? trackNumber,
+    bool? isPublished,
   }) {
     return Song(
       id: id,
@@ -100,6 +105,7 @@ class Song {
       trackNumber: trackNumber ?? this.trackNumber,
       uploadedBy: uploadedBy,
       createdAt: createdAt,
+      isPublished: isPublished ?? this.isPublished,
     );
   }
 }

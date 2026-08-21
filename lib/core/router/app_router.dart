@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../dev/gallery/dev_gallery_screen.dart';
-import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/auth/presentation/auth_wrapper.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
@@ -32,6 +31,15 @@ import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/premium/presentation/pages/premium_upgrade_placeholder_page.dart';
 import '../../features/subscription/presentation/pages/checkout_page.dart';
 import '../../features/subscription/presentation/pages/transaction_history_page.dart';
+import '../../features/admin/presentation/layout/admin_shell.dart';
+import '../../features/admin/presentation/pages/ad_analytics_page.dart';
+import '../../features/admin/presentation/pages/analytics_page.dart';
+import '../../features/admin/presentation/pages/catalog_admin_page.dart';
+import '../../features/admin/presentation/pages/pricing_page.dart';
+import '../../features/admin/presentation/pages/revenue_page.dart';
+import '../../features/admin/presentation/pages/users_page.dart';
+import '../../features/admin/presentation/widgets/admin_role_guard.dart';
+import '../models/app_role.dart';
 import '../constants/app_routes.dart';
 
 /// Root app router
@@ -141,12 +149,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return AlbumDetailScreen(albumId: id ?? '');
         },
       ),
-      GoRoute(
-        path: AppRoutes.admin,
-        name: AppRoutes.adminName,
-        builder: (context, state) => const CatalogAccessGuard(
-          child: AdminDashboardScreen(),
-        ),
+          ShellRoute(
+        builder: (context, state, child) => AdminShell(child: child),
+        routes: [
+          GoRoute(
+            path: AppRoutes.admin,
+            name: AppRoutes.adminName,
+            redirect: (_, __) => '/admin/analytics',
+          ),
+          GoRoute(
+            path: '/admin/analytics',
+            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: AnalyticsPage()),
+          ),
+          GoRoute(
+            path: '/admin/revenue',
+            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: RevenuePage()),
+          ),
+          GoRoute(
+            path: '/admin/users',
+            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: UsersPage()),
+          ),
+          GoRoute(
+            path: '/admin/catalog',
+            builder: (context, state) => const CatalogAccessGuard(child: CatalogAdminPage()),
+          ),
+          GoRoute(
+            path: '/admin/pricing',
+            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.owner], child: PricingPage()),
+          ),
+          GoRoute(
+            path: '/admin/ads',
+            builder: (context, state) => const AdminRoleGuard(allowed: [AppRole.admin, AppRole.owner], child: AdAnalyticsPage()),
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.fullPlayer,
