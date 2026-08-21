@@ -22,7 +22,7 @@ class RecentlyPlayedPage extends ConsumerWidget {
         decoration: BoxDecoration(
             gradient: isDark
                 ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient),
+                : AppColors.lightBackgroundGradient,),
         child: SafeArea(
           child: Column(
             children: [
@@ -32,20 +32,21 @@ class RecentlyPlayedPage extends ConsumerWidget {
                   children: [
                     IconButton(
                         onPressed: () => context.pop(),
-                        icon: const Icon(CupertinoIcons.back)),
+                        icon: const Icon(CupertinoIcons.back),),
                     Text('Recently Played',
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                            ?.copyWith(fontWeight: FontWeight.w700),),
                   ],
                 ),
               ),
               Expanded(
                 child: historyAsync.when(
                   data: (rows) {
-                    if (rows.isEmpty)
+                    if (rows.isEmpty) {
                       return const Center(child: Text('No play history yet'));
+                    }
                     // Dedup by song_id, keep most recent played_at
                     final seen = <String>{};
                     final deduped = <Map<String, dynamic>>[];
@@ -57,7 +58,7 @@ class RecentlyPlayedPage extends ConsumerWidget {
                     }
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                          horizontal: 16, vertical: 8,),
                       itemCount: deduped.length,
                       itemBuilder: (context, i) {
                         final r = deduped[i];
@@ -126,7 +127,7 @@ class _HistoryTile extends ConsumerWidget {
       this.coverUrl,
       this.playedAt,
       required this.songId,
-      required this.song});
+      required this.song,});
   final String title;
   final String? artist;
   final String? coverUrl;
@@ -152,7 +153,7 @@ class _HistoryTile extends ConsumerWidget {
                   value: coverUrl,
                   width: 44,
                   height: 44,
-                  fallbackIcon: CupertinoIcons.music_note)),
+                  fallbackIcon: CupertinoIcons.music_note,),),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -161,7 +162,7 @@ class _HistoryTile extends ConsumerWidget {
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontWeight: FontWeight.w600),),
                 Row(
                   children: [
                     if (artist != null)
@@ -171,11 +172,11 @@ class _HistoryTile extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   color: AppColors.textSecondary,
-                                  fontSize: 12))),
+                                  fontSize: 12,),),),
                     if (timeStr.isNotEmpty)
                       Text(timeStr,
                           style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 11)),
+                              color: AppColors.textSecondary, fontSize: 11,),),
                   ],
                 ),
               ],

@@ -27,9 +27,9 @@ import '../../features/library/presentation/pages/playlist_detail_page.dart';
 import '../../features/library/presentation/pages/playlist_form_page.dart';
 import '../../features/library/presentation/pages/recently_played_page.dart';
 import '../../features/main/presentation/main_shell.dart';
-import '../../features/premium/presentation/pages/premium_upgrade_placeholder_page.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
+import '../../features/premium/presentation/pages/premium_upgrade_placeholder_page.dart';
 import '../constants/app_routes.dart';
 
 /// Root app router
