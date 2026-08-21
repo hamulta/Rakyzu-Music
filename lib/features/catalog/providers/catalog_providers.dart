@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/providers/supabase_providers.dart';
+import '../../onboarding/providers/onboarding_provider.dart';
 import '../data/catalog_repository.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
@@ -339,4 +340,30 @@ final albumTracksProvider =
     FutureProvider.family<List<Song>, String>((ref, albumId) async {
   final repo = ref.watch(catalogRepositoryProvider);
   return repo.getAlbumTracks(albumId);
+});
+
+// ---------------------------------------------------------------------------
+// MADE FOR YOU (genre-based recommendations)
+// ---------------------------------------------------------------------------
+
+/// Recommended songs based on user's preferred genres from onboarding.
+/// Excludes songs the user has already played recently.
+final recommendedSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+
+  // Get user's preferred genres from onboarding.
+  final onboarding = ref.watch(onboardingProvider);
+  final genres = onboarding.selectedGenres;
+
+  // Get recently played song IDs for exclusion.
+  final recentIds = await repo.getRecentlyPlayedSongIds();
+
+  // Get recommended songs.
+  final allRecommended = await repo.getRecommendedSongs(genres, limit: 30);
+
+  // Exclude recently played songs.
+  final filtered =
+      allRecommended.where((s) => !recentIds.contains(s.id)).toList();
+
+  return filtered.take(20).toList();
 });

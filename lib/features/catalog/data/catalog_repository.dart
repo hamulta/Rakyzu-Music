@@ -493,6 +493,53 @@ class CatalogRepository {
     }
   }
 
+  /// Get recommended songs based on genre preferences.
+  /// Fetches songs from user's preferred genres, ordered by play_count.
+  Future<List<Song>> getRecommendedSongs(
+    List<String> genres, {
+    int limit = 20,
+  }) async {
+    try {
+      if (genres.isEmpty) {
+        // Fallback: just get popular songs.
+        final rows = await _supabase
+            .from('songs')
+            .select('*, album:albums(title), artist:artists(name)')
+            .order('play_count', ascending: false)
+            .limit(limit);
+        return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+      }
+
+      // Query songs matching any of the preferred genres.
+      final rows = await _supabase
+          .from('songs')
+          .select('*, album:albums(title), artist:artists(name)')
+          .inFilter('genre', genres)
+          .order('play_count', ascending: false)
+          .limit(limit);
+      return rows.map((row) => Song.fromJson(_mapSongRow(row))).toList();
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  /// Get song IDs that user has recently played (for exclusion in recommendations).
+  Future<List<String>> getRecentlyPlayedSongIds({int limit = 50}) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return const [];
+      final rows = await _supabase
+          .from('play_history')
+          .select('song_id')
+          .eq('user_id', userId)
+          .order('played_at', ascending: false)
+          .limit(limit);
+      return rows.map((r) => r['song_id'] as String).toList();
+    } catch (e) {
+      return const [];
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // SEARCH — multi-table
   // ---------------------------------------------------------------------------

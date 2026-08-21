@@ -27,6 +27,8 @@ class HomeTab extends ConsumerWidget {
         ref.watch(newReleaseAlbumsProvider).valueOrNull ?? [];
     final newReleaseSongs =
         ref.watch(newReleaseSongsProvider).valueOrNull ?? [];
+    final recommendedSongs =
+        ref.watch(recommendedSongsProvider).valueOrNull ?? [];
 
     final verifiedArtists =
         artists.where((a) => a.isVerified).toList().take(6).toList();
@@ -87,6 +89,17 @@ class HomeTab extends ConsumerWidget {
                   items: verifiedArtists,
                   height: 120,
                   itemBuilder: (artist) => _ArtistCard(artist: artist),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // Made For You — personalized recommendations.
+              if (recommendedSongs.isNotEmpty) ...[
+                _FeedSection<Song>(
+                  title: 'Made For You',
+                  items: recommendedSongs,
+                  height: 180,
+                  itemBuilder: (song) => _SongCard(song: song),
                 ),
                 const SizedBox(height: 24),
               ],
