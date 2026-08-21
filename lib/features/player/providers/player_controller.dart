@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide StorageException;
 
 import '../../catalog/data/r2_storage_service.dart';
 import '../../catalog/models/song.dart';
@@ -23,6 +24,8 @@ class PlaybackState {
     this.repeatMode = RepeatMode.off,
     this.isLoading = false,
     this.error,
+    this.crossFadeEnabled = false,
+    this.crossFadeDuration = 3,
   });
 
   final Song? currentTrack;
@@ -34,6 +37,8 @@ class PlaybackState {
   final RepeatMode repeatMode;
   final bool isLoading;
   final String? error;
+  final bool crossFadeEnabled;
+  final int crossFadeDuration; // seconds (1-5)
 
   bool get hasTrack => currentTrack != null;
   bool get hasQueue => queue.isNotEmpty;
@@ -60,6 +65,8 @@ class PlaybackState {
     bool? isLoading,
     String? error,
     bool clearError = false,
+    bool? crossFadeEnabled,
+    int? crossFadeDuration,
   }) {
     return PlaybackState(
       currentTrack:
@@ -72,6 +79,8 @@ class PlaybackState {
       repeatMode: repeatMode ?? this.repeatMode,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      crossFadeEnabled: crossFadeEnabled ?? this.crossFadeEnabled,
+      crossFadeDuration: crossFadeDuration ?? this.crossFadeDuration,
     );
   }
 }
@@ -185,6 +194,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
       final url = await _getSignedUrl(song.audioUrl!);
       await _player.setUrl(url);
       await _player.play();
+      _resetPlayCountFlag();
       state = state.copyWith(
         currentTrack: song,
         queue: [song],
@@ -214,6 +224,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
       final url = await _getSignedUrl(target.audioUrl!);
       await _player.setUrl(url);
       await _player.play();
+      _resetPlayCountFlag();
       state = state.copyWith(
         currentTrack: target,
         queue: songs,
@@ -395,6 +406,82 @@ class PlayerController extends StateNotifier<PlaybackState> {
   }
 
   // ---------------------------------------------------------------------------
+  // Cross-fade
+  // ---------------------------------------------------------------------------
+
+  /// Toggle cross-fade on/off.
+  void toggleCrossFade() {
+    state = state.copyWith(crossFadeEnabled: !state.crossFadeEnabled);
+  }
+
+  /// Set cross-fade duration (1-5 seconds).
+  void setCrossFadeDuration(int seconds) {
+    state = state.copyWith(
+      crossFadeDuration: seconds.clamp(1, 5),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Play count & history (v0.3.8)
+  // ---------------------------------------------------------------------------
+
+  /// Threshold: lagu dianggap "diputar penuh" jika position mencapai
+  /// max(30 detik, 50% durasi). Alasan:
+  /// - 30 detik minimum mencegah spam skip berulang.
+  /// - 50% durasi untuk lagu pendek (< 60 detik).
+  static const int _minPlaySeconds = 30;
+  static const double _playPercentage = 0.5;
+
+  bool _playCountRecorded = false;
+
+  void _checkPlayCountThreshold(Duration position) {
+    if (_playCountRecorded || !state.hasTrack) return;
+
+    final durSec = state.duration.inSeconds;
+    final posSec = position.inSeconds;
+    final threshold =
+        durSec < 60 ? (durSec * _playPercentage).round() : _minPlaySeconds;
+
+    if (posSec >= threshold) {
+      _playCountRecorded = true;
+      _recordPlayCount(state.currentTrack!);
+      _recordPlayHistory(state.currentTrack!);
+    }
+  }
+
+  /// Reset play count flag when track changes.
+  void _resetPlayCountFlag() {
+    _playCountRecorded = false;
+  }
+
+  Future<void> _recordPlayCount(Song song) async {
+    try {
+      final client = Supabase.instance.client;
+      await client.from('songs').update({
+        'play_count': song.playCount + 1,
+      }).eq('id', song.id);
+    } on Object {
+      // Silently fail — play count bukan fitur kritis.
+    }
+  }
+
+  Future<void> _recordPlayHistory(Song song) async {
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await client.from('play_history').insert({
+        'user_id': userId,
+        'song_id': song.id,
+        'played_at': DateTime.now().toIso8601String(),
+      });
+    } on Object {
+      // Silently fail.
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Signed URL management
   // ---------------------------------------------------------------------------
 
@@ -446,6 +533,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
       final url = await _getSignedUrl(track.audioUrl!);
       await _player.setUrl(url);
       await _player.play();
+      _resetPlayCountFlag();
       state = state.copyWith(
         currentTrack: track,
         isLoading: false,
@@ -477,10 +565,6 @@ class PlayerController extends StateNotifier<PlaybackState> {
           state = state.copyWith(isPlaying: false);
         }
     }
-  }
-
-  void _checkPlayCountThreshold(Duration position) {
-    // Placeholder for v0.3.8 (play count tracking).
   }
 
   @override
