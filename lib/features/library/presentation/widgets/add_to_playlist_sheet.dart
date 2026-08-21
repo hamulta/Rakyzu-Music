@@ -52,28 +52,37 @@ class _AddToPlaylistSheetState extends ConsumerState<AddToPlaylistSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
-                    child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(2),),),),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
-                Text('Add to Playlist',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),),
-                Text(widget.song.title,
-                    style: const TextStyle(color: AppColors.textSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,),
+                Text(
+                  'Add to Playlist',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  widget.song.title,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 16),
                 playlistsAsync.when(
                   data: (list) {
                     if (list.isEmpty) {
-                      return const Text('No playlists yet — create one below.',
-                          style: TextStyle(color: AppColors.textSecondary),);
+                      return const Text(
+                        'No playlists yet — create one below.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      );
                     }
                     return Flexible(
                       child: ListView.separated(
@@ -94,30 +103,41 @@ class _AddToPlaylistSheetState extends ConsumerState<AddToPlaylistSheet> {
                                 if (mounted) {
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content:
-                                              Text('Added to "${pl.name}"'),),);
+                                    SnackBar(
+                                      content: Text('Added to "${pl.name}"'),
+                                    ),
+                                  );
                                 }
                               } catch (e) {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed: $e')),);
+                                    SnackBar(content: Text('Failed: $e')),
+                                  );
                                 }
                               }
                             },
                             child: Row(
                               children: [
-                                const Icon(CupertinoIcons.music_note_list,
-                                    color: AppColors.azureMistDeep,),
+                                const Icon(
+                                  CupertinoIcons.music_note_list,
+                                  color: AppColors.azureMistDeep,
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                    child: Text(pl.name,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w600,),),),
-                                Text('${pl.songCount} songs',
+                                  child: Text(
+                                    pl.name,
                                     style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 12,),),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${pl.songCount} songs',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ],
                             ),
                           );
@@ -132,22 +152,28 @@ class _AddToPlaylistSheetState extends ConsumerState<AddToPlaylistSheet> {
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 8),
-                Text('Create new playlist',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),),
+                Text(
+                  'Create new playlist',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                        child: CupertinoTextField(
-                            controller: _newNameCtrl,
-                            placeholder: 'Playlist name',),),
+                      child: CupertinoTextField(
+                        controller: _newNameCtrl,
+                        placeholder: 'Playlist name',
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     CupertinoButton.filled(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10,),
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       onPressed: _creating
                           ? null
                           : () async {
@@ -166,14 +192,18 @@ class _AddToPlaylistSheetState extends ConsumerState<AddToPlaylistSheet> {
                                 if (mounted) {
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              'Created "${pl.name}" and added song',),),);
+                                    SnackBar(
+                                      content: Text(
+                                        'Created "${pl.name}" and added song',
+                                      ),
+                                    ),
+                                  );
                                 }
                               } catch (e) {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed: $e')),);
+                                    SnackBar(content: Text('Failed: $e')),
+                                  );
                                 }
                               } finally {
                                 if (mounted) setState(() => _creating = false);
@@ -181,7 +211,8 @@ class _AddToPlaylistSheetState extends ConsumerState<AddToPlaylistSheet> {
                             },
                       child: _creating
                           ? const CupertinoActivityIndicator(
-                              color: Colors.white,)
+                              color: Colors.white,
+                            )
                           : const Text('Create'),
                     ),
                   ],

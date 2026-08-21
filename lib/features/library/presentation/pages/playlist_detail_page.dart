@@ -25,9 +25,10 @@ class PlaylistDetailPage extends ConsumerWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient,),
+          gradient: isDark
+              ? AppColors.darkBackgroundGradient
+              : AppColors.lightBackgroundGradient,
+        ),
         child: SafeArea(
           child: playlistAsync.when(
             data: (pl) {
@@ -44,8 +45,9 @@ class PlaylistDetailPage extends ConsumerWidget {
                       child: Row(
                         children: [
                           IconButton(
-                              onPressed: () => context.pop(),
-                              icon: const Icon(CupertinoIcons.back),),
+                            onPressed: () => context.pop(),
+                            icon: const Icon(CupertinoIcons.back),
+                          ),
                           const Spacer(),
                           if (pl.isPublic)
                             IconButton(
@@ -53,7 +55,8 @@ class PlaylistDetailPage extends ConsumerWidget {
                                 final link =
                                     'https://rakyzumusic.app/playlist/${pl.id}';
                                 Share.share(
-                                    'Check out my playlist "${pl.name}" on Rakyzu Music: $link',);
+                                  'Check out my playlist "${pl.name}" on Rakyzu Music: $link',
+                                );
                               },
                               icon: const Icon(CupertinoIcons.share),
                             ),
@@ -70,14 +73,15 @@ class PlaylistDetailPage extends ConsumerWidget {
                                     content: Text('Hapus "${pl.name}"?'),
                                     actions: [
                                       CupertinoDialogAction(
-                                          onPressed: () =>
-                                              Navigator.pop(c, false),
-                                          child: const Text('Cancel'),),
+                                        onPressed: () =>
+                                            Navigator.pop(c, false),
+                                        child: const Text('Cancel'),
+                                      ),
                                       CupertinoDialogAction(
-                                          isDestructiveAction: true,
-                                          onPressed: () =>
-                                              Navigator.pop(c, true),
-                                          child: const Text('Delete'),),
+                                        isDestructiveAction: true,
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('Delete'),
+                                      ),
                                     ],
                                   ),
                                 );
@@ -92,9 +96,13 @@ class PlaylistDetailPage extends ConsumerWidget {
                             },
                             itemBuilder: (_) => [
                               const PopupMenuItem(
-                                  value: 'edit', child: Text('Edit'),),
+                                value: 'edit',
+                                child: Text('Edit'),
+                              ),
                               const PopupMenuItem(
-                                  value: 'delete', child: Text('Delete'),),
+                                value: 'delete',
+                                child: Text('Delete'),
+                              ),
                             ],
                           ),
                         ],
@@ -104,7 +112,9 @@ class PlaylistDetailPage extends ConsumerWidget {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 8,),
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
                       child: Column(
                         children: [
                           ClipRRect(
@@ -116,37 +126,48 @@ class PlaylistDetailPage extends ConsumerWidget {
                                         width: 180,
                                         height: 180,
                                         fallbackIcon:
-                                            CupertinoIcons.music_note_list,)
+                                            CupertinoIcons.music_note_list,
+                                      )
                                     : Container(
                                         width: 180,
                                         height: 180,
                                         color: AppColors.azureMistDeep
                                             .withOpacity(0.15),
                                         child: const Icon(
-                                            CupertinoIcons.music_note_list,
-                                            size: 64,
-                                            color: AppColors.azureMistDeep,),),
+                                          CupertinoIcons.music_note_list,
+                                          size: 64,
+                                          color: AppColors.azureMistDeep,
+                                        ),
+                                      ),
                           ),
                           const SizedBox(height: 16),
-                          Text(pl.name,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                              textAlign: TextAlign.center,),
+                          Text(
+                            pl.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                            textAlign: TextAlign.center,
+                          ),
                           if (pl.description != null &&
                               pl.description!.isNotEmpty) ...[
                             const SizedBox(height: 6),
-                            Text(pl.description!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    color: AppColors.textSecondary,),),
+                            Text(
+                              pl.description!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                           ],
                           const SizedBox(height: 8),
-                          Text('${pl.isPublic ? 'Public' : 'Private'} playlist',
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,),),
+                          Text(
+                            '${pl.isPublic ? 'Public' : 'Private'} playlist',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
                           const SizedBox(height: 16),
                           songsAsync.when(
                             data: (songs) {
@@ -156,38 +177,53 @@ class PlaylistDetailPage extends ConsumerWidget {
                                 children: [
                                   CupertinoButton.filled(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 20, vertical: 8,),
+                                      horizontal: 20,
+                                      vertical: 8,
+                                    ),
                                     onPressed: () async {
                                       final ctrl = ref.read(
-                                          playerControllerProvider.notifier,);
-                                      await ctrl.playFromQueue(songs,
-                                          startIndex: 0,);
+                                        playerControllerProvider.notifier,
+                                      );
+                                      await ctrl.playFromQueue(
+                                        songs,
+                                        startIndex: 0,
+                                      );
                                     },
-                                    child: const Row(children: [
-                                      Icon(CupertinoIcons.play_fill, size: 18),
-                                      SizedBox(width: 6),
-                                      Text('Play All'),
-                                    ],),
+                                    child: const Row(
+                                      children: [
+                                        Icon(CupertinoIcons.play_fill,
+                                            size: 18),
+                                        SizedBox(width: 6),
+                                        Text('Play All'),
+                                      ],
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   CupertinoButton(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 20, vertical: 8,),
+                                      horizontal: 20,
+                                      vertical: 8,
+                                    ),
                                     color: AppColors.textSecondary
                                         .withOpacity(0.15),
                                     onPressed: () async {
                                       final list = List<Song>.from(songs)
                                         ..shuffle();
                                       final ctrl = ref.read(
-                                          playerControllerProvider.notifier,);
-                                      await ctrl.playFromQueue(list,
-                                          startIndex: 0,);
+                                        playerControllerProvider.notifier,
+                                      );
+                                      await ctrl.playFromQueue(
+                                        list,
+                                        startIndex: 0,
+                                      );
                                     },
-                                    child: const Row(children: [
-                                      Icon(CupertinoIcons.shuffle, size: 18),
-                                      SizedBox(width: 6),
-                                      Text('Shuffle'),
-                                    ],),
+                                    child: const Row(
+                                      children: [
+                                        Icon(CupertinoIcons.shuffle, size: 18),
+                                        SizedBox(width: 6),
+                                        Text('Shuffle'),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               );
@@ -204,11 +240,15 @@ class PlaylistDetailPage extends ConsumerWidget {
                     data: (songs) {
                       if (songs.isEmpty) {
                         return const SliverToBoxAdapter(
-                            child: Padding(
-                                padding: EdgeInsets.all(32),
-                                child: Center(
-                                    child: Text(
-                                        'Belum ada lagu • tap + Add to Playlist dari Home/Search',),),),);
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(
+                              child: Text(
+                                'Belum ada lagu • tap + Add to Playlist dari Home/Search',
+                              ),
+                            ),
+                          ),
+                        );
                       }
                       return SliverReorderableList(
                         itemCount: songs.length,
@@ -229,21 +269,26 @@ class PlaylistDetailPage extends ConsumerWidget {
                           return Padding(
                             key: ValueKey(s.id),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4,),
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
                             child: _PlaylistSongTile(
-                                playlistId: playlistId,
-                                song: s,
-                                index: i,
-                                songs: songs,
-                                isOwner: isOwner,),
+                              playlistId: playlistId,
+                              song: s,
+                              index: i,
+                              songs: songs,
+                              isOwner: isOwner,
+                            ),
                           );
                         },
                       );
                     },
                     loading: () => const SliverToBoxAdapter(
-                        child: Center(child: CupertinoActivityIndicator()),),
+                      child: Center(child: CupertinoActivityIndicator()),
+                    ),
                     error: (e, _) => SliverToBoxAdapter(
-                        child: Center(child: Text('Error: $e')),),
+                      child: Center(child: Text('Error: $e')),
+                    ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
@@ -259,12 +304,13 @@ class PlaylistDetailPage extends ConsumerWidget {
 }
 
 class _PlaylistSongTile extends ConsumerWidget {
-  const _PlaylistSongTile(
-      {required this.playlistId,
-      required this.song,
-      required this.index,
-      required this.songs,
-      required this.isOwner,});
+  const _PlaylistSongTile({
+    required this.playlistId,
+    required this.song,
+    required this.index,
+    required this.songs,
+    required this.isOwner,
+  });
   final String playlistId;
   final Song song;
   final int index;
@@ -281,32 +327,44 @@ class _PlaylistSongTile extends ConsumerWidget {
       child: Row(
         children: [
           if (isOwner)
-            const Icon(CupertinoIcons.bars,
-                size: 16, color: AppColors.textSecondary,),
+            const Icon(
+              CupertinoIcons.bars,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
           if (isOwner) const SizedBox(width: 8),
           ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SignedImage(
-                  value: song.coverUrl,
-                  width: 44,
-                  height: 44,
-                  fallbackIcon: CupertinoIcons.music_note,),),
+            borderRadius: BorderRadius.circular(8),
+            child: SignedImage(
+              value: song.coverUrl,
+              width: 44,
+              height: 44,
+              fallbackIcon: CupertinoIcons.music_note,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(song.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isActive ? AppColors.azureMistDeep : null,),),
-                Text(song.artistName ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12,),),
+                Text(
+                  song.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? AppColors.azureMistDeep : null,
+                  ),
+                ),
+                Text(
+                  song.artistName ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -322,10 +380,11 @@ class _PlaylistSongTile extends ConsumerWidget {
               }
             },
             icon: Icon(
-                isActive && playerState.isPlaying
-                    ? CupertinoIcons.pause_fill
-                    : CupertinoIcons.play_fill,
-                size: 18,),
+              isActive && playerState.isPlaying
+                  ? CupertinoIcons.pause_fill
+                  : CupertinoIcons.play_fill,
+              size: 18,
+            ),
           ),
           if (isOwner)
             PopupMenuButton<String>(
@@ -340,7 +399,9 @@ class _PlaylistSongTile extends ConsumerWidget {
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(
-                    value: 'remove', child: Text('Remove from playlist'),),
+                  value: 'remove',
+                  child: Text('Remove from playlist'),
+                ),
               ],
             ),
         ],

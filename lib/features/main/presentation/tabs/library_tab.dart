@@ -51,15 +51,19 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: Row(
                     children: [
-                      Text('Library',
-                          style: Theme.of(context).textTheme.headlineLarge,),
+                      Text(
+                        'Library',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
                       const Spacer(),
                       if (showPlaylists)
                         IconButton(
                           onPressed: () =>
                               context.push('/library/playlist/create'),
-                          icon: const Icon(CupertinoIcons.add_circled,
-                              color: AppColors.azureMistDeep,),
+                          icon: const Icon(
+                            CupertinoIcons.add_circled,
+                            color: AppColors.azureMistDeep,
+                          ),
                         ),
                     ],
                   ),
@@ -90,17 +94,22 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     child: Row(
                       children: [
-                        Text('Playlists',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),),
+                        Text(
+                          'Playlists',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         const Spacer(),
                         myPlaylistsAsync.when(
-                          data: (list) => Text('${list.length}',
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,),),
+                          data: (list) => Text(
+                            '${list.length}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
                           loading: () => const SizedBox.shrink(),
                           error: (_, __) => const SizedBox.shrink(),
                         ),
@@ -117,17 +126,22 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     child: Row(
                       children: [
-                        Text('Following',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),),
+                        Text(
+                          'Following',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         const Spacer(),
                         followedAsync.when(
-                          data: (l) => Text('${l.length}',
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,),),
+                          data: (l) => Text(
+                            '${l.length}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
                           loading: () => const SizedBox.shrink(),
                           error: (_, __) => const SizedBox.shrink(),
                         ),
@@ -142,11 +156,13 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                    child: Text('Recently Played',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),),
+                    child: Text(
+                      'Recently Played',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
                 _RecentSection(recentAsync: recentAsync),
@@ -185,8 +201,9 @@ class _FilterChips extends StatelessWidget {
         onSelected: (_) => onSelected(f),
         selectedColor: AppColors.azureMistDeep.withOpacity(0.2),
         labelStyle: TextStyle(
-            color: isSel ? AppColors.azureMistDeep : AppColors.textSecondary,
-            fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,),
+          color: isSel ? AppColors.azureMistDeep : AppColors.textSecondary,
+          fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,
+        ),
       );
     }
 
@@ -219,7 +236,8 @@ class _LikedSongsEntry extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                  colors: [Color(0xFF7FB3E8), Color(0xFF5A9BD8)],),
+                colors: [Color(0xFF7FB3E8), Color(0xFF5A9BD8)],
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(CupertinoIcons.heart_fill, color: Colors.white),
@@ -229,20 +247,29 @@ class _LikedSongsEntry extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Liked Songs',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),),
+                Text(
+                  'Liked Songs',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 2),
-                Text(count == null ? '—' : '$count songs',
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12,),),
+                Text(
+                  count == null ? '—' : '$count songs',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
-          const Icon(CupertinoIcons.chevron_right,
-              color: AppColors.textSecondary, size: 18,),
+          const Icon(
+            CupertinoIcons.chevron_right,
+            color: AppColors.textSecondary,
+            size: 18,
+          ),
         ],
       ),
     );
@@ -265,11 +292,15 @@ class _PlaylistsSection extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(CupertinoIcons.music_note_list,
-                        color: AppColors.textSecondary,),
+                    const Icon(
+                      CupertinoIcons.music_note_list,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(height: 8),
-                    Text('Belum ada playlist',
-                        style: Theme.of(context).textTheme.bodyMedium,),
+                    Text(
+                      'Belum ada playlist',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 8),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
@@ -302,15 +333,17 @@ class _PlaylistsSection extends StatelessWidget {
                                 value: pl.coverUrl,
                                 width: 48,
                                 height: 48,
-                                fallbackIcon: CupertinoIcons.music_note_list,)
+                                fallbackIcon: CupertinoIcons.music_note_list,
+                              )
                             : Container(
                                 width: 48,
                                 height: 48,
                                 color:
                                     AppColors.azureMistDeep.withOpacity(0.15),
                                 child: const Icon(
-                                    CupertinoIcons.music_note_list,
-                                    color: AppColors.azureMistDeep,),
+                                  CupertinoIcons.music_note_list,
+                                  color: AppColors.azureMistDeep,
+                                ),
                               ),
                       ),
                       const SizedBox(width: 12),
@@ -318,22 +351,30 @@ class _PlaylistsSection extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(pl.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600,),),
+                            Text(
+                              pl.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               '${pl.songCount} songs • ${pl.isPublic ? 'Public' : 'Private'}',
                               style: const TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 12,),
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(CupertinoIcons.chevron_right,
-                          size: 16, color: AppColors.textSecondary,),
+                      const Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
                     ],
                   ),
                 ),
@@ -344,12 +385,17 @@ class _PlaylistsSection extends StatelessWidget {
         );
       },
       loading: () => const SliverToBoxAdapter(
-          child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(child: CupertinoActivityIndicator()),),),
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(child: CupertinoActivityIndicator()),
+        ),
+      ),
       error: (e, _) => SliverToBoxAdapter(
-          child: Padding(
-              padding: const EdgeInsets.all(20), child: Text('Error: $e'),),),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('Error: $e'),
+        ),
+      ),
     );
   }
 }
@@ -368,9 +414,9 @@ class _FollowingSection extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: GlassCard(
-                  padding: EdgeInsets.all(16),
-                  child:
-                      Text('Belum follow artist', textAlign: TextAlign.center),),
+                padding: EdgeInsets.all(16),
+                child: Text('Belum follow artist', textAlign: TextAlign.center),
+              ),
             ),
           );
         }
@@ -389,19 +435,24 @@ class _FollowingSection extends StatelessWidget {
                   child: Column(
                     children: [
                       ClipOval(
-                          child: SignedImage(
-                              value: a.imageUrl,
-                              width: 64,
-                              height: 64,
-                              fallbackIcon: CupertinoIcons.person_fill,),),
+                        child: SignedImage(
+                          value: a.imageUrl,
+                          width: 64,
+                          height: 64,
+                          fallbackIcon: CupertinoIcons.person_fill,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       SizedBox(
-                          width: 72,
-                          child: Text(a.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 12),),),
+                        width: 72,
+                        child: Text(
+                          a.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -411,11 +462,17 @@ class _FollowingSection extends StatelessWidget {
         );
       },
       loading: () => const SliverToBoxAdapter(
-          child: SizedBox(
-              height: 64, child: Center(child: CupertinoActivityIndicator()),),),
+        child: SizedBox(
+          height: 64,
+          child: Center(child: CupertinoActivityIndicator()),
+        ),
+      ),
       error: (e, _) => SliverToBoxAdapter(
-          child: Padding(
-              padding: const EdgeInsets.all(20), child: Text('Error: $e'),),),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('Error: $e'),
+        ),
+      ),
     );
   }
 }
@@ -431,10 +488,14 @@ class _RecentSection extends StatelessWidget {
         final songs = list as List;
         if (songs.isEmpty) {
           return const SliverToBoxAdapter(
-              child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Text('No recent plays',
-                      style: TextStyle(color: AppColors.textSecondary),),),);
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'No recent plays',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+          );
         }
         return SliverToBoxAdapter(
           child: SizedBox(
@@ -454,17 +515,22 @@ class _RecentSection extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: SignedImage(
-                            value: s.coverUrl,
-                            width: 110,
-                            height: 110,
-                            fallbackIcon: CupertinoIcons.music_note,),
+                          value: s.coverUrl,
+                          width: 110,
+                          height: 110,
+                          fallbackIcon: CupertinoIcons.music_note,
+                        ),
                       ),
                       const SizedBox(height: 6),
-                      Text(s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600,),),
+                      Text(
+                        s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -474,11 +540,17 @@ class _RecentSection extends StatelessWidget {
         );
       },
       loading: () => const SliverToBoxAdapter(
-          child: SizedBox(
-              height: 80, child: Center(child: CupertinoActivityIndicator()),),),
+        child: SizedBox(
+          height: 80,
+          child: Center(child: CupertinoActivityIndicator()),
+        ),
+      ),
       error: (e, _) => SliverToBoxAdapter(
-          child: Padding(
-              padding: const EdgeInsets.all(20), child: Text('Error: $e'),),),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('Error: $e'),
+        ),
+      ),
     );
   }
 }

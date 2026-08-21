@@ -18,9 +18,10 @@ class FollowingPage extends ConsumerWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient,),
+          gradient: isDark
+              ? AppColors.darkBackgroundGradient
+              : AppColors.lightBackgroundGradient,
+        ),
         child: SafeArea(
           child: Column(
             children: [
@@ -29,13 +30,16 @@ class FollowingPage extends ConsumerWidget {
                 child: Row(
                   children: [
                     IconButton(
-                        onPressed: () => context.pop(),
-                        icon: const Icon(CupertinoIcons.back),),
-                    Text('Following',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),),
+                      onPressed: () => context.pop(),
+                      icon: const Icon(CupertinoIcons.back),
+                    ),
+                    Text(
+                      'Following',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ],
                 ),
               ),
@@ -44,7 +48,8 @@ class FollowingPage extends ConsumerWidget {
                   data: (list) {
                     if (list.isEmpty) {
                       return const Center(
-                          child: Text('Not following anyone yet'),);
+                        child: Text('Not following anyone yet'),
+                      );
                     }
                     return ListView.separated(
                       padding: const EdgeInsets.all(16),
@@ -59,19 +64,27 @@ class FollowingPage extends ConsumerWidget {
                           child: Row(
                             children: [
                               ClipOval(
-                                  child: SignedImage(
-                                      value: a.imageUrl,
-                                      width: 48,
-                                      height: 48,
-                                      fallbackIcon:
-                                          CupertinoIcons.person_fill,),),
+                                child: SignedImage(
+                                  value: a.imageUrl,
+                                  width: 48,
+                                  height: 48,
+                                  fallbackIcon: CupertinoIcons.person_fill,
+                                ),
+                              ),
                               const SizedBox(width: 12),
                               Expanded(
-                                  child: Text(a.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w600,),),),
-                              const Icon(CupertinoIcons.chevron_right,
-                                  size: 16, color: AppColors.textSecondary,),
+                                child: Text(
+                                  a.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const Icon(
+                                CupertinoIcons.chevron_right,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
                             ],
                           ),
                         );

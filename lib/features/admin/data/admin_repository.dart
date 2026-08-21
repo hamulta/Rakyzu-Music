@@ -6,8 +6,17 @@ class AdminRepository {
 
   Future<Map<String, int>> getUserCountsPerRole() async {
     final rows = await _supabase.from('users').select('role');
-    final map = <String, int>{'free':0,'premium':0,'staff':0,'admin':0,'owner':0};
-    for (final r in rows) { final role = (r as Map)['role'] as String? ?? 'free'; map[role] = (map[role] ?? 0) + 1; }
+    final map = <String, int>{
+      'free': 0,
+      'premium': 0,
+      'staff': 0,
+      'admin': 0,
+      'owner': 0
+    };
+    for (final r in rows) {
+      final role = (r as Map)['role'] as String? ?? 'free';
+      map[role] = (map[role] ?? 0) + 1;
+    }
     return map;
   }
 
@@ -25,17 +34,25 @@ class AdminRepository {
     return (rows as List).length;
   }
 
-  Future<List<Map<String, dynamic>>> getTopSongs({int limit=10}) async {
-    final rows = await _supabase.from('songs').select('id,title,artist_id,play_count,artist:artists(name)').order('play_count', ascending:false).limit(limit);
+  Future<List<Map<String, dynamic>>> getTopSongs({int limit = 10}) async {
+    final rows = await _supabase
+        .from('songs')
+        .select('id,title,artist_id,play_count,artist:artists(name)')
+        .order('play_count', ascending: false)
+        .limit(limit);
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
-  Future<List<Map<String, dynamic>>> getUsers({String? search, String? role}) async {
-    var q = _supabase.from('users').select('id,username,email,full_name,role,is_banned,created_at');
-    if (search != null && search.trim().isNotEmpty) q = q.ilike('email','%${search.trim()}%');
+  Future<List<Map<String, dynamic>>> getUsers(
+      {String? search, String? role}) async {
+    var q = _supabase
+        .from('users')
+        .select('id,username,email,full_name,role,is_banned,created_at');
+    if (search != null && search.trim().isNotEmpty)
+      q = q.ilike('email', '%${search.trim()}%');
     if (role != null && role.isNotEmpty) q = q.eq('role', role);
-    final rows = await q.order('created_at', ascending:false).limit(100);
-    return (rows as List).cast<Map<String,dynamic>>();
+    final rows = await q.order('created_at', ascending: false).limit(100);
+    return (rows as List).cast<Map<String, dynamic>>();
   }
 
   Future<void> setUserBanned(String uid, bool banned) async {
@@ -47,30 +64,55 @@ class AdminRepository {
   }
 
   Future<Map<String, dynamic>> getRevenueStats() async {
-    final rows = await _supabase.from('subscriptions').select('plan_type,status').eq('status','active');
+    final rows = await _supabase
+        .from('subscriptions')
+        .select('plan_type,status')
+        .eq('status', 'active');
     var totalRevenue = 0;
     var monthly = 0;
-    var yearly=0;
+    var yearly = 0;
     for (final r in rows as List) {
-      final m = r as Map<String,dynamic>;
+      final m = r as Map<String, dynamic>;
       final plan = m['plan_type'] as String;
-      if (plan == 'monthly') { totalRevenue += 49000; monthly++; } else if (plan == 'yearly'){ totalRevenue += 449000; yearly++; }
+      if (plan == 'monthly') {
+        totalRevenue += 49000;
+        monthly++;
+      } else if (plan == 'yearly') {
+        totalRevenue += 449000;
+        yearly++;
+      }
     }
-    final mrr = monthly*49000 + yearly*449000 ~/12;
-    return {'totalRevenue': totalRevenue, 'activeCount': rows.length, 'monthly': monthly, 'yearly': yearly, 'mrr': mrr};
+    final mrr = monthly * 49000 + yearly * 449000 ~/ 12;
+    return {
+      'totalRevenue': totalRevenue,
+      'activeCount': rows.length,
+      'monthly': monthly,
+      'yearly': yearly,
+      'mrr': mrr
+    };
   }
 
-  Future<List<Map<String,dynamic>>> getPricingPlans() async {
-    final rows = await _supabase.from('pricing_plans').select().order('price_idr');
-    return (rows as List).cast<Map<String,dynamic>>();
+  Future<List<Map<String, dynamic>>> getPricingPlans() async {
+    final rows =
+        await _supabase.from('pricing_plans').select().order('price_idr');
+    return (rows as List).cast<Map<String, dynamic>>();
   }
+
   Future<void> updatePricing(String name, int price) async {
-    await _supabase.from('pricing_plans').update({'price_idr': price, 'updated_at': DateTime.now().toIso8601String()}).eq('name', name);
+    await _supabase.from('pricing_plans').update({
+      'price_idr': price,
+      'updated_at': DateTime.now().toIso8601String()
+    }).eq('name', name);
   }
 
-  Future<List<Map<String,dynamic>>> getAdImpressions({int days=7}) async {
-    final since = DateTime.now().subtract(Duration(days: days)).toIso8601String();
-    final rows = await _supabase.from('ad_impressions').select('ad_type,created_at').gte('created_at', since).order('created_at');
-    return (rows as List).cast<Map<String,dynamic>>();
+  Future<List<Map<String, dynamic>>> getAdImpressions({int days = 7}) async {
+    final since =
+        DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final rows = await _supabase
+        .from('ad_impressions')
+        .select('ad_type,created_at')
+        .gte('created_at', since)
+        .order('created_at');
+    return (rows as List).cast<Map<String, dynamic>>();
   }
 }

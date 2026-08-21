@@ -122,14 +122,16 @@ class PlayerController extends StateNotifier<PlaybackState> {
   // ---------------------------------------------------------------------------
 
   /// Counter skip Free tier (6/jam). Reset tiap jam via SkipLimitService.
-  final SkipLimitService skipLimit = SkipLimitService(limitPerHour: AdsConfig.freeSkipLimitPerHour);
+  final SkipLimitService skipLimit =
+      SkipLimitService(limitPerHour: AdsConfig.freeSkipLimitPerHour);
 
   /// Hitung lagu diputar penuh sejak ad terakhir. Tampilkan interstitial tiap N=3.
   int _songsPlayedSinceAd = 0;
   int get songsPlayedSinceAd => _songsPlayedSinceAd;
 
   /// True jika interstitial harus tampil (hanya untuk Free, N tercapai).
-  bool get shouldShowInterstitial => _songsPlayedSinceAd >= AdsConfig.interstitialInterval;
+  bool get shouldShowInterstitial =>
+      _songsPlayedSinceAd >= AdsConfig.interstitialInterval;
 
   void _incrementSongsPlayed() {
     _songsPlayedSinceAd++;

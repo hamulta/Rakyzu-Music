@@ -140,7 +140,7 @@ jobs:
     name: Build iOS
     runs-on: macos-latest
     needs: [analyze, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: false # DITUNDA ke v2.0.0 per PM — rilis v1.0.0 hanya Android+Web
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

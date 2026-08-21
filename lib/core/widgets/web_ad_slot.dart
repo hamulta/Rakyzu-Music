@@ -17,7 +17,9 @@ class WebAdSlot extends StatelessWidget {
       height: height,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurfaceElevated : Colors.white.withOpacity(0.7),
+        color: isDark
+            ? AppColors.darkSurfaceElevated
+            : Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.getBorderGlass(isDark)),
       ),
@@ -25,7 +27,8 @@ class WebAdSlot extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.campaign_outlined, color: AppColors.textSecondary.withOpacity(0.6)),
+            Icon(Icons.campaign_outlined,
+                color: AppColors.textSecondary.withOpacity(0.6)),
             const SizedBox(height: 4),
             Text(
               'Ad Slot — Web (AdSense ready)',

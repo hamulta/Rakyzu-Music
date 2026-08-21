@@ -50,7 +50,9 @@ class AdsService {
   // Legacy wrapper untuk AdBanner lama (google_mobile_ads) — kini pakai Start.io.
   // AdBanner widget akan memanggil loadBannerAd dan menampilkan StartAppBanner.
   // Keep method signature untuk minim rewrite UI.
-  dynamic createBannerAd({required void Function(dynamic) onAdLoaded, required void Function(dynamic, dynamic) onAdFailed}) {
+  dynamic createBannerAd(
+      {required void Function(dynamic) onAdLoaded,
+      required void Function(dynamic, dynamic) onAdFailed}) {
     // Start.io banner loading via async — panggil manual di widget.
     // Return dummy untuk kompatibilitas, widget sebenarnya pakai loadBannerAd().
     return null;

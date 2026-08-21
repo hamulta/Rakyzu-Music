@@ -202,24 +202,37 @@ class AlbumDetailPage extends ConsumerWidget {
                       final moved = reordered.removeAt(oldIndex);
                       reordered.insert(newIndex, moved);
                       try {
-                        await ref.read(catalogRepositoryProvider).reorderAlbumTracks(
+                        await ref
+                            .read(catalogRepositoryProvider)
+                            .reorderAlbumTracks(
                               albumId,
-                              reordered.asMap().entries.map((e) => (id: e.value.id, trackNumber: e.key + 1)).toList(),
+                              reordered
+                                  .asMap()
+                                  .entries
+                                  .map((e) =>
+                                      (id: e.value.id, trackNumber: e.key + 1))
+                                  .toList(),
                             );
                         ref.invalidate(albumTracksProvider(albumId));
                       } catch (e) {
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reorder failed: $e')));
+                        if (context.mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Reorder failed: $e')));
                       }
                     },
                     itemBuilder: (context, index) => Padding(
                       key: ValueKey(tracks[index].id),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                      child: _TrackTile(song: tracks[index], index: index, allTracks: tracks),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
+                      child: _TrackTile(
+                          song: tracks[index], index: index, allTracks: tracks),
                     ),
                   );
                 },
-                loading: () => const SliverToBoxAdapter(child: Center(child: CupertinoActivityIndicator())),
-                error: (e, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
+                loading: () => const SliverToBoxAdapter(
+                    child: Center(child: CupertinoActivityIndicator())),
+                error: (e, _) =>
+                    SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 100)),

@@ -23,9 +23,10 @@ class LikedSongsPage extends ConsumerWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient,),
+          gradient: isDark
+              ? AppColors.darkBackgroundGradient
+              : AppColors.lightBackgroundGradient,
+        ),
         child: SafeArea(
           child: Column(
             children: [
@@ -34,13 +35,16 @@ class LikedSongsPage extends ConsumerWidget {
                 child: Row(
                   children: [
                     IconButton(
-                        onPressed: () => context.pop(),
-                        icon: const Icon(CupertinoIcons.back),),
-                    Text('Liked Songs',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),),
+                      onPressed: () => context.pop(),
+                      icon: const Icon(CupertinoIcons.back),
+                    ),
+                    Text(
+                      'Liked Songs',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     const Spacer(),
                     likedAsync.when(
                       data: (songs) => songs.isEmpty
@@ -51,8 +55,10 @@ class LikedSongsPage extends ConsumerWidget {
                                     ref.read(playerControllerProvider.notifier);
                                 await ctrl.playFromQueue(songs, startIndex: 0);
                               },
-                              icon: const Icon(CupertinoIcons.play_fill,
-                                  color: AppColors.azureMistDeep,),
+                              icon: const Icon(
+                                CupertinoIcons.play_fill,
+                                color: AppColors.azureMistDeep,
+                              ),
                             ),
                       loading: () => const SizedBox.shrink(),
                       error: (_, __) => const SizedBox.shrink(),
@@ -65,23 +71,32 @@ class LikedSongsPage extends ConsumerWidget {
                   data: (songs) {
                     if (songs.isEmpty) {
                       return const Center(
-                          child:
-                              Column(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(CupertinoIcons.heart,
-                            size: 48, color: AppColors.textSecondary,),
-                        SizedBox(height: 12),
-                        Text('No liked songs yet'),
-                      ],),);
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              CupertinoIcons.heart,
+                              size: 48,
+                              color: AppColors.textSecondary,
+                            ),
+                            SizedBox(height: 12),
+                            Text('No liked songs yet'),
+                          ],
+                        ),
+                      );
                     }
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8,),
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       itemCount: songs.length,
                       itemBuilder: (context, i) {
                         final s = songs[i];
                         return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _LikedTile(song: s, index: i, all: songs),);
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _LikedTile(song: s, index: i, all: songs),
+                        );
                       },
                     );
                   },
@@ -99,8 +114,11 @@ class LikedSongsPage extends ConsumerWidget {
 }
 
 class _LikedTile extends ConsumerWidget {
-  const _LikedTile(
-      {required this.song, required this.index, required this.all,});
+  const _LikedTile({
+    required this.song,
+    required this.index,
+    required this.all,
+  });
   final Song song;
   final int index;
   final List<Song> all;
@@ -115,28 +133,37 @@ class _LikedTile extends ConsumerWidget {
       child: Row(
         children: [
           ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SignedImage(
-                  value: song.coverUrl,
-                  width: 44,
-                  height: 44,
-                  fallbackIcon: CupertinoIcons.music_note,),),
+            borderRadius: BorderRadius.circular(8),
+            child: SignedImage(
+              value: song.coverUrl,
+              width: 44,
+              height: 44,
+              fallbackIcon: CupertinoIcons.music_note,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(song.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isActive ? AppColors.azureMistDeep : null,),),
-                Text(song.artistName ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12,),),
+                Text(
+                  song.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? AppColors.azureMistDeep : null,
+                  ),
+                ),
+                Text(
+                  song.artistName ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -151,10 +178,11 @@ class _LikedTile extends ConsumerWidget {
               }
             },
             icon: Icon(
-                isActive && playerState.isPlaying
-                    ? CupertinoIcons.pause_fill
-                    : CupertinoIcons.play_fill,
-                size: 18,),
+              isActive && playerState.isPlaying
+                  ? CupertinoIcons.pause_fill
+                  : CupertinoIcons.play_fill,
+              size: 18,
+            ),
           ),
           PopupMenuButton<String>(
             onSelected: (v) async {

@@ -7,7 +7,8 @@ class PaymentConfig {
   static const String merchantId = 'M046699444';
   static const String clientKey = 'Mid-client-6CGNGblh8i2GfdRB';
   // Server key TIDAK disimpan di client — lihat supabase/functions secrets
-  static const String env = String.fromEnvironment('PAYMENT_ENV', defaultValue: 'sandbox'); // sandbox | production
+  static const String env = String.fromEnvironment('PAYMENT_ENV',
+      defaultValue: 'sandbox'); // sandbox | production
   static bool get isProduction => env == 'production';
   static bool get isSandbox => !isProduction;
   static String get snapJsUrl => isProduction

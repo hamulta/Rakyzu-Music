@@ -33,8 +33,10 @@ class PlaylistRepository {
     }
   }
 
-  Future<List<Playlist>> getPublicPlaylists(
-      {int limit = 20, String? search,}) async {
+  Future<List<Playlist>> getPublicPlaylists({
+    int limit = 20,
+    String? search,
+  }) async {
     try {
       var query = _supabase
           .from('playlists')
@@ -152,7 +154,8 @@ class PlaylistRepository {
       final rows = await _supabase
           .from('playlist_songs')
           .select(
-              'position, song:songs(*, album:albums(title), artist:artists(name))',)
+            'position, song:songs(*, album:albums(title), artist:artists(name))',
+          )
           .eq('playlist_id', playlistId)
           .order('position');
       final songs = <Song>[];
@@ -216,7 +219,9 @@ class PlaylistRepository {
   }
 
   Future<void> reorderPlaylistSongs(
-      String playlistId, List<String> orderedSongIds,) async {
+    String playlistId,
+    List<String> orderedSongIds,
+  ) async {
     try {
       // Update position per song. Use upsert to ensure atomic per-row.
       for (var i = 0; i < orderedSongIds.length; i++) {

@@ -20,9 +20,10 @@ class RecentlyPlayedPage extends ConsumerWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.darkBackgroundGradient
-                : AppColors.lightBackgroundGradient,),
+          gradient: isDark
+              ? AppColors.darkBackgroundGradient
+              : AppColors.lightBackgroundGradient,
+        ),
         child: SafeArea(
           child: Column(
             children: [
@@ -31,13 +32,16 @@ class RecentlyPlayedPage extends ConsumerWidget {
                 child: Row(
                   children: [
                     IconButton(
-                        onPressed: () => context.pop(),
-                        icon: const Icon(CupertinoIcons.back),),
-                    Text('Recently Played',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),),
+                      onPressed: () => context.pop(),
+                      icon: const Icon(CupertinoIcons.back),
+                    ),
+                    Text(
+                      'Recently Played',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ],
                 ),
               ),
@@ -58,7 +62,9 @@ class RecentlyPlayedPage extends ConsumerWidget {
                     }
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8,),
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       itemCount: deduped.length,
                       itemBuilder: (context, i) {
                         final r = deduped[i];
@@ -121,13 +127,14 @@ class RecentlyPlayedPage extends ConsumerWidget {
 }
 
 class _HistoryTile extends ConsumerWidget {
-  const _HistoryTile(
-      {required this.title,
-      this.artist,
-      this.coverUrl,
-      this.playedAt,
-      required this.songId,
-      required this.song,});
+  const _HistoryTile({
+    required this.title,
+    this.artist,
+    this.coverUrl,
+    this.playedAt,
+    required this.songId,
+    required this.song,
+  });
   final String title;
   final String? artist;
   final String? coverUrl;
@@ -148,35 +155,47 @@ class _HistoryTile extends ConsumerWidget {
       child: Row(
         children: [
           ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SignedImage(
-                  value: coverUrl,
-                  width: 44,
-                  height: 44,
-                  fallbackIcon: CupertinoIcons.music_note,),),
+            borderRadius: BorderRadius.circular(8),
+            child: SignedImage(
+              value: coverUrl,
+              width: 44,
+              height: 44,
+              fallbackIcon: CupertinoIcons.music_note,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 Row(
                   children: [
                     if (artist != null)
                       Expanded(
-                          child: Text(artist!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,),),),
-                    if (timeStr.isNotEmpty)
-                      Text(timeStr,
+                        child: Text(
+                          artist!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 11,),),
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    if (timeStr.isNotEmpty)
+                      Text(
+                        timeStr,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
                   ],
                 ),
               ],
