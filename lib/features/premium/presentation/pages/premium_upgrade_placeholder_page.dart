@@ -168,6 +168,32 @@ class _PremiumUpgradePlaceholderPageState
                             color: AppColors.textSecondary.withOpacity(0.7),
                             fontSize: 11),
                         textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      children: [
+                        const Text('Dengan melanjutkan, Anda menyetujui ',
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        GestureDetector(
+                            onTap: () => context.push('/terms'),
+                            child: const Text('TOS',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.azureMistDeep,
+                                    decoration: TextDecoration.underline))),
+                        const Text(' & ',
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        GestureDetector(
+                            onTap: () => context.push('/privacy'),
+                            child: const Text('Privacy Policy',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.azureMistDeep,
+                                    decoration: TextDecoration.underline))),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     Consumer(
                       builder: (context, ref, _) {

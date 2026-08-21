@@ -24,6 +24,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _agreeTos = false;
 
   @override
   void dispose() {
@@ -36,6 +37,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   Future<void> _handleSignUp() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_agreeTos) {
+      _showError('Anda harus menyetujui TOS & Privacy Policy');
+      return;
+    }
 
     try {
       await ref.read(authControllerProvider.notifier).signUp(
@@ -164,7 +169,41 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             : CupertinoIcons.eye_slash,
                         validator: _validateConfirm,
                       ),
-                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          CupertinoSwitch(
+                              value: _agreeTos,
+                              onChanged: (v) => setState(() => _agreeTos = v)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Wrap(
+                              children: [
+                                const Text('Saya setuju dengan ',
+                                    style: TextStyle(fontSize: 12)),
+                                GestureDetector(
+                                    onTap: () => context.push('/terms'),
+                                    child: const Text('TOS',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.azureMistDeep,
+                                            decoration:
+                                                TextDecoration.underline))),
+                                const Text(' & ',
+                                    style: TextStyle(fontSize: 12)),
+                                GestureDetector(
+                                    onTap: () => context.push('/privacy'),
+                                    child: const Text('Privacy Policy',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.azureMistDeep,
+                                            decoration:
+                                                TextDecoration.underline))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       GlassButton(
                         label: isLoading ? 'Loading...' : 'Daftar',
                         isPrimary: true,
