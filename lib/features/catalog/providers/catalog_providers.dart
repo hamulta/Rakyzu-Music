@@ -377,3 +377,42 @@ final recentlyPlayedProvider = FutureProvider<List<Song>>((ref) async {
   final repo = ref.watch(catalogRepositoryProvider);
   return repo.getRecentlyPlayedSongs(limit: 20);
 });
+
+// ---------------------------------------------------------------------------
+// FOLLOWED ARTISTS
+// ---------------------------------------------------------------------------
+
+final followedArtistsProvider = FutureProvider<List<Artist>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getFollowedArtists();
+});
+
+// ---------------------------------------------------------------------------
+// LIKED SONGS
+// ---------------------------------------------------------------------------
+
+final likedSongsProvider = FutureProvider<List<Song>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getLikedSongs();
+});
+
+final isSongLikedProvider =
+    FutureProvider.family<bool, String>((ref, songId) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.isSongLiked(songId);
+});
+
+final likedSongsCountProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getLikedSongsCount();
+});
+
+// ---------------------------------------------------------------------------
+// PLAY HISTORY DETAILED
+// ---------------------------------------------------------------------------
+
+final playHistoryDetailedProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.getPlayHistoryDetailed(limit: 100);
+});

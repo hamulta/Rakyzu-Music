@@ -181,6 +181,129 @@ class CatalogRepository {
     }
   }
 
+  /// Get artists followed by current user.
+  Future<List<Artist>> getFollowedArtists() async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return [];
+      final rows = await _supabase
+          .from('follows')
+          .select('artist:artists(*)')
+          .eq('user_id', uid)
+          .order('followed_at', ascending: false);
+      final artists = <Artist>[];
+      for (final r in rows) {
+        final a = r['artist'];
+        if (a is Map<String, dynamic>) artists.add(Artist.fromJson(a));
+      }
+      return artists;
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // LIKED_SONGS
+  // ---------------------------------------------------------------------------
+
+  Future<List<Song>> getLikedSongs() async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return [];
+      final rows = await _supabase
+          .from('liked_songs')
+          .select('song:songs(*, album:albums(title), artist:artists(name))')
+          .eq('user_id', uid)
+          .order('liked_at', ascending: false);
+      final songs = <Song>[];
+      for (final r in rows) {
+        final s = r['song'];
+        if (s is Map<String, dynamic>) songs.add(Song.fromJson(_mapSongRow(s)));
+      }
+      return songs;
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  Future<bool> isSongLiked(String songId) async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return false;
+      final rows = await _supabase
+          .from('liked_songs')
+          .select('song_id')
+          .eq('user_id', uid)
+          .eq('song_id', songId)
+          .limit(1);
+      return rows.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> likeSong(String songId) async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return;
+      await _supabase
+          .from('liked_songs')
+          .insert({'user_id': uid, 'song_id': songId});
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  Future<void> unlikeSong(String songId) async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return;
+      await _supabase
+          .from('liked_songs')
+          .delete()
+          .eq('user_id', uid)
+          .eq('song_id', songId);
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
+  Future<int> getLikedSongsCount() async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return 0;
+      final rows = await _supabase
+          .from('liked_songs')
+          .select('song_id')
+          .eq('user_id', uid);
+      return rows.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // PLAY_HISTORY EXTENDED
+  // ---------------------------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> getPlayHistoryDetailed(
+      {int limit = 50}) async {
+    try {
+      final uid = _supabase.auth.currentUser?.id;
+      if (uid == null) return [];
+      final rows = await _supabase
+          .from('play_history')
+          .select(
+              'id, played_at, song:songs(*, album:albums(title), artist:artists(name))')
+          .eq('user_id', uid)
+          .order('played_at', ascending: false)
+          .limit(limit);
+      return rows;
+    } catch (e) {
+      throw CatalogException.from(e);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // ALBUMS
   // ---------------------------------------------------------------------------
@@ -577,7 +700,7 @@ class CatalogRepository {
       // Maintain order from play_history.
       final songMap = {
         for (final row in songRows)
-          row['id'] as String: Song.fromJson(_mapSongRow(row))
+          row['id'] as String: Song.fromJson(_mapSongRow(row)),
       };
       return uniqueIds
           .take(limit)
