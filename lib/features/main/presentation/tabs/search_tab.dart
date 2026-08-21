@@ -14,6 +14,7 @@ import '../../../catalog/models/song.dart';
 import '../../../catalog/providers/catalog_providers.dart';
 
 /// Search tab with real-time as-you-type query to Supabase (debounced ~400ms).
+/// Results are displayed in tabs: Songs, Artists, Albums, Playlists.
 class SearchTab extends ConsumerStatefulWidget {
   const SearchTab({super.key});
 
@@ -21,7 +22,8 @@ class SearchTab extends ConsumerStatefulWidget {
   ConsumerState<SearchTab> createState() => _SearchTabState();
 }
 
-class _SearchTabState extends ConsumerState<SearchTab> {
+class _SearchTabState extends ConsumerState<SearchTab>
+    with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   Timer? _debounce;
   String _query = '';
@@ -34,10 +36,19 @@ class _SearchTabState extends ConsumerState<SearchTab> {
   List<Map<String, dynamic>> _playlists = [];
   bool _isLoading = false;
 
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -117,6 +128,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
                 onChanged: _onSearchChanged,
               ),
               const SizedBox(height: 8),
+              if (_showResults && !_isLoading) _buildTabs(),
               Expanded(
                 child: _buildContent(),
               ),
@@ -127,15 +139,45 @@ class _SearchTabState extends ConsumerState<SearchTab> {
     );
   }
 
+  Widget _buildTabs() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.textSecondary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        isScrollable: true,
+        labelColor: AppColors.azureMistDeep,
+        unselectedLabelColor: AppColors.textSecondary,
+        indicatorColor: AppColors.azureMistDeep,
+        indicatorSize: TabBarIndicatorSize.label,
+        tabs: [
+          _TabWithBadge(label: 'Songs', count: _songs.length),
+          _TabWithBadge(label: 'Artists', count: _artists.length),
+          _TabWithBadge(label: 'Albums', count: _albums.length),
+          _TabWithBadge(label: 'Playlists', count: _playlists.length),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: CupertinoActivityIndicator(),
-      );
+      return const Center(child: CupertinoActivityIndicator());
     }
 
     if (_showResults) {
-      return _buildResults();
+      return TabBarView(
+        controller: _tabController,
+        children: [
+          _SongsTab(songs: _songs),
+          _ArtistsTab(artists: _artists),
+          _AlbumsTab(albums: _albums),
+          _PlaylistsTab(playlists: _playlists),
+        ],
+      );
     }
 
     if (_query.isEmpty) {
@@ -144,83 +186,134 @@ class _SearchTabState extends ConsumerState<SearchTab> {
 
     return const _SearchEmptyState();
   }
+}
 
-  Widget _buildResults() {
-    final hasResults = _songs.isNotEmpty ||
-        _artists.isNotEmpty ||
-        _albums.isNotEmpty ||
-        _playlists.isNotEmpty;
+// =============================================================================
+// TAB WITH BADGE
+// =============================================================================
 
-    if (!hasResults) {
-      return const _SearchEmptyState();
+class _TabWithBadge extends StatelessWidget {
+  const _TabWithBadge({required this.label, required this.count});
+
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.azureMistDeep.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.azureMistDeep,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// TAB VIEWS
+// =============================================================================
+
+class _SongsTab extends StatelessWidget {
+  const _SongsTab({required this.songs});
+
+  final List<Song> songs;
+
+  @override
+  Widget build(BuildContext context) {
+    if (songs.isEmpty) return const _TabEmptyState(message: 'No songs found');
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      itemCount: songs.length,
+      itemBuilder: (context, index) => _SongResultTile(song: songs[index]),
+    );
+  }
+}
+
+class _ArtistsTab extends StatelessWidget {
+  const _ArtistsTab({required this.artists});
+
+  final List<Artist> artists;
+
+  @override
+  Widget build(BuildContext context) {
+    if (artists.isEmpty)
+      return const _TabEmptyState(message: 'No artists found');
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(20),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: artists.length,
+      itemBuilder: (context, index) =>
+          _ArtistResultCard(artist: artists[index]),
+    );
+  }
+}
+
+class _AlbumsTab extends StatelessWidget {
+  const _AlbumsTab({required this.albums});
+
+  final List<Album> albums;
+
+  @override
+  Widget build(BuildContext context) {
+    if (albums.isEmpty) return const _TabEmptyState(message: 'No albums found');
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(20),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.85,
+      ),
+      itemCount: albums.length,
+      itemBuilder: (context, index) => _AlbumResultCard(album: albums[index]),
+    );
+  }
+}
+
+class _PlaylistsTab extends StatelessWidget {
+  const _PlaylistsTab({required this.playlists});
+
+  final List<Map<String, dynamic>> playlists;
+
+  @override
+  Widget build(BuildContext context) {
+    if (playlists.isEmpty) {
+      return const _TabEmptyState(message: 'No playlists found');
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: [
-        if (_songs.isNotEmpty) ...[
-          _ResultSectionHeader(
-            title: 'Songs',
-            count: _songs.length,
-          ),
-          const SizedBox(height: 8),
-          for (final song in _songs.take(5))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _SongResultTile(song: song),
-            ),
-          const SizedBox(height: 16),
-        ],
-        if (_artists.isNotEmpty) ...[
-          _ResultSectionHeader(
-            title: 'Artists',
-            count: _artists.length,
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 100,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _artists.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) =>
-                  _ArtistResultCard(artist: _artists[index]),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_albums.isNotEmpty) ...[
-          _ResultSectionHeader(
-            title: 'Albums',
-            count: _albums.length,
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 180,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _albums.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) =>
-                  _AlbumResultCard(album: _albums[index]),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_playlists.isNotEmpty) ...[
-          _ResultSectionHeader(
-            title: 'Playlists',
-            count: _playlists.length,
-          ),
-          const SizedBox(height: 8),
-          for (final pl in _playlists.take(5))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _PlaylistResultTile(playlist: pl),
-            ),
-          const SizedBox(height: 16),
-        ],
-      ],
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      itemCount: playlists.length,
+      itemBuilder: (context, index) =>
+          _PlaylistResultTile(playlist: playlists[index]),
     );
   }
 }
@@ -272,50 +365,6 @@ class _GenreGrid extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-// =============================================================================
-// RESULT SECTION HEADER
-// =============================================================================
-
-class _ResultSectionHeader extends StatelessWidget {
-  const _ResultSectionHeader({
-    required this.title,
-    required this.count,
-  });
-
-  final String title;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: AppColors.azureMistDeep.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            '$count',
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.azureMistDeep,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -392,28 +441,25 @@ class _ArtistResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 80,
-      child: Column(
-        children: [
-          ClipOval(
-            child: SignedImage(
-              value: artist.imageUrl,
-              width: 64,
-              height: 64,
-              fallbackIcon: CupertinoIcons.person_fill,
-            ),
+    return Column(
+      children: [
+        ClipOval(
+          child: SignedImage(
+            value: artist.imageUrl,
+            width: 80,
+            height: 80,
+            fallbackIcon: CupertinoIcons.person_fill,
           ),
-          const SizedBox(height: 6),
-          Text(
-            artist.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          artist.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
     );
   }
 }
@@ -425,36 +471,33 @@ class _AlbumResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 120,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SignedImage(
-              value: album.coverUrl,
-              width: 120,
-              height: 120,
-              fallbackIcon: CupertinoIcons.music_albums,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SignedImage(
+            value: album.coverUrl,
+            width: double.infinity,
+            height: 120,
+            fallbackIcon: CupertinoIcons.music_albums,
           ),
-          const SizedBox(height: 6),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          album.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        if (album.artistName != null)
           Text(
-            album.title,
+            album.artistName!,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodySmall,
           ),
-          if (album.artistName != null)
-            Text(
-              album.artistName!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -517,8 +560,35 @@ class _PlaylistResultTile extends StatelessWidget {
 }
 
 // =============================================================================
-// EMPTY STATE
+// EMPTY STATES
 // =============================================================================
+
+class _TabEmptyState extends StatelessWidget {
+  const _TabEmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            CupertinoIcons.search,
+            size: 40,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _SearchEmptyState extends StatelessWidget {
   const _SearchEmptyState();
