@@ -22,15 +22,24 @@ else
   echo "app_links build.gradle sudah ter-patch, skip"
 fi
 
-# Workaround Start.io SDK 0.1.6: missing buildFeatures.buildConfig
+# Workaround Start.io SDK 0.1.6: missing buildFeatures.buildConfig & namespace (AGP 8)
 STARTAPP_GRADLE="$BASE/startapp_sdk-0.1.6/android/build.gradle"
 if [[ -f "$STARTAPP_GRADLE" ]]; then
   if ! grep -q "buildFeatures" "$STARTAPP_GRADLE"; then
-    # Insert buildFeatures after android {
     sed -i '/^android {/a \    buildFeatures {\n        buildConfig true\n    }' "$STARTAPP_GRADLE"
     echo "Patched $STARTAPP_GRADLE -> buildFeatures.buildConfig true"
   else
-    echo "startapp_sdk build.gradle sudah ter-patch, skip"
+    echo "startapp_sdk build.gradle buildFeatures sudah ter-patch, skip"
+  fi
+  if ! grep -q "namespace" "$STARTAPP_GRADLE"; then
+    sed -i '/^android {/a \    namespace '\''com.startapp.flutter.sdk'\''' "$STARTAPP_GRADLE"
+    echo "Patched $STARTAPP_GRADLE -> namespace com.startapp.flutter.sdk"
+  else
+    echo "startapp_sdk namespace sudah ada, skip"
+  fi
+  if grep -q "compileSdkVersion 31" "$STARTAPP_GRADLE"; then
+    sed -i 's/compileSdkVersion 31/compileSdkVersion 34/' "$STARTAPP_GRADLE"
+    echo "Patched $STARTAPP_GRADLE -> compileSdkVersion 34"
   fi
 else
   echo "startapp_sdk build.gradle tidak ditemukan di $STARTAPP_GRADLE (skip)"
