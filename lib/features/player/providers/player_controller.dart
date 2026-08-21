@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide StorageException;
 
 import '../../catalog/data/r2_storage_service.dart';
 import '../../catalog/models/song.dart';
+import '../../../core/ads/ads_config.dart';
+import '../../../core/ads/skip_limit_service.dart';
 import 'audio_handler.dart';
 
 /// Repeat mode untuk pemutar.
@@ -114,6 +116,36 @@ class PlayerController extends StateNotifier<PlaybackState> {
   final Map<String, _CachedUrl> _urlCache = {};
 
   AudioPlayer get player => _player;
+
+  // ---------------------------------------------------------------------------
+  // Monetisasi Free tier — skip limit & interstitial (0.6.x)
+  // ---------------------------------------------------------------------------
+
+  /// Counter skip Free tier (6/jam). Reset tiap jam via SkipLimitService.
+  final SkipLimitService skipLimit = SkipLimitService(limitPerHour: AdsConfig.freeSkipLimitPerHour);
+
+  /// Hitung lagu diputar penuh sejak ad terakhir. Tampilkan interstitial tiap N=3.
+  int _songsPlayedSinceAd = 0;
+  int get songsPlayedSinceAd => _songsPlayedSinceAd;
+
+  /// True jika interstitial harus tampil (hanya untuk Free, N tercapai).
+  bool get shouldShowInterstitial => _songsPlayedSinceAd >= AdsConfig.interstitialInterval;
+
+  void _incrementSongsPlayed() {
+    _songsPlayedSinceAd++;
+  }
+
+  void resetInterstitialCounter() {
+    _songsPlayedSinceAd = 0;
+  }
+
+  /// Coba konsumsi 1 skip. Return true jika diizinkan.
+  /// Premium/staff bypass — panggil hanya saat free (gate di UI).
+  bool tryConsumeSkip() => skipLimit.tryConsume();
+
+  bool get isSkipLimitReached => skipLimit.isLimitReached;
+  int get skipRemaining => skipLimit.remaining;
+  Duration get skipTimeUntilReset => skipLimit.timeUntilReset;
 
   /// Set audio handler untuk background playback.
   /// Panggil setelah AudioService.init() di main.dart.
@@ -446,6 +478,7 @@ class PlayerController extends StateNotifier<PlaybackState> {
       _playCountRecorded = true;
       _recordPlayCount(state.currentTrack!);
       _recordPlayHistory(state.currentTrack!);
+      _incrementSongsPlayed();
     }
   }
 
