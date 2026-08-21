@@ -296,7 +296,9 @@ class _SongCard extends ConsumerWidget {
                         Text(
                           _formatCount(song.playCount),
                           style: const TextStyle(
-                              fontSize: 10, color: Colors.white),
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),

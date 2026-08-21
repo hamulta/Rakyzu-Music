@@ -235,8 +235,11 @@ class _SearchIdleView extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(CupertinoIcons.clock,
-                        size: 16, color: AppColors.textSecondary),
+                    const Icon(
+                      CupertinoIcons.clock,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Recent Searches',

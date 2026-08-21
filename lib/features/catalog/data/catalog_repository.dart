@@ -150,8 +150,10 @@ class CatalogRepository {
   }
 
   /// Get top tracks for an artist (by play_count).
-  Future<List<Song>> getArtistTopTracks(String artistId,
-      {int limit = 10}) async {
+  Future<List<Song>> getArtistTopTracks(
+    String artistId, {
+    int limit = 10,
+  }) async {
     try {
       final rows = await _supabase
           .from('songs')
@@ -546,33 +548,7 @@ class CatalogRepository {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return const [];
 
-      // Get recent play_history entries (with dedup by song_id).
-      final rows = await _supabase.rpc('get_recently_played', params: {
-        'p_user_id': userId,
-        'p_limit': limit,
-      });
-
-      if (rows is List && rows.isNotEmpty) {
-        return rows.map((row) {
-          // The RPC returns song data joined.
-          return Song.fromJson({
-            'id': row['song_id'],
-            'title': row['title'],
-            'album_id': row['album_id'],
-            'artist_id': row['artist_id'],
-            'duration_seconds': row['duration_seconds'],
-            'audio_url': row['audio_url'],
-            'cover_url': row['cover_url'],
-            'genre': row['genre'],
-            'play_count': row['play_count'],
-            'created_at': row['created_at'],
-            'album_title': row['album_title'],
-            'artist_name': row['artist_name'],
-          });
-        }).toList();
-      }
-
-      // Fallback: manual dedup if RPC doesn't exist.
+      // Fallback: manual dedup from play_history.
       final historyRows = await _supabase
           .from('play_history')
           .select('song_id, played_at')
