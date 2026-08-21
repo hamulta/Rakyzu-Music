@@ -5,6 +5,6 @@
 - Description listing + short description
 - Privacy policy page: /privacy (covers Midtrans, Start.io, Supabase data collection)
 - Play Console: closed testing track created, internal testers added
-- Cloudflare Pages production domain: rakyzu-music.pages.dev → final domain rakyzu.com (DNS pending)
+- Cloudflare Pages production domain: **https://Rakyzu.my.id** (custom domain untuk project `rakyzu-music`, ganti dari `rakyzu-music.pages.dev`)
 
 No iOS App Store (deferred to v2.0.0 per PM).

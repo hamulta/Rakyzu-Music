@@ -25,7 +25,7 @@ Dari `docs/PLAY_STORE_0.9.8.md` sudah ada persiapan (icon, screenshots, privacy 
 
 ## 5. Cloudflare Pages Production
 
-- Dari staging `rakyzu-music.pages.dev` → production domain final (misal `rakyzu.com`) via Cloudflare Dashboard → Pages → Custom domain.
+- Production domain final: **https://Rakyzu.my.id** (custom domain untuk Pages project `rakyzu-music`, ganti dari `rakyzu-music.pages.dev`) via Cloudflare Dashboard → Pages → Custom domain → Add `Rakyzu.my.id` + `www.Rakyzu.my.id`.
 
 ## Yang sudah bisa otomatis
 
