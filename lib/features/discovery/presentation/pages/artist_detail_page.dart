@@ -142,7 +142,9 @@ class ArtistDetailPage extends ConsumerWidget {
                         for (var i = 0; i < tracks.length; i++)
                           Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 4),
+                              horizontal: 20,
+                              vertical: 4,
+                            ),
                             child: _TrackTile(song: tracks[i], index: i),
                           ),
                       ],

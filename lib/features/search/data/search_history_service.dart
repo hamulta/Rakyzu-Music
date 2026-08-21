@@ -32,9 +32,9 @@ class SearchHistoryService {
     history.insert(0, trimmed);
 
     // Trim to max items.
-    final trimmed_history = history.take(_maxItems).toList();
+    final trimmedHistory = history.take(_maxItems).toList();
 
-    await prefs.setString(_key, jsonEncode(trimmed_history));
+    await prefs.setString(_key, jsonEncode(trimmedHistory));
   }
 
   /// Remove a specific query from history.

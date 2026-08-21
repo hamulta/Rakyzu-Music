@@ -290,8 +290,11 @@ class _SongCard extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(CupertinoIcons.play_fill,
-                            size: 10, color: Colors.white),
+                        const Icon(
+                          CupertinoIcons.play_fill,
+                          size: 10,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           _formatCount(song.playCount),

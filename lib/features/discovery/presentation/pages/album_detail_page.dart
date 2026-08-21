@@ -101,9 +101,12 @@ class AlbumDetailPage extends ConsumerWidget {
                                   ?.copyWith(color: AppColors.textSecondary),
                             ),
                             if (album.genre != null) ...[
-                              const Text(' · ',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary)),
+                              const Text(
+                                ' · ',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                               Text(
                                 album.genre!,
                                 style: Theme.of(context)
@@ -195,7 +198,9 @@ class AlbumDetailPage extends ConsumerWidget {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) => Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 4),
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
                         child: _TrackTile(
                           song: tracks[index],
                           index: index,

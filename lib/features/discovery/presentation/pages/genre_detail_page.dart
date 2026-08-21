@@ -205,8 +205,10 @@ class _PlayButton extends ConsumerWidget {
                   [];
           if (songs.isNotEmpty) {
             final idx = songs.indexWhere((s) => s.id == song.id);
-            await controller.playFromQueue(songs,
-                startIndex: idx >= 0 ? idx : 0);
+            await controller.playFromQueue(
+              songs,
+              startIndex: idx >= 0 ? idx : 0,
+            );
           } else {
             await controller.playSingle(song);
           }
