@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/signed_image.dart';
 import '../../providers/player_controller.dart';
 import '../../providers/player_provider.dart';
+import '../widgets/queue_sheet.dart';
 
 /// Full-screen player — swipe-up dari mini player atau navigasi eksplisit.
 ///
@@ -53,7 +54,46 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
               const SizedBox(height: 20),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          // Secondary controls: shuffle, queue, repeat.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                onPressed: controller.toggleShuffle,
+                icon: Icon(
+                  CupertinoIcons.shuffle,
+                  size: 22,
+                  color: playerState.shuffleEnabled
+                      ? AppColors.azureMistDeep
+                      : AppColors.textSecondary,
+                ),
+              ),
+              IconButton(
+                onPressed: () => QueueSheet.show(context),
+                icon: const Icon(
+                  CupertinoIcons.list_bullet,
+                  size: 22,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              IconButton(
+                onPressed: controller.toggleRepeat,
+                icon: Icon(
+                  switch (playerState.repeatMode) {
+                    RepeatMode.off => CupertinoIcons.repeat,
+                    RepeatMode.all => CupertinoIcons.repeat,
+                    RepeatMode.one => CupertinoIcons.repeat_1,
+                  },
+                  size: 22,
+                  color: playerState.repeatMode != RepeatMode.off
+                      ? AppColors.azureMistDeep
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
