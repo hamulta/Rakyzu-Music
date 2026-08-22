@@ -61,13 +61,38 @@ class _MainShellState extends ConsumerState<MainShell> {
     // 0.6.1: observer interstitial tiap N songs (free only, tidak ganggu queue).
     ref.watch(interstitialManagerProvider);
 
-    return CupertinoTabScaffold(
-      tabBar: _buildTabBar(),
-      tabBuilder: (context, index) {
-        return CupertinoTabView(
-          builder: (context) => _buildTabContent(index),
-        );
-      },
+    return Stack(
+      children: [
+        CupertinoTabScaffold(
+          tabBar: _buildTabBar(),
+          tabBuilder: (context, index) {
+            return CupertinoTabView(
+              builder: (context) => _buildTabContent(index),
+            );
+          },
+        ),
+        // Mini player + banner di atas bottom nav (z-index paling atas, presisi nempel di atas nav)
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 50),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AdBanner(),
+                  GlassMiniPlayer(
+                    onTapFullPlayer: () => context.push(AppRoutes.fullPlayer),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -89,14 +114,6 @@ class _MainShellState extends ConsumerState<MainShell> {
       _ => const HomeTab(),
     };
 
-    return Column(
-      children: [
-        Expanded(child: tabContent),
-        const AdBanner(),
-        GlassMiniPlayer(
-          onTapFullPlayer: () => context.push(AppRoutes.fullPlayer),
-        ),
-      ],
-    );
+    return tabContent;
   }
 }
