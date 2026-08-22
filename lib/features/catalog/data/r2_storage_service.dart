@@ -49,7 +49,7 @@ class R2StorageService {
     required String extension,
     void Function(double progress)? onProgress,
   }) async {
-    final key = '$folder/${_uuid.v4()}.$extension.toLowerCase()';
+    final key = '$folder/${_uuid.v4()}.${extension.toLowerCase()}';
     final signed = await _requestSignedUrl(
       key: key,
       action: 'put',
