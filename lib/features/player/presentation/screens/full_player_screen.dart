@@ -6,6 +6,7 @@ import '../../../../core/ads/ads_gate_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/signed_image.dart';
 import '../../../../core/widgets/upsell_prompt.dart';
+import '../../../library/presentation/widgets/like_button.dart';
 import '../../providers/player_controller.dart';
 import '../../providers/player_provider.dart';
 
@@ -147,26 +148,11 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                 ref.read(playerControllerProvider.notifier).seek(pos),
           ),
           const SizedBox(height: 8),
-          // Like button (placeholder).
+          // Like button — reuse LikeButton dari v0.5.5 (sinkron liked_songs)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(
-                onPressed: () {
-                  // TODO(v0.4.x): Connect to liked_songs.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Like functionality coming soon!'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                },
-                icon: const Icon(
-                  CupertinoIcons.heart,
-                  size: 24,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+              LikeButton(songId: track.id, size: 28),
             ],
           ),
         ],
