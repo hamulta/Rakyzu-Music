@@ -308,7 +308,8 @@ class _SongCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isActive = ref.watch(playerControllerProvider).currentTrack?.id == song.id;
+    final isActive =
+        ref.watch(playerControllerProvider).currentTrack?.id == song.id;
     return SizedBox(
       width: 140,
       child: Column(
@@ -537,5 +538,3 @@ class _SongRow extends ConsumerWidget {
     return parts.join(' · ');
   }
 }
-
-
