@@ -5,10 +5,9 @@ import 'package:startapp_sdk/startapp.dart';
 
 import '../ads/ads_gate_provider.dart';
 import '../ads/ads_service.dart';
-import 'web_ad_slot.dart';
 
 /// Banner yang otomatis:
-/// - kIsWeb  -> WebAdSlot placeholder (Start.io tidak support Web)
+/// - kIsWeb  -> SizedBox.shrink (Web placeholder dihapus total dari production)
 /// - mobile free -> Start.io Banner (App ID 207228132, test mode)
 /// - premium/staff/admin/owner -> SizedBox.shrink
 /// AdsGateProvider tetap single source, tidak peduli SDK di baliknya.
@@ -35,11 +34,13 @@ class _AdBannerState extends ConsumerState<AdBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) return const WebAdSlot();
+    // Web placeholder debug dihapus total dari production — area kosong kecuali real Start.io ad.
+    // Start.io tidak support Web, jadi di Web selalu kosong.
+    if (kIsWeb) return const SizedBox.shrink();
     final gate = ref.watch(adsGateProvider);
     if (!gate.shouldShowAds) return const SizedBox.shrink();
     final ad = _bannerAd;
-    if (ad == null) return const SizedBox(height: 50);
+    if (ad == null) return const SizedBox.shrink();
     return SizedBox(height: 50, child: StartAppBanner(ad));
   }
 }

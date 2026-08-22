@@ -8,8 +8,23 @@ import '../../../../core/widgets/signed_image.dart';
 import '../../../catalog/models/album.dart';
 import '../../../catalog/models/artist.dart';
 import '../../../catalog/models/song.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../../catalog/providers/catalog_providers.dart';
 import '../../../player/providers/player_provider.dart';
+
+Future<void> _playFromSection(
+    WidgetRef ref, List<Song> queue, int index) async {
+  final song = queue[index];
+  if (song.audioUrl == null) return;
+  final controller = ref.read(playerControllerProvider.notifier);
+  final current = ref.read(playerControllerProvider).currentTrack;
+  if (current?.id == song.id) {
+    await controller.togglePlay();
+  } else {
+    await controller.playFromQueue(queue, startIndex: index);
+  }
+}
 
 /// Home feed publik — menampilkan konten katalog (artis, album, lagu terbaru)
 /// untuk semua user. Streaming dimulai lewat tombol play (signed URL).
@@ -67,7 +82,13 @@ class HomeTab extends ConsumerWidget {
                   title: 'Trending Now',
                   items: trendingSongs,
                   height: 180,
-                  itemBuilder: (song) => _SongCard(song: song),
+                  itemBuilder: (song) {
+                    final idx = trendingSongs.indexOf(song);
+                    return GestureDetector(
+                      onTap: () => _playFromSection(ref, trendingSongs, idx),
+                      child: _SongCard(song: song),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
               ],
@@ -78,7 +99,10 @@ class HomeTab extends ConsumerWidget {
                   title: 'New Releases',
                   items: newReleaseAlbums,
                   height: 180,
-                  itemBuilder: (album) => _AlbumCard(album: album),
+                  itemBuilder: (album) => GestureDetector(
+                    onTap: () => context.push('/album/${album.id}'),
+                    child: _AlbumCard(album: album),
+                  ),
                 ),
                 const SizedBox(height: 24),
               ],
@@ -100,7 +124,13 @@ class HomeTab extends ConsumerWidget {
                   title: 'Made For You',
                   items: recommendedSongs,
                   height: 180,
-                  itemBuilder: (song) => _SongCard(song: song),
+                  itemBuilder: (song) {
+                    final idx = recommendedSongs.indexOf(song);
+                    return GestureDetector(
+                      onTap: () => _playFromSection(ref, recommendedSongs, idx),
+                      child: _SongCard(song: song),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
               ],
@@ -111,12 +141,18 @@ class HomeTab extends ConsumerWidget {
                   title: 'Recently Played',
                   items: recentlyPlayed,
                   height: 180,
-                  itemBuilder: (song) => _SongCard(song: song),
+                  itemBuilder: (song) {
+                    final idx = recentlyPlayed.indexOf(song);
+                    return GestureDetector(
+                      onTap: () => _playFromSection(ref, recentlyPlayed, idx),
+                      child: _SongCard(song: song),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
               ],
 
-              // New release songs — vertical list.
+              // New release songs — vertical list (full row tap, no round button).
               if (newReleaseSongs.isNotEmpty) ...[
                 const _SectionHeader('Lagu Terbaru'),
                 const SizedBox(height: 12),
@@ -125,7 +161,13 @@ class HomeTab extends ConsumerWidget {
                     for (final song in newReleaseSongs.take(10))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: _SongRow(song: song),
+                        child: GestureDetector(
+                          onTap: () {
+                            final idx = newReleaseSongs.indexOf(song);
+                            _playFromSection(ref, newReleaseSongs, idx);
+                          },
+                          child: _SongRow(song: song),
+                        ),
                       ),
                   ],
                 ),
@@ -141,7 +183,13 @@ class HomeTab extends ConsumerWidget {
                     for (final song in songs.take(10))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: _SongRow(song: song),
+                        child: GestureDetector(
+                          onTap: () {
+                            final idx = songs.indexOf(song);
+                            _playFromSection(ref, songs, idx);
+                          },
+                          child: _SongRow(song: song),
+                        ),
                       ),
                   ],
                 ),
@@ -260,6 +308,8 @@ class _SongCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isActive =
+        ref.watch(playerControllerProvider).currentTrack?.id == song.id;
     return SizedBox(
       width: 140,
       child: Column(
@@ -269,14 +319,32 @@ class _SongCard extends ConsumerWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: SignedImage(
-                  value: song.coverUrl,
-                  width: 140,
-                  height: 140,
-                  fallbackIcon: CupertinoIcons.music_note,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: isActive
+                        ? Border.all(color: AppColors.azureMistDeep, width: 2)
+                        : null,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: SignedImage(
+                    value: song.coverUrl,
+                    width: 140,
+                    height: 140,
+                    fallbackIcon: CupertinoIcons.music_note,
+                  ),
                 ),
               ),
-              if (song.playCount > 0)
+              if (isActive)
+                const Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Icon(
+                    CupertinoIcons.waveform,
+                    size: 16,
+                    color: AppColors.azureMistDeep,
+                  ),
+                ),
+              if (song.playCount > 0 && !isActive)
                 Positioned(
                   top: 8,
                   right: 8,
@@ -290,15 +358,15 @@ class _SongCard extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           CupertinoIcons.play_fill,
                           size: 10,
                           color: Colors.white,
                         ),
-                        const SizedBox(width: 2),
+                        SizedBox(width: 2),
                         Text(
                           _formatCount(song.playCount),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             color: Colors.white,
                           ),
@@ -314,7 +382,10 @@ class _SongCard extends ConsumerWidget {
             song.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: isActive ? AppColors.azureMistDeep : null,
+                  fontWeight: isActive ? FontWeight.w700 : null,
+                ),
           ),
           if (song.artistName != null && song.artistName!.isNotEmpty)
             Text(
@@ -419,9 +490,10 @@ class _SongRow extends ConsumerWidget {
                   song.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
+                    color: isActive ? AppColors.azureMistDeep : null,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -437,7 +509,20 @@ class _SongRow extends ConsumerWidget {
               ],
             ),
           ),
-          _PlayToggle(song: song, isActive: isActive),
+          if (isActive)
+            Icon(
+              playerState.isPlaying
+                  ? CupertinoIcons.waveform
+                  : CupertinoIcons.play_fill,
+              size: 18,
+              color: AppColors.azureMistDeep,
+            )
+          else
+            const Icon(
+              CupertinoIcons.chevron_right,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
         ],
       ),
     );
@@ -451,64 +536,5 @@ class _SongRow extends ConsumerWidget {
         song.albumTitle!,
     ];
     return parts.join(' · ');
-  }
-}
-
-// =============================================================================
-// PLAY TOGGLE
-// =============================================================================
-
-class _PlayToggle extends ConsumerWidget {
-  const _PlayToggle({required this.song, required this.isActive});
-
-  final Song song;
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
-    final isCurrentlyPlaying = isActive && playerState.isPlaying;
-
-    return IconButton.filled(
-      onPressed: () => _toggle(context, ref, isCurrentlyPlaying),
-      style: IconButton.styleFrom(
-        backgroundColor: AppColors.azureMistDeep,
-        foregroundColor: Colors.white,
-      ),
-      icon: Icon(
-        isCurrentlyPlaying
-            ? CupertinoIcons.pause_fill
-            : CupertinoIcons.play_fill,
-      ),
-    );
-  }
-
-  Future<void> _toggle(
-    BuildContext context,
-    WidgetRef ref,
-    bool isCurrentlyPlaying,
-  ) async {
-    final audioKey = song.audioUrl;
-    if (audioKey == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Audio belum tersedia.')),
-      );
-      return;
-    }
-
-    final controller = ref.read(playerControllerProvider.notifier);
-
-    if (isActive) {
-      await controller.togglePlay();
-      return;
-    }
-
-    final songs = ref.read(songsControllerProvider).valueOrNull ?? [];
-    if (songs.isNotEmpty) {
-      final idx = songs.indexWhere((s) => s.id == song.id);
-      await controller.playFromQueue(songs, startIndex: idx >= 0 ? idx : 0);
-    } else {
-      await controller.playSingle(song);
-    }
   }
 }

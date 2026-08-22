@@ -44,9 +44,12 @@ import '../../features/legal/presentation/pages/terms_of_service_page.dart';
 import '../constants/app_routes.dart';
 import '../models/app_role.dart';
 
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Root app router
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     routes: [
       GoRoute(
@@ -196,6 +199,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.fullPlayer,
         name: AppRoutes.fullPlayerName,
+        parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) => CustomTransitionPage<void>(
           key: state.pageKey,
           child: const FullPlayerScreen(),
