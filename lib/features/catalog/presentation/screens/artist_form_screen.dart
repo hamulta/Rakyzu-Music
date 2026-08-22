@@ -55,6 +55,26 @@ class _ArtistFormScreenState extends ConsumerState<ArtistFormScreen> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant ArtistFormScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.artistId != widget.artistId) {
+      // Reset state when navigating to different artist or to Tambah (null)
+      _nameController.clear();
+      _bioController.clear();
+      _imageBytes = null;
+      _imageExtension = '';
+      _existingImageKey = null;
+      _isVerified = false;
+      _isEdit = widget.artistId != null;
+      if (_isEdit) {
+        _loadArtist();
+      } else {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   Future<void> _loadArtist() async {
     setState(() => _loading = true);
     try {

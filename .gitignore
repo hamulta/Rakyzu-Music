@@ -97,3 +97,6 @@ doc/api/
 
 # Hive
 *.hive
+
+# Supabase
+supabase/.temp/
