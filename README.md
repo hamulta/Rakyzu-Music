@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.0.4**
+Current version: **0.0.5**
 
 ## Technology baseline
 
@@ -33,7 +33,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.4-debug.apk`.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.5-debug.apk`.
 
 ## Configuration and security
 
@@ -44,5 +44,7 @@ Privileged CLI credentials may be kept in the ignored local `credential.env` fil
 Database migrations and pgTAP policy tests live under `supabase/`. The database workflow replays them against an isolated Postgres instance before deploying forward-only migrations to the linked Rakyzu Music Android project.
 
 Email/password authentication uses Supabase Auth with mandatory email confirmation and PKCE callbacks to `my.id.rakyzumusic://auth`. Access tokens, refresh tokens, and PKCE verifiers are encrypted at rest with an AES-GCM key generated inside Android Keystore. Local logout revokes and removes only the current device session.
+
+Password recovery uses the exact callback `my.id.rakyzumusic://auth/recovery`, a persisted encrypted recovery requirement, and a non-enumerating email response. Authenticated listener profiles are owner-scoped by RLS; the Android shell remains gated until required display-name onboarding completes.
 
 See [Architecture](docs/ARCHITECTURE.md), [Database](docs/DATABASE.md), [Roadmap](docs/ROADMAP.md), and [Security](SECURITY.md).

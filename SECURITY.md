@@ -17,10 +17,13 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - CI uses least-privilege GitHub permissions and protected environment secrets.
 - Supabase access/refresh tokens and PKCE verifiers are encrypted at rest with AES-GCM and a non-exportable Android Keystore key; they are never logged or included in backups.
 - Authentication uses PKCE, mandatory email confirmation, rotating refresh tokens, and current-device logout by default.
+- Password recovery accepts only the exact branded callback containing a PKCE code; its required state is encrypted and cannot be skipped by restarting the app.
+- Recovery requests use a generic success response so the client does not disclose whether an email address is registered.
 
 ## Data controls
 
 - Row Level Security is mandatory on all exposed Supabase tables.
+- Listener profile reads and updates are restricted to the active `auth.uid()` and covered by owner/cross-owner pgTAP tests.
 - Storage and database authorization are verified server-side; client claims are never trusted directly.
 - Schema changes use reviewed, reversible migrations.
 - Dependency, lint, unit, and build checks must pass before a push is considered releasable.

@@ -8,7 +8,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - `0.0.2` — complete: adaptive app shell, Navigation 3, accessibility baseline.
 - `0.0.3` — complete: Supabase project bootstrap, migrations, RLS test strategy.
 - `0.0.4` — complete: email authentication, PKCE callbacks, encrypted session lifecycle, and local logout.
-- `0.0.5`: profile/onboarding and account recovery.
+- `0.0.5` — complete: owner-scoped profile onboarding, account editing, and secure password recovery.
 - `0.0.6`: catalog domain and offline-first database.
 - `0.0.7`: Worker API contract and authenticated R2 delivery spike.
 - `0.0.8`: Media3 playback service and notification controls.

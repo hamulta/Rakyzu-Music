@@ -20,4 +20,12 @@ class RakyzuMusicAccessibilityTest {
 
         composeRule.onNode(hasText("Join Rakyzu Music") and isHeading()).assertExists()
     }
+
+    @Test
+    fun passwordRecoveryExposesSemanticHeading() {
+        composeRule.onNodeWithText("Forgot password?").performClick()
+
+        composeRule.onNode(hasText("Reset your password") and isHeading()).assertExists()
+        composeRule.onNodeWithText("Back to sign in").assertExists()
+    }
 }

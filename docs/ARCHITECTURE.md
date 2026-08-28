@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.4`.
+Status: baseline for `0.0.5`.
 
 ## Goals
 
@@ -24,6 +24,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
 - `feature:home`: the first independently owned feature surface.
+- `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
 
 Planned boundaries include `core:database`, `core:network`, `core:playback`, `feature:search`, `feature:library`, and `feature:player`.
 
@@ -34,6 +35,10 @@ The Android app never connects to R2 using S3 credentials. Catalog metadata and 
 Supabase schema changes are committed as ordered forward migrations. Client-facing tables start with RLS enabled and forced, explicit role grants, and pgTAP coverage for both allowed and denied access. The initial `profiles` boundary is private to its authenticated owner; privileged lifecycle operations remain server-controlled.
 
 The app observes Supabase `sessionStatus` as the sole authentication navigation source. Email confirmation callbacks use PKCE through the branded Android deep link. The SDK's session and verifier stores are replaced by AES-GCM persistence whose non-exportable key is generated in Android Keystore; corrupt or invalidated encrypted state is discarded and requires a new sign-in. Auth failures are mapped to bounded product errors so raw backend responses and tokens never reach the UI or logs.
+
+Password recovery uses a separate exact deep-link path and only marks recovery after receiving a PKCE authorization code. The recovery requirement is encrypted with the session state, survives process death, and is cleared only after a successful password update or local sign-out. Recovery-email responses do not reveal whether an account exists.
+
+The authenticated shell loads the current user's `profiles` row through Postgrest using the same short-lived Auth JWT. Both the explicit `id` filter and database RLS enforce ownership. New and existing incomplete profiles remain behind a profile gate until the listener saves a valid display name; profile network failures degrade to a retry surface rather than bypassing onboarding or crashing navigation.
 
 ## Reliability
 

@@ -32,4 +32,6 @@ GitHub Actions runs this sequence against an isolated database on every database
 
 Every client-facing table must explicitly enable and force RLS, revoke default access, grant only required operations, and test anonymous, owner, and cross-owner behavior. Privileged functions use a fixed empty `search_path`, fully qualified object names, and revoked public execution.
 
+`public.profiles` stores the listener's required `display_name` and non-null `onboarding_completed` state. Authenticated clients may select and update only their own row; profile inserts and deletes remain lifecycle operations controlled by the Auth trigger and privileged backend. The onboarding migration defaults existing and new rows to incomplete without deleting or rewriting profile data.
+
 Credentials belong only in local ignored files or GitHub encrypted secrets. Neither SQL migrations nor the Android build may contain privileged keys.
