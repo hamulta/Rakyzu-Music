@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 rootProject.name = "RakyzuMusicAndroid"
 
 include(":app")
+include(":core:data")
 include(":core:designsystem")
 include(":core:model")
 include(":feature:home")

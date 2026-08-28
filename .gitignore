@@ -12,6 +12,7 @@ keystore.properties
 # Android / Gradle
 .gradle/
 **/.gradle/
+**/.kotlin/
 **/build/
 captures/
 .externalNativeBuild/
