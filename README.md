@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.0.1**
+Current version: **0.0.2**
 
 ## Technology baseline
 
@@ -30,13 +30,15 @@ Prerequisites: JDK 17 and Android SDK 37.
 
 ```bash
 cd apps/android
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.1-debug.apk`.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.2-debug.apk`.
 
 ## Configuration and security
 
 Copy `.env.example` only for local server/tooling configuration. Android may receive a Supabase publishable key and public URL through generated build configuration in a future integration milestone; service-role keys, Cloudflare tokens, and R2 secrets are server-only.
+
+Privileged CLI credentials may be kept in the ignored local `credential.env` file with permission `600`. That file must never be staged, committed, logged, uploaded as an artifact, or read by the Android build.
 
 See [Architecture](docs/ARCHITECTURE.md), [Roadmap](docs/ROADMAP.md), and [Security](SECURITY.md).

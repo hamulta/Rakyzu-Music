@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+/credential.env
 local.properties
 **/local.properties
 keystore.properties

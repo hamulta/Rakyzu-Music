@@ -4,8 +4,8 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 
 ## Foundation — 0.0.x
 
-- `0.0.1`: repository, Android modular scaffold, Rakyzu design baseline, test/lint/build CI.
-- `0.0.2`: adaptive app shell, Navigation 3, accessibility baseline.
+- `0.0.1` — complete: repository, Android modular scaffold, Rakyzu design baseline, test/lint/build CI.
+- `0.0.2` — complete: adaptive app shell, Navigation 3, accessibility baseline.
 - `0.0.3`: Supabase project bootstrap, migrations, RLS test strategy.
 - `0.0.4`: email authentication and secure session lifecycle.
 - `0.0.5`: profile/onboarding and account recovery.

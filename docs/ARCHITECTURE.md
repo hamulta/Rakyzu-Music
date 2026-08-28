@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.1`.
+Status: baseline for `0.0.2`.
 
 ## Goals
 

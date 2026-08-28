@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,15 +22,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.NotificationsNone
-import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -37,9 +33,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,7 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,7 +56,6 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 
 private data class ShelfItem(
@@ -87,10 +80,11 @@ private val madeForYou = listOf(
 fun HomeScreen(
     versionName: String,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
 
-    Box(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .background(
@@ -102,40 +96,32 @@ fun HomeScreen(
                     ),
                 ),
             ),
+        contentPadding = contentPadding,
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 196.dp),
-        ) {
-            item {
-                HomeHeader(versionName = versionName)
-            }
-            item {
-                FilterRow(
-                    selectedFilter = selectedFilter,
-                    onFilterSelected = { selectedFilter = it },
-                )
-            }
-            item {
-                FeaturedCard()
-            }
-            item {
-                Shelf(
-                    title = "Jump back in",
-                    items = recentlyPlayed,
-                )
-            }
-            item {
-                Shelf(
-                    title = "Made for you",
-                    items = madeForYou,
-                )
-            }
+        item {
+            HomeHeader(versionName = versionName)
         }
-
-        PlayerAndNavigation(
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        item {
+            FilterRow(
+                selectedFilter = selectedFilter,
+                onFilterSelected = { selectedFilter = it },
+            )
+        }
+        item {
+            FeaturedCard()
+        }
+        item {
+            Shelf(
+                title = "Jump back in",
+                items = recentlyPlayed,
+            )
+        }
+        item {
+            Shelf(
+                title = "Made for you",
+                items = madeForYou,
+            )
+        }
     }
 }
 
@@ -170,6 +156,7 @@ private fun HomeHeader(versionName: String) {
                 text = "Good evening",
                 color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
                 text = "Rakyzu Music · v$versionName",
@@ -267,6 +254,7 @@ private fun FeaturedCard() {
                 Spacer(Modifier.height(10.dp))
                 Surface(
                     onClick = {},
+                    modifier = Modifier.heightIn(min = 48.dp),
                     shape = CircleShape,
                     color = RakyzuAqua,
                 ) {
@@ -302,7 +290,9 @@ private fun Shelf(
             text = title,
             color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .semantics { heading() },
         )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
@@ -365,89 +355,10 @@ private fun AlbumCover(
     }
 }
 
-@Composable
-private fun PlayerAndNavigation(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            color = Color(0xFF302548),
-            shape = RoundedCornerShape(14.dp),
-            shadowElevation = 8.dp,
-        ) {
-            Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AlbumCover(
-                    colors = listOf(RakyzuPurple, RakyzuAqua),
-                    modifier = Modifier.size(48.dp),
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Midnight Signal",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                    )
-                    Text(
-                        text = "Rakyzu Sessions",
-                        color = Color.White.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                    )
-                }
-                IconButton(onClick = {}) {
-                    Icon(Icons.Rounded.MoreVert, "More options", tint = Color.White)
-                }
-                IconButton(onClick = {}) {
-                    Icon(Icons.Rounded.Pause, "Pause", tint = Color.White)
-                }
-            }
-        }
-        NavigationBar(
-            containerColor = RakyzuSurface.copy(alpha = 0.98f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            BottomDestination.entries.forEach { destination ->
-                NavigationBarItem(
-                    selected = destination == BottomDestination.Home,
-                    onClick = {},
-                    icon = {
-                        Icon(
-                            imageVector = destination.icon,
-                            contentDescription = destination.label,
-                        )
-                    },
-                    label = { Text(destination.label) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = RakyzuBlack,
-                        selectedTextColor = RakyzuAqua,
-                        indicatorColor = RakyzuAqua,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                )
-            }
-        }
-    }
-}
-
-private enum class BottomDestination(
-    val label: String,
-    val icon: ImageVector,
-) {
-    Home("Home", Icons.Rounded.Home),
-    Search("Search", Icons.Rounded.Search),
-    Library("Your Library", Icons.Rounded.LibraryMusic),
-}
-
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.0.1")
+        HomeScreen(versionName = "0.0.2")
     }
 }
