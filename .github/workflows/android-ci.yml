@@ -1,0 +1,52 @@
+name: Rakyzu Music Android CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Test, lint, and build 0.0.1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/android
+
+    steps:
+      - name: Checkout Rakyzu Music
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          validate-wrappers: true
+
+      - name: Install Android SDK 37.0
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
+
+      - name: Validate Android project
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
+
+      - name: Upload Rakyzu Music debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Rakyzu-Music-0.0.1-debug
+          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.1-debug.apk
+          if-no-files-found: error
+          retention-days: 14

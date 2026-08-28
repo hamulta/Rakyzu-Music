@@ -1,0 +1,25 @@
+# Local secrets and machine configuration
+.env
+.env.*
+!.env.example
+local.properties
+**/local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# Android / Gradle
+.gradle/
+**/.gradle/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
