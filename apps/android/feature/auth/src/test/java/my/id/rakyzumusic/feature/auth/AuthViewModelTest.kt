@@ -39,7 +39,7 @@ class AuthViewModelTest {
         val viewModel = AuthViewModel(repository)
 
         viewModel.updateEmail("invalid")
-        viewModel.updatePassword("secure-password")
+        viewModel.updatePassword("Secure-Password1")
         viewModel.submit()
 
         assertEquals(0, repository.signInCalls)
@@ -53,7 +53,7 @@ class AuthViewModelTest {
         val viewModel = AuthViewModel(repository)
 
         viewModel.updateEmail("  Listener@Rakyzu.My.Id ")
-        viewModel.updatePassword("secure-password")
+        viewModel.updatePassword("Secure-Password1")
         viewModel.submit()
         testScheduler.advanceUntilIdle()
 
@@ -71,8 +71,8 @@ class AuthViewModelTest {
 
         viewModel.switchMode()
         viewModel.updateEmail("listener@rakyzu.my.id")
-        viewModel.updatePassword("secure-password")
-        viewModel.updatePasswordConfirmation("secure-password")
+        viewModel.updatePassword("Secure-Password1")
+        viewModel.updatePasswordConfirmation("Secure-Password1")
         viewModel.submit()
         testScheduler.advanceUntilIdle()
 

@@ -176,7 +176,7 @@ fun AuthScreen(
                     enabled = !state.isSubmitting,
                     label = { Text("Password") },
                     supportingText = if (!isSignIn) {
-                        { Text("Use at least 8 characters.") }
+                        { Text("Use 8+ characters with uppercase, lowercase, and a number.") }
                     } else {
                         null
                     },

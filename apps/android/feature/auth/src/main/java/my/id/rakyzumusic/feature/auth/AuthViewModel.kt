@@ -97,7 +97,8 @@ class AuthViewModel(
         val message = when (validation) {
             CredentialValidation.InvalidEmail -> "Enter a valid email address."
             CredentialValidation.WeakPassword -> "Use at least " +
-                AuthCredentials.MINIMUM_PASSWORD_LENGTH + " characters for your password."
+                AuthCredentials.MINIMUM_PASSWORD_LENGTH +
+                " characters with uppercase, lowercase, and a number."
             is CredentialValidation.Valid -> return
         }
         showError(message)

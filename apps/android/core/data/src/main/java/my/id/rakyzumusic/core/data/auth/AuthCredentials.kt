@@ -15,7 +15,8 @@ data class AuthCredentials(
         val normalized = normalized()
         return when {
             !emailPattern.matches(normalized.email) -> CredentialValidation.InvalidEmail
-            normalized.password.length < MINIMUM_PASSWORD_LENGTH -> CredentialValidation.WeakPassword
+            normalized.password.length < MINIMUM_PASSWORD_LENGTH ||
+                !normalized.password.hasRequiredCharacterGroups() -> CredentialValidation.WeakPassword
             else -> CredentialValidation.Valid(normalized)
         }
     }
@@ -24,6 +25,9 @@ data class AuthCredentials(
         const val MINIMUM_PASSWORD_LENGTH = 8
     }
 }
+
+private fun String.hasRequiredCharacterGroups(): Boolean =
+    any(Char::isLowerCase) && any(Char::isUpperCase) && any(Char::isDigit)
 
 sealed interface CredentialValidation {
     data class Valid(val credentials: AuthCredentials) : CredentialValidation
