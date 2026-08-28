@@ -1,0 +1,79 @@
+name: Rakyzu Music Database CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/database-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/database-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: pgTAP, lint, and migration replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Rakyzu Music
+        uses: actions/checkout@v6
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.115.0
+          github-token: ${{ github.token }}
+
+      - name: Start isolated Postgres
+        run: supabase db start
+
+      - name: Test database policies
+        run: supabase test db --local
+
+      - name: Lint database schemas
+        run: >-
+          supabase db lint --local --schema public,private
+          --level error --fail-on error
+
+      - name: Stop isolated Postgres
+        if: always()
+        run: supabase stop --no-backup
+
+  deploy:
+    name: Deploy forward migrations
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+    steps:
+      - name: Checkout Rakyzu Music
+        uses: actions/checkout@v6
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.115.0
+          github-token: ${{ github.token }}
+
+      - name: Link Rakyzu Music Android
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy pending migrations
+        run: supabase db push --linked

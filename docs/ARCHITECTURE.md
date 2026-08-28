@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.2`.
+Status: baseline for `0.0.3`.
 
 ## Goals
 
@@ -28,6 +28,8 @@ Planned boundaries include `core:data`, `core:database`, `core:network`, `core:p
 ## Data and media security
 
 The Android app never connects to R2 using S3 credentials. Catalog metadata and user operations go through Supabase with RLS or through a Cloudflare Worker using the user's verified JWT. Protected audio is returned through authorization-aware streaming or short-lived signed URLs. Upload and catalog administration belong to a separate privileged surface.
+
+Supabase schema changes are committed as ordered forward migrations. Client-facing tables start with RLS enabled and forced, explicit role grants, and pgTAP coverage for both allowed and denied access. The initial `profiles` boundary is private to its authenticated owner; privileged lifecycle operations remain server-controlled.
 
 ## Reliability
 

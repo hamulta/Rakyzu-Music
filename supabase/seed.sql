@@ -1,0 +1,1 @@
+-- Intentionally empty. Production-like listener data must never be seeded.
