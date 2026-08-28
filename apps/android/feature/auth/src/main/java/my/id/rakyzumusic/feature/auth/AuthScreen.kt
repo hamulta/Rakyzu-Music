@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,10 +64,15 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 fun AuthRoute(
     repository: AuthRepository,
     sessionMessage: String? = null,
+    passwordRecoveryRequired: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(repository))
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(passwordRecoveryRequired) {
+        if (passwordRecoveryRequired) viewModel.showPasswordReset()
+    }
 
     AuthScreen(
         state = state,
@@ -76,6 +82,8 @@ fun AuthRoute(
         onPasswordConfirmationChanged = viewModel::updatePasswordConfirmation,
         onTogglePasswordVisibility = viewModel::togglePasswordVisibility,
         onSwitchMode = viewModel::switchMode,
+        onForgotPassword = viewModel::showForgotPassword,
+        onCancelRecovery = viewModel::cancelRecovery,
         onSubmit = viewModel::submit,
         modifier = modifier,
     )
@@ -89,11 +97,16 @@ fun AuthScreen(
     onPasswordConfirmationChanged: (String) -> Unit,
     onTogglePasswordVisibility: () -> Unit,
     onSwitchMode: () -> Unit,
+    onForgotPassword: () -> Unit,
+    onCancelRecovery: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
     sessionMessage: String? = null,
 ) {
     val isSignIn = state.mode == AuthMode.SignIn
+    val isSignUp = state.mode == AuthMode.SignUp
+    val isForgotPassword = state.mode == AuthMode.ForgotPassword
+    val isResetPassword = state.mode == AuthMode.ResetPassword
     val message = state.message ?: sessionMessage
     val messageIsError = state.message?.let { state.messageIsError } ?: (sessionMessage != null)
 
@@ -132,7 +145,12 @@ fun AuthScreen(
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = if (isSignIn) "Sign in to keep listening" else "Create your listening space",
+            text = when (state.mode) {
+                AuthMode.SignIn -> "Sign in to keep listening"
+                AuthMode.SignUp -> "Create your listening space"
+                AuthMode.ForgotPassword -> "Recover your listening space"
+                AuthMode.ResetPassword -> "Secure your Rakyzu Music account"
+            },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyLarge,
         )
@@ -148,26 +166,36 @@ fun AuthScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
-                    text = if (isSignIn) "Welcome back" else "Join Rakyzu Music",
+                    text = when (state.mode) {
+                        AuthMode.SignIn -> "Welcome back"
+                        AuthMode.SignUp -> "Join Rakyzu Music"
+                        AuthMode.ForgotPassword -> "Reset your password"
+                        AuthMode.ResetPassword -> "Choose a new password"
+                    },
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { heading() },
                 )
-                OutlinedTextField(
-                    value = state.email,
-                    onValueChange = onEmailChanged,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("auth_email"),
-                    enabled = !state.isSubmitting,
-                    label = { Text("Email") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email,
-                        imeAction = ImeAction.Next,
-                    ),
-                )
-                OutlinedTextField(
+                if (!isResetPassword) {
+                    OutlinedTextField(
+                        value = state.email,
+                        onValueChange = onEmailChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("auth_email"),
+                        enabled = !state.isSubmitting,
+                        label = { Text("Email") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = if (isForgotPassword) ImeAction.Done else ImeAction.Next,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { if (isForgotPassword) onSubmit() },
+                        ),
+                    )
+                }
+                if (!isForgotPassword) OutlinedTextField(
                     value = state.password,
                     onValueChange = onPasswordChanged,
                     modifier = Modifier
@@ -175,7 +203,7 @@ fun AuthScreen(
                         .testTag("auth_password"),
                     enabled = !state.isSubmitting,
                     label = { Text("Password") },
-                    supportingText = if (!isSignIn) {
+                    supportingText = if (isSignUp || isResetPassword) {
                         { Text("Use 8+ characters with uppercase, lowercase, and a number.") }
                     } else {
                         null
@@ -210,7 +238,7 @@ fun AuthScreen(
                         }
                     },
                 )
-                if (!isSignIn) {
+                if (isSignUp || isResetPassword) {
                     OutlinedTextField(
                         value = state.passwordConfirmation,
                         onValueChange = onPasswordConfirmationChanged,
@@ -260,26 +288,50 @@ fun AuthScreen(
                         )
                     } else {
                         Text(
-                            text = if (isSignIn) "Sign in" else "Create account",
+                            text = when (state.mode) {
+                                AuthMode.SignIn -> "Sign in"
+                                AuthMode.SignUp -> "Create account"
+                                AuthMode.ForgotPassword -> "Send reset link"
+                                AuthMode.ResetPassword -> "Update password"
+                            },
                             fontWeight = FontWeight.Bold,
                         )
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (isSignIn) "New to Rakyzu Music?" else "Already have an account?",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(
-                        onClick = onSwitchMode,
-                        enabled = !state.isSubmitting,
+                if (isSignIn || isSignUp) {
+                    if (isSignIn) {
+                        TextButton(
+                            onClick = onForgotPassword,
+                            enabled = !state.isSubmitting,
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        ) {
+                            Text("Forgot password?")
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (isSignIn) "Sign up" else "Sign in")
+                        Text(
+                            text = if (isSignIn) "New to Rakyzu Music?" else "Already have an account?",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(
+                            onClick = onSwitchMode,
+                            enabled = !state.isSubmitting,
+                        ) {
+                            Text(if (isSignIn) "Sign up" else "Sign in")
+                        }
+                    }
+                } else if (isForgotPassword) {
+                    TextButton(
+                        onClick = onCancelRecovery,
+                        enabled = !state.isSubmitting,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
+                        Text("Back to sign in")
                     }
                 }
             }
@@ -333,6 +385,8 @@ private fun AuthScreenPreview() {
             onPasswordConfirmationChanged = {},
             onTogglePasswordVisibility = {},
             onSwitchMode = {},
+            onForgotPassword = {},
+            onCancelRecovery = {},
             onSubmit = {},
         )
     }

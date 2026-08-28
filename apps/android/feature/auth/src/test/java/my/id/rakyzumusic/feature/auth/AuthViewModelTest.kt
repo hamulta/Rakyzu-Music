@@ -81,16 +81,52 @@ class AuthViewModelTest {
         assertTrue(viewModel.uiState.value.message?.contains("Check your email") == true)
         assertFalse(viewModel.uiState.value.messageIsError)
     }
+
+    @Test
+    fun recoveryRequestNormalizesEmailAndUsesNonEnumeratingMessage() = runTest(dispatcher) {
+        val repository = FakeAuthRepository(
+            recoveryResult = AuthActionResult.RecoveryEmailSent("listener@rakyzu.my.id"),
+        )
+        val viewModel = AuthViewModel(repository)
+
+        viewModel.showForgotPassword()
+        viewModel.updateEmail("  Listener@Rakyzu.My.Id ")
+        viewModel.submit()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("listener@rakyzu.my.id", repository.lastEmail)
+        assertEquals(AuthMode.SignIn, viewModel.uiState.value.mode)
+        assertTrue(viewModel.uiState.value.message?.startsWith("If an account exists") == true)
+        assertFalse(viewModel.uiState.value.messageIsError)
+    }
+
+    @Test
+    fun resetPasswordRequiresMatchingStrongPasswords() = runTest(dispatcher) {
+        val repository = FakeAuthRepository()
+        val viewModel = AuthViewModel(repository)
+
+        viewModel.showPasswordReset()
+        viewModel.updatePassword("Secure-Password1")
+        viewModel.updatePasswordConfirmation("Different-Password1")
+        viewModel.submit()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, repository.updatePasswordCalls)
+        assertEquals("Passwords do not match.", viewModel.uiState.value.message)
+    }
 }
 
 private class FakeAuthRepository(
     private val signInResult: AuthActionResult = AuthActionResult.Success,
     private val signUpResult: AuthActionResult = AuthActionResult.Success,
+    private val recoveryResult: AuthActionResult = AuthActionResult.Success,
+    private val updatePasswordResult: AuthActionResult = AuthActionResult.Success,
 ) : AuthRepository {
     override val sessionState: StateFlow<AuthSessionState> = MutableStateFlow(AuthSessionState.SignedOut)
     var signInCalls = 0
     var signUpCalls = 0
     var lastEmail: String? = null
+    var updatePasswordCalls = 0
 
     override suspend fun signIn(email: String, password: String): AuthActionResult {
         signInCalls += 1
@@ -105,4 +141,16 @@ private class FakeAuthRepository(
     }
 
     override suspend fun signOut(): AuthActionResult = AuthActionResult.Success
+
+    override suspend fun requestPasswordReset(email: String): AuthActionResult {
+        lastEmail = email
+        return recoveryResult
+    }
+
+    override suspend fun updatePassword(password: String): AuthActionResult {
+        updatePasswordCalls += 1
+        return updatePasswordResult
+    }
+
+    override fun markPasswordRecoveryCallback() = Unit
 }

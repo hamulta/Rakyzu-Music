@@ -101,6 +101,11 @@ fun RakyzuMusicApp(
             sessionMessage = state.failure.toSessionMessage(),
             modifier = modifier,
         )
+        is AuthSessionState.PasswordRecovery -> AuthRoute(
+            repository = authRepository,
+            passwordRecoveryRequired = true,
+            modifier = modifier,
+        )
         is AuthSessionState.SignedIn -> AuthenticatedRakyzuMusicApp(
             versionName = versionName,
             email = state.email,
@@ -139,6 +144,7 @@ private fun AuthenticatedRakyzuMusicApp(
                         when (val result = authRepository.signOut()) {
                             AuthActionResult.Success -> showAccount = false
                             is AuthActionResult.ConfirmationRequired -> showAccount = false
+                            is AuthActionResult.RecoveryEmailSent -> showAccount = false
                             is AuthActionResult.Failure -> {
                                 signOutMessage = result.reason.toSignOutMessage()
                             }

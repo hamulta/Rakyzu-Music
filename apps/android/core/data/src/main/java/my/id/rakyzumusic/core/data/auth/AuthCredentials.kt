@@ -5,6 +5,42 @@ private val emailPattern = Regex(
     option = RegexOption.IGNORE_CASE,
 )
 
+data class AuthEmail(val value: String) {
+    fun normalized(): AuthEmail = copy(value = value.trim().lowercase())
+
+    fun validate(): EmailValidation {
+        val normalized = normalized()
+        return if (emailPattern.matches(normalized.value)) {
+            EmailValidation.Valid(normalized.value)
+        } else {
+            EmailValidation.Invalid
+        }
+    }
+}
+
+sealed interface EmailValidation {
+    data class Valid(val email: String) : EmailValidation
+
+    data object Invalid : EmailValidation
+}
+
+data class AuthPassword(val value: String) {
+    fun validate(): PasswordValidation = if (
+        value.length >= AuthCredentials.MINIMUM_PASSWORD_LENGTH &&
+        value.hasRequiredCharacterGroups()
+    ) {
+        PasswordValidation.Valid(value)
+    } else {
+        PasswordValidation.Weak
+    }
+}
+
+sealed interface PasswordValidation {
+    data class Valid(val password: String) : PasswordValidation
+
+    data object Weak : PasswordValidation
+}
+
 data class AuthCredentials(
     val email: String,
     val password: String,
@@ -14,9 +50,10 @@ data class AuthCredentials(
     fun validate(): CredentialValidation {
         val normalized = normalized()
         return when {
-            !emailPattern.matches(normalized.email) -> CredentialValidation.InvalidEmail
-            normalized.password.length < MINIMUM_PASSWORD_LENGTH ||
-                !normalized.password.hasRequiredCharacterGroups() -> CredentialValidation.WeakPassword
+            AuthEmail(normalized.email).validate() !is EmailValidation.Valid ->
+                CredentialValidation.InvalidEmail
+            AuthPassword(normalized.password).validate() !is PasswordValidation.Valid ->
+                CredentialValidation.WeakPassword
             else -> CredentialValidation.Valid(normalized)
         }
     }

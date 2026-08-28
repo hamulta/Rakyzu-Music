@@ -9,7 +9,13 @@ interface AuthRepository {
 
     suspend fun signUp(email: String, password: String): AuthActionResult
 
+    suspend fun requestPasswordReset(email: String): AuthActionResult
+
+    suspend fun updatePassword(password: String): AuthActionResult
+
     suspend fun signOut(): AuthActionResult
+
+    fun markPasswordRecoveryCallback()
 }
 
 sealed interface AuthSessionState {
@@ -22,6 +28,11 @@ sealed interface AuthSessionState {
         val email: String?,
     ) : AuthSessionState
 
+    data class PasswordRecovery(
+        val userId: String,
+        val email: String?,
+    ) : AuthSessionState
+
     data class RecoveryRequired(val failure: AuthFailure) : AuthSessionState
 }
 
@@ -29,6 +40,8 @@ sealed interface AuthActionResult {
     data object Success : AuthActionResult
 
     data class ConfirmationRequired(val email: String) : AuthActionResult
+
+    data class RecoveryEmailSent(val email: String) : AuthActionResult
 
     data class Failure(val reason: AuthFailure) : AuthActionResult
 }

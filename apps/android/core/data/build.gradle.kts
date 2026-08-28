@@ -21,6 +21,7 @@ dependencies {
     val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.8.0")
     implementation(supabaseBom)
     implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.ktor:ktor-client-okhttp:3.5.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")

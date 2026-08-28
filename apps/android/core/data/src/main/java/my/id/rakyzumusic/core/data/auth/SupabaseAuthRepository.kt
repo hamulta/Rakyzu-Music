@@ -13,15 +13,19 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 internal class SupabaseAuthRepository(
     private val auth: Auth,
+    private val recoveryState: PasswordRecoveryState,
     applicationScope: CoroutineScope,
 ) : AuthRepository {
-    override val sessionState: StateFlow<AuthSessionState> = auth.sessionStatus
-        .map(::toDomainSessionState)
+    override val sessionState: StateFlow<AuthSessionState> = combine(
+        auth.sessionStatus,
+        recoveryState.isRecoveryRequired,
+        ::toDomainSessionState,
+    )
         .stateIn(
             scope = applicationScope,
             started = SharingStarted.Eagerly,
@@ -48,9 +52,30 @@ internal class SupabaseAuthRepository(
         }
     }
 
+    override suspend fun requestPasswordReset(email: String): AuthActionResult = authRequest {
+        auth.resetPasswordForEmail(
+            email = email,
+            redirectUrl = PASSWORD_RECOVERY_REDIRECT,
+        )
+        AuthActionResult.RecoveryEmailSent(email)
+    }
+
+    override suspend fun updatePassword(password: String): AuthActionResult = authRequest {
+        auth.updateUser {
+            this.password = password
+        }
+        recoveryState.complete()
+        AuthActionResult.Success
+    }
+
     override suspend fun signOut(): AuthActionResult = authRequest {
         auth.signOut(SignOutScope.LOCAL)
+        recoveryState.complete()
         AuthActionResult.Success
+    }
+
+    override fun markPasswordRecoveryCallback() {
+        recoveryState.requireRecovery()
     }
 
     private suspend fun authRequest(block: suspend () -> AuthActionResult): AuthActionResult = try {
@@ -60,15 +85,29 @@ internal class SupabaseAuthRepository(
     } catch (error: Throwable) {
         AuthActionResult.Failure(error.toAuthFailure())
     }
+
+    private companion object {
+        const val PASSWORD_RECOVERY_REDIRECT = "my.id.rakyzumusic://auth/recovery"
+    }
 }
 
-private fun toDomainSessionState(status: SessionStatus): AuthSessionState = when (status) {
+private fun toDomainSessionState(
+    status: SessionStatus,
+    isPasswordRecoveryRequired: Boolean,
+): AuthSessionState = when (status) {
     SessionStatus.Initializing -> AuthSessionState.Initializing
     is SessionStatus.NotAuthenticated -> AuthSessionState.SignedOut
-    is SessionStatus.Authenticated -> AuthSessionState.SignedIn(
-        userId = status.session.user?.id.orEmpty(),
-        email = status.session.user?.email,
-    )
+    is SessionStatus.Authenticated -> if (isPasswordRecoveryRequired) {
+        AuthSessionState.PasswordRecovery(
+            userId = status.session.user?.id.orEmpty(),
+            email = status.session.user?.email,
+        )
+    } else {
+        AuthSessionState.SignedIn(
+            userId = status.session.user?.id.orEmpty(),
+            email = status.session.user?.email,
+        )
+    }
     is SessionStatus.RefreshFailure -> AuthSessionState.RecoveryRequired(AuthFailure.SessionExpired)
 }
 

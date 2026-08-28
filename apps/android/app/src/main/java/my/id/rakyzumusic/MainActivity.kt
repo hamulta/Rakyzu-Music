@@ -11,6 +11,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val rakyzuApplication = application as RakyzuMusicApplication
+        if (
+            intent?.data?.path == PASSWORD_RECOVERY_PATH &&
+            !intent?.data?.getQueryParameter(AUTH_CODE_PARAMETER).isNullOrBlank()
+        ) {
+            rakyzuApplication.authRepository.markPasswordRecoveryCallback()
+        }
         setContent {
             RakyzuMusicTheme(darkTheme = true) {
                 RakyzuMusicApp(
@@ -19,5 +25,10 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private companion object {
+        const val AUTH_CODE_PARAMETER = "code"
+        const val PASSWORD_RECOVERY_PATH = "/recovery"
     }
 }

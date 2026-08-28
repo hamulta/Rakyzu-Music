@@ -6,8 +6,12 @@ import androidx.lifecycle.viewModelScope
 import my.id.rakyzumusic.core.data.auth.AuthActionResult
 import my.id.rakyzumusic.core.data.auth.AuthCredentials
 import my.id.rakyzumusic.core.data.auth.AuthFailure
+import my.id.rakyzumusic.core.data.auth.AuthEmail
+import my.id.rakyzumusic.core.data.auth.AuthPassword
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.CredentialValidation
+import my.id.rakyzumusic.core.data.auth.EmailValidation
+import my.id.rakyzumusic.core.data.auth.PasswordValidation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +21,8 @@ import kotlinx.coroutines.launch
 enum class AuthMode {
     SignIn,
     SignUp,
+    ForgotPassword,
+    ResetPassword,
 }
 
 data class AuthUiState(
@@ -67,9 +73,63 @@ class AuthViewModel(
         }
     }
 
+    fun showForgotPassword() {
+        mutableUiState.update {
+            it.copy(
+                mode = AuthMode.ForgotPassword,
+                password = "",
+                passwordConfirmation = "",
+                isPasswordVisible = false,
+                message = null,
+                messageIsError = false,
+            )
+        }
+    }
+
+    fun showPasswordReset() {
+        mutableUiState.update {
+            if (it.mode == AuthMode.ResetPassword) it else it.copy(
+                mode = AuthMode.ResetPassword,
+                email = "",
+                password = "",
+                passwordConfirmation = "",
+                isPasswordVisible = false,
+                message = null,
+                messageIsError = false,
+            )
+        }
+    }
+
+    fun cancelRecovery() {
+        mutableUiState.update {
+            it.copy(
+                mode = AuthMode.SignIn,
+                password = "",
+                passwordConfirmation = "",
+                isPasswordVisible = false,
+                message = null,
+                messageIsError = false,
+            )
+        }
+    }
+
     fun submit() {
         val state = mutableUiState.value
         if (state.isSubmitting) return
+
+        when (state.mode) {
+            AuthMode.ForgotPassword -> requestPasswordReset(state.email)
+            AuthMode.ResetPassword -> updatePassword(
+                password = state.password,
+                confirmation = state.passwordConfirmation,
+            )
+            AuthMode.SignIn,
+            AuthMode.SignUp,
+            -> submitCredentials(state)
+        }
+    }
+
+    private fun submitCredentials(state: AuthUiState) {
 
         val validation = AuthCredentials(state.email, state.password).validate()
         if (validation !is CredentialValidation.Valid) {
@@ -90,6 +150,39 @@ class AuthViewModel(
                 repository.signUp(credentials.email, credentials.password)
             }
             handleResult(result)
+        }
+    }
+
+    private fun requestPasswordReset(email: String) {
+        val validation = AuthEmail(email).validate()
+        if (validation !is EmailValidation.Valid) {
+            showError("Enter a valid email address.")
+            return
+        }
+
+        mutableUiState.update { it.copy(isSubmitting = true, message = null) }
+        viewModelScope.launch {
+            handleResult(repository.requestPasswordReset(validation.email))
+        }
+    }
+
+    private fun updatePassword(password: String, confirmation: String) {
+        val validation = AuthPassword(password).validate()
+        if (validation !is PasswordValidation.Valid) {
+            showError(
+                "Use at least ${AuthCredentials.MINIMUM_PASSWORD_LENGTH} characters with " +
+                    "uppercase, lowercase, and a number.",
+            )
+            return
+        }
+        if (password != confirmation) {
+            showError("Passwords do not match.")
+            return
+        }
+
+        mutableUiState.update { it.copy(isSubmitting = true, message = null) }
+        viewModelScope.launch {
+            handleResult(repository.updatePassword(validation.password))
         }
     }
 
@@ -122,6 +215,17 @@ class AuthViewModel(
                     passwordConfirmation = "",
                     isSubmitting = false,
                     message = "Check your email to confirm your Rakyzu Music account, then sign in.",
+                    messageIsError = false,
+                )
+            }
+            is AuthActionResult.RecoveryEmailSent -> mutableUiState.update {
+                it.copy(
+                    mode = AuthMode.SignIn,
+                    email = result.email,
+                    password = "",
+                    passwordConfirmation = "",
+                    isSubmitting = false,
+                    message = "If an account exists for this email, a password reset link is on its way.",
                     messageIsError = false,
                 )
             }
