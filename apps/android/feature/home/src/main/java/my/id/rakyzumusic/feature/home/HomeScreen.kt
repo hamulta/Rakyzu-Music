@@ -79,6 +79,7 @@ private val madeForYou = listOf(
 @Composable
 fun HomeScreen(
     versionName: String,
+    displayName: String = "Rakyzu Listener",
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
     onProfileClick: () -> Unit = {},
@@ -102,6 +103,7 @@ fun HomeScreen(
         item {
             HomeHeader(
                 versionName = versionName,
+                displayName = displayName,
                 onProfileClick = onProfileClick,
             )
         }
@@ -132,6 +134,7 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     versionName: String,
+    displayName: String,
     onProfileClick: () -> Unit,
 ) {
     Row(
@@ -160,7 +163,7 @@ private fun HomeHeader(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Good evening",
+                text = "Good evening, ${displayName.substringBefore(' ')}",
                 color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() },
@@ -171,14 +174,14 @@ private fun HomeHeader(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        IconButton(onClick = onProfileClick) {
+        IconButton(onClick = {}) {
             Icon(
                 imageVector = Icons.Rounded.NotificationsNone,
                 contentDescription = "Notifications",
                 tint = MaterialTheme.colorScheme.onBackground,
             )
         }
-        IconButton(onClick = {}) {
+        IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Rounded.Person,
                 contentDescription = "Profile",

@@ -3,7 +3,9 @@ package my.id.rakyzumusic
 import android.app.Application
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
+import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
+import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,8 +13,8 @@ import kotlinx.coroutines.SupervisorJob
 class RakyzuMusicApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    val authRepository: AuthRepository by lazy {
-        RakyzuAuthFactory.create(
+    private val repositories: RakyzuRepositories by lazy {
+        RakyzuAuthFactory.createRepositories(
             context = this,
             configuration = SupabasePublicConfiguration(
                 url = BuildConfig.SUPABASE_URL,
@@ -21,4 +23,10 @@ class RakyzuMusicApplication : Application() {
             applicationScope = applicationScope,
         )
     }
+
+    val authRepository: AuthRepository
+        get() = repositories.authRepository
+
+    val profileRepository: ProfileRepository
+        get() = repositories.profileRepository
 }

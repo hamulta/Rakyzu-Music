@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
                 RakyzuMusicApp(
                     versionName = BuildConfig.VERSION_NAME,
                     authRepository = rakyzuApplication.authRepository,
+                    profileRepository = rakyzuApplication.profileRepository,
                 )
             }
         }

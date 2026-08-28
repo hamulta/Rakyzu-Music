@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -60,12 +62,17 @@ import my.id.rakyzumusic.core.data.auth.AuthActionResult
 import my.id.rakyzumusic.core.data.auth.AuthFailure
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
+import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.feature.auth.AuthRoute
 import my.id.rakyzumusic.feature.home.HomeScreen
+import my.id.rakyzumusic.feature.profile.OnboardingScreen
+import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
+import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
+import my.id.rakyzumusic.feature.profile.ProfileViewModel
 import my.id.rakyzumusic.navigation.RakyzuRoute
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
 import kotlinx.coroutines.launch
@@ -86,6 +93,7 @@ private val topLevelDestinations = listOf(
 fun RakyzuMusicApp(
     versionName: String,
     authRepository: AuthRepository,
+    profileRepository: ProfileRepository,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -106,9 +114,57 @@ fun RakyzuMusicApp(
             passwordRecoveryRequired = true,
             modifier = modifier,
         )
-        is AuthSessionState.SignedIn -> AuthenticatedRakyzuMusicApp(
+        is AuthSessionState.SignedIn -> ProfileGatedRakyzuMusicApp(
             versionName = versionName,
+            userId = state.userId,
             email = state.email,
+            authRepository = authRepository,
+            profileRepository = profileRepository,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun ProfileGatedRakyzuMusicApp(
+    versionName: String,
+    userId: String,
+    email: String?,
+    authRepository: AuthRepository,
+    profileRepository: ProfileRepository,
+    modifier: Modifier = Modifier,
+) {
+    val profileViewModel: ProfileViewModel = viewModel(
+        key = "profile-$userId",
+        factory = ProfileViewModel.factory(profileRepository),
+    )
+    val profileState by profileViewModel.uiState.collectAsStateWithLifecycle()
+    val profile = profileState.profile
+
+    when {
+        profile == null && profileState.isLoading -> ProfileLoadingScreen(modifier)
+        profile == null -> ProfileUnavailableScreen(
+            message = profileState.message ?: "Your Rakyzu Music profile is temporarily unavailable.",
+            onRetry = profileViewModel::loadProfile,
+            modifier = modifier,
+        )
+        !profile.onboardingCompleted -> OnboardingScreen(
+            state = profileState,
+            onDisplayNameChanged = profileViewModel::updateDisplayName,
+            onContinue = { profileViewModel.saveProfile(completeOnboarding = true) },
+            modifier = modifier,
+        )
+        else -> AuthenticatedRakyzuMusicApp(
+            versionName = versionName,
+            email = email,
+            displayName = profile.displayName,
+            profileDisplayNameDraft = profileState.displayName,
+            isSavingProfile = profileState.isSaving,
+            profileMessage = profileState.message,
+            profileMessageIsError = profileState.messageIsError,
+            onProfileDisplayNameChanged = profileViewModel::updateDisplayName,
+            onSaveProfile = { profileViewModel.saveProfile(completeOnboarding = false) },
+            onResetProfileDraft = profileViewModel::resetDraft,
             authRepository = authRepository,
             modifier = modifier,
         )
@@ -120,6 +176,14 @@ fun RakyzuMusicApp(
 private fun AuthenticatedRakyzuMusicApp(
     versionName: String,
     email: String?,
+    displayName: String,
+    profileDisplayNameDraft: String,
+    isSavingProfile: Boolean,
+    profileMessage: String?,
+    profileMessageIsError: Boolean,
+    onProfileDisplayNameChanged: (String) -> Unit,
+    onSaveProfile: () -> Unit,
+    onResetProfileDraft: () -> Unit,
     authRepository: AuthRepository,
     modifier: Modifier = Modifier,
 ) {
@@ -133,9 +197,21 @@ private fun AuthenticatedRakyzuMusicApp(
     if (showAccount) {
         AccountSheet(
             email = email,
+            displayName = displayName,
+            displayNameDraft = profileDisplayNameDraft,
+            isSavingProfile = isSavingProfile,
+            profileMessage = profileMessage,
+            profileMessageIsError = profileMessageIsError,
             isSigningOut = isSigningOut,
             message = signOutMessage,
-            onDismiss = { if (!isSigningOut) showAccount = false },
+            onDisplayNameChanged = onProfileDisplayNameChanged,
+            onSaveProfile = onSaveProfile,
+            onDismiss = {
+                if (!isSigningOut && !isSavingProfile) {
+                    onResetProfileDraft()
+                    showAccount = false
+                }
+            },
             onSignOut = {
                 if (!isSigningOut) {
                     coroutineScope.launch {
@@ -187,6 +263,7 @@ private fun AuthenticatedRakyzuMusicApp(
                     entry<RakyzuRoute.Home> {
                         HomeScreen(
                             versionName = versionName,
+                            displayName = displayName,
                             onProfileClick = {
                                 signOutMessage = null
                                 showAccount = true
@@ -255,8 +332,15 @@ private fun SessionLoadingScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun AccountSheet(
     email: String?,
+    displayName: String,
+    displayNameDraft: String,
+    isSavingProfile: Boolean,
+    profileMessage: String?,
+    profileMessageIsError: Boolean,
     isSigningOut: Boolean,
     message: String?,
+    onDisplayNameChanged: (String) -> Unit,
+    onSaveProfile: () -> Unit,
     onDismiss: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -279,10 +363,56 @@ private fun AccountSheet(
                 modifier = Modifier.semantics { heading() },
             )
             Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
                 text = email ?: "Signed in to Rakyzu Music",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyLarge,
             )
+            OutlinedTextField(
+                value = displayNameDraft,
+                onValueChange = onDisplayNameChanged,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSavingProfile && !isSigningOut,
+                label = { Text("Display name") },
+                supportingText = { Text("2-60 characters") },
+                singleLine = true,
+            )
+            if (profileMessage != null) {
+                Text(
+                    text = profileMessage,
+                    color = if (profileMessageIsError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        RakyzuAqua
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Button(
+                onClick = onSaveProfile,
+                enabled = !isSavingProfile && !isSigningOut && displayNameDraft != displayName,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RakyzuAqua,
+                    contentColor = RakyzuBlack,
+                ),
+            ) {
+                if (isSavingProfile) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = RakyzuBlack,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Save profile", fontWeight = FontWeight.Bold)
+                }
+            }
             Text(
                 text = "Signing out removes this device's encrypted session. Other devices stay signed in.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -297,7 +427,7 @@ private fun AccountSheet(
             }
             Button(
                 onClick = onSignOut,
-                enabled = !isSigningOut,
+                enabled = !isSigningOut && !isSavingProfile,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 52.dp),
