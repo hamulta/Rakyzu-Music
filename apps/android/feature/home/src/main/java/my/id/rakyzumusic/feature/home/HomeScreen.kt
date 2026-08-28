@@ -81,6 +81,7 @@ fun HomeScreen(
     versionName: String,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
+    onProfileClick: () -> Unit = {},
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
 
@@ -99,7 +100,10 @@ fun HomeScreen(
         contentPadding = contentPadding,
     ) {
         item {
-            HomeHeader(versionName = versionName)
+            HomeHeader(
+                versionName = versionName,
+                onProfileClick = onProfileClick,
+            )
         }
         item {
             FilterRow(
@@ -126,7 +130,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(versionName: String) {
+private fun HomeHeader(
+    versionName: String,
+    onProfileClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -164,7 +171,7 @@ private fun HomeHeader(versionName: String) {
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        IconButton(onClick = {}) {
+        IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Rounded.NotificationsNone,
                 contentDescription = "Notifications",

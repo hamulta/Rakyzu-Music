@@ -10,9 +10,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val rakyzuApplication = application as RakyzuMusicApplication
         setContent {
             RakyzuMusicTheme(darkTheme = true) {
-                RakyzuMusicApp(versionName = BuildConfig.VERSION_NAME)
+                RakyzuMusicApp(
+                    versionName = BuildConfig.VERSION_NAME,
+                    authRepository = rakyzuApplication.authRepository,
+                )
             }
         }
     }

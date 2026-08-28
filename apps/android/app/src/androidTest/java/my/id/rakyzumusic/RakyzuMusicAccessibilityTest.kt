@@ -13,11 +13,11 @@ class RakyzuMusicAccessibilityTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun topLevelNavigationExposesSemanticHeadings() {
-        composeRule.onNode(hasText("Good evening") and isHeading()).assertExists()
+    fun authenticationEntryExposesSemanticHeadings() {
+        composeRule.onNode(hasText("Rakyzu Music") and isHeading()).assertExists()
 
-        composeRule.onNodeWithText("Search").performClick()
+        composeRule.onNodeWithText("Sign up").performClick()
 
-        composeRule.onNode(hasText("Search") and isHeading()).assertExists()
+        composeRule.onNode(hasText("Join Rakyzu Music") and isHeading()).assertExists()
     }
 }

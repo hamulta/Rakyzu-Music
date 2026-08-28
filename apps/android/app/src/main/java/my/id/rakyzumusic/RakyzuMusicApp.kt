@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,14 +23,24 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,16 +52,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import my.id.rakyzumusic.core.data.auth.AuthActionResult
+import my.id.rakyzumusic.core.data.auth.AuthFailure
+import my.id.rakyzumusic.core.data.auth.AuthRepository
+import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
+import my.id.rakyzumusic.feature.auth.AuthRoute
 import my.id.rakyzumusic.feature.home.HomeScreen
 import my.id.rakyzumusic.navigation.RakyzuRoute
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
+import kotlinx.coroutines.launch
 
 private data class TopLevelDestination(
     val route: RakyzuRoute,
@@ -63,14 +82,73 @@ private val topLevelDestinations = listOf(
     TopLevelDestination(RakyzuRoute.Library, "Your Library", Icons.Rounded.LibraryMusic),
 )
 
-@OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class)
 @Composable
 fun RakyzuMusicApp(
     versionName: String,
+    authRepository: AuthRepository,
+    modifier: Modifier = Modifier,
+) {
+    val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
+
+    when (val state = sessionState) {
+        AuthSessionState.Initializing -> SessionLoadingScreen(modifier)
+        AuthSessionState.SignedOut -> AuthRoute(
+            repository = authRepository,
+            modifier = modifier,
+        )
+        is AuthSessionState.RecoveryRequired -> AuthRoute(
+            repository = authRepository,
+            sessionMessage = state.failure.toSessionMessage(),
+            modifier = modifier,
+        )
+        is AuthSessionState.SignedIn -> AuthenticatedRakyzuMusicApp(
+            versionName = versionName,
+            email = state.email,
+            authRepository = authRepository,
+            modifier = modifier,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class)
+@Composable
+private fun AuthenticatedRakyzuMusicApp(
+    versionName: String,
+    email: String?,
+    authRepository: AuthRepository,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
+    val coroutineScope = rememberCoroutineScope()
+    var showAccount by remember { mutableStateOf(false) }
+    var isSigningOut by remember { mutableStateOf(false) }
+    var signOutMessage by remember { mutableStateOf<String?>(null) }
+
+    if (showAccount) {
+        AccountSheet(
+            email = email,
+            isSigningOut = isSigningOut,
+            message = signOutMessage,
+            onDismiss = { if (!isSigningOut) showAccount = false },
+            onSignOut = {
+                if (!isSigningOut) {
+                    coroutineScope.launch {
+                        isSigningOut = true
+                        signOutMessage = null
+                        when (val result = authRepository.signOut()) {
+                            AuthActionResult.Success -> showAccount = false
+                            is AuthActionResult.ConfirmationRequired -> showAccount = false
+                            is AuthActionResult.Failure -> {
+                                signOutMessage = result.reason.toSignOutMessage()
+                            }
+                        }
+                        isSigningOut = false
+                    }
+                }
+            },
+        )
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -101,7 +179,13 @@ fun RakyzuMusicApp(
                 backStack = backStack,
                 entryProvider = entryProvider {
                     entry<RakyzuRoute.Home> {
-                        HomeScreen(versionName = versionName)
+                        HomeScreen(
+                            versionName = versionName,
+                            onProfileClick = {
+                                signOutMessage = null
+                                showAccount = true
+                            },
+                        )
                     }
                     entry<RakyzuRoute.Search> {
                         FoundationDestination(
@@ -124,6 +208,122 @@ fun RakyzuMusicApp(
             MiniPlayer(modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
+}
+
+@Composable
+private fun SessionLoadingScreen(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF211240), RakyzuBlack))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "R",
+                    color = RakyzuBlack,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+            CircularProgressIndicator(color = RakyzuAqua)
+            Text(
+                text = "Restoring your secure session",
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountSheet(
+    email: String?,
+    isSigningOut: Boolean,
+    message: String?,
+    onDismiss: () -> Unit,
+    onSignOut: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = RakyzuSurface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = "Your account",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = email ?: "Signed in to Rakyzu Music",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = "Signing out removes this device's encrypted session. Other devices stay signed in.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (message != null) {
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Button(
+                onClick = onSignOut,
+                enabled = !isSigningOut,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ) {
+                if (isSigningOut) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Sign out", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+private fun AuthFailure.toSessionMessage(): String = when (this) {
+    AuthFailure.InvalidConfiguration -> "Sign-in is unavailable because this build is missing public configuration."
+    AuthFailure.NetworkUnavailable -> "Your saved session could not be refreshed. Check your connection or sign in again."
+    AuthFailure.SessionExpired -> "Your session expired. Sign in again to continue."
+    else -> "Your secure session could not be restored. Sign in again to continue."
+}
+
+private fun AuthFailure.toSignOutMessage(): String = when (this) {
+    AuthFailure.NetworkUnavailable -> "Check your connection and try signing out again."
+    else -> "Unable to sign out right now. Try again."
 }
 
 @Composable

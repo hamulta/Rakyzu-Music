@@ -6,6 +6,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+fun String.asBuildConfigString(): String = "\"" +
+    replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val supabaseUrl = providers.gradleProperty("SUPABASE_URL")
+    .orElse(providers.environmentVariable("SUPABASE_URL"))
+    .getOrElse("")
+val supabasePublishableKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY")
+    .orElse(providers.environmentVariable("SUPABASE_PUBLISHABLE_KEY"))
+    .getOrElse("")
+
 android {
     namespace = "my.id.rakyzumusic"
     compileSdk = 37
@@ -16,6 +26,13 @@ android {
         targetSdk = 37
         versionCode = 3
         versionName = "0.0.3"
+
+        buildConfigField("String", "SUPABASE_URL", supabaseUrl.asBuildConfigString())
+        buildConfigField(
+            "String",
+            "SUPABASE_PUBLISHABLE_KEY",
+            supabasePublishableKey.asBuildConfigString(),
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -56,12 +73,15 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
 }
 
 dependencies {
+    implementation(project(":core:data"))
     implementation(project(":core:designsystem"))
+    implementation(project(":feature:auth"))
     implementation(project(":feature:home"))
 
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.navigation3:navigation3-runtime:1.1.7")
     implementation("androidx.navigation3:navigation3-ui:1.1.7")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
