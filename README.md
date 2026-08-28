@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.0.3**
+Current version: **0.0.4**
 
 ## Technology baseline
 
@@ -33,14 +33,16 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.3-debug.apk`.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.4-debug.apk`.
 
 ## Configuration and security
 
-Copy `.env.example` only for local server/tooling configuration. Android may receive a Supabase publishable key and public URL through generated build configuration in a future integration milestone; service-role keys, Cloudflare tokens, and R2 secrets are server-only.
+Android reads `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from Gradle properties or environment variables and exposes only those public values through generated BuildConfig fields. GitHub Actions injects them from encrypted repository secrets. A build with missing or invalid public configuration fails closed into an unavailable sign-in state; service-role keys, Cloudflare tokens, and R2 secrets remain server-only.
 
 Privileged CLI credentials may be kept in the ignored local `credential.env` file with permission `600`. That file must never be staged, committed, logged, uploaded as an artifact, or read by the Android build.
 
 Database migrations and pgTAP policy tests live under `supabase/`. The database workflow replays them against an isolated Postgres instance before deploying forward-only migrations to the linked Rakyzu Music Android project.
+
+Email/password authentication uses Supabase Auth with mandatory email confirmation and PKCE callbacks to `my.id.rakyzumusic://auth`. Access tokens, refresh tokens, and PKCE verifiers are encrypted at rest with an AES-GCM key generated inside Android Keystore. Local logout revokes and removes only the current device session.
 
 See [Architecture](docs/ARCHITECTURE.md), [Database](docs/DATABASE.md), [Roadmap](docs/ROADMAP.md), and [Security](SECURITY.md).

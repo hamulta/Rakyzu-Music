@@ -15,6 +15,8 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - R2 media access must use an authenticated Worker, a public custom domain for intentionally public assets, or short-lived signed URLs.
 - Every exposed credential must be revoked and replaced, then repository history and logs must be audited.
 - CI uses least-privilege GitHub permissions and protected environment secrets.
+- Supabase access/refresh tokens and PKCE verifiers are encrypted at rest with AES-GCM and a non-exportable Android Keystore key; they are never logged or included in backups.
+- Authentication uses PKCE, mandatory email confirmation, rotating refresh tokens, and current-device logout by default.
 
 ## Data controls
 
