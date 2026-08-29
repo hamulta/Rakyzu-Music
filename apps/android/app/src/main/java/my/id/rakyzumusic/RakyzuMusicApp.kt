@@ -19,9 +19,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +69,9 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
+import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
+import my.id.rakyzumusic.core.playback.PlaybackSnapshot
+import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.feature.auth.AuthRoute
 import my.id.rakyzumusic.feature.home.HomeRoute
 import my.id.rakyzumusic.feature.profile.OnboardingScreen
@@ -96,9 +100,16 @@ fun RakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(sessionState) {
+        if (sessionState !is AuthSessionState.SignedIn) {
+            playbackController.stopAndClear()
+        }
+    }
 
     when (val state = sessionState) {
         AuthSessionState.Initializing -> SessionLoadingScreen(modifier)
@@ -123,6 +134,7 @@ fun RakyzuMusicApp(
             authRepository = authRepository,
             profileRepository = profileRepository,
             catalogRepository = catalogRepository,
+            playbackController = playbackController,
             modifier = modifier,
         )
     }
@@ -136,6 +148,7 @@ private fun ProfileGatedRakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -171,6 +184,7 @@ private fun ProfileGatedRakyzuMusicApp(
             onResetProfileDraft = profileViewModel::resetDraft,
             authRepository = authRepository,
             catalogRepository = catalogRepository,
+            playbackController = playbackController,
             modifier = modifier,
         )
     }
@@ -191,10 +205,12 @@ private fun AuthenticatedRakyzuMusicApp(
     onResetProfileDraft: () -> Unit,
     authRepository: AuthRepository,
     catalogRepository: CatalogRepository,
+    playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
+    val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
     var isSigningOut by remember { mutableStateOf(false) }
@@ -271,6 +287,7 @@ private fun AuthenticatedRakyzuMusicApp(
                             repository = catalogRepository,
                             versionName = versionName,
                             displayName = displayName,
+                            onTrackPlay = playbackController::play,
                             onProfileClick = {
                                 signOutMessage = null
                                 showAccount = true
@@ -295,7 +312,13 @@ private fun AuthenticatedRakyzuMusicApp(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            MiniPlayer(modifier = Modifier.align(Alignment.BottomCenter))
+            if (playbackSnapshot.mediaId != null) {
+                PlaybackBar(
+                    snapshot = playbackSnapshot,
+                    onTogglePlayPause = playbackController::togglePlayPause,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
     }
 }
@@ -509,7 +532,16 @@ private fun FoundationDestination(
 }
 
 @Composable
-private fun MiniPlayer(modifier: Modifier = Modifier) {
+private fun PlaybackBar(
+    snapshot: PlaybackSnapshot,
+    onTogglePlayPause: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val title = snapshot.title ?: "Rakyzu Music"
+    val isBuffering = snapshot.status == PlaybackStatus.Buffering ||
+        snapshot.status == PlaybackStatus.Connecting
+    val isPlaying = snapshot.status == PlaybackStatus.Playing
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -529,43 +561,53 @@ private fun MiniPlayer(modifier: Modifier = Modifier) {
                     .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua))),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(RakyzuBlack.copy(alpha = 0.72f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.MusicNote,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Rounded.MusicNote,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Midnight Signal",
+                    text = title,
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Rakyzu Sessions",
+                    text = if (snapshot.error != null) {
+                        "Playback unavailable"
+                    } else {
+                        snapshot.artist ?: "Rakyzu Music"
+                    },
                     color = Color.White.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = {}) {
-                Icon(Icons.Rounded.MoreVert, "More playback options", tint = Color.White)
-            }
-            IconButton(onClick = {}) {
-                Icon(Icons.Rounded.Pause, "Pause Midnight Signal", tint = Color.White)
+            if (isBuffering) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .size(24.dp),
+                    color = RakyzuAqua,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                IconButton(
+                    onClick = onTogglePlayPause,
+                    enabled = snapshot.error == null,
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause $title" else "Play $title",
+                        tint = Color.White,
+                    )
+                }
             }
         }
     }

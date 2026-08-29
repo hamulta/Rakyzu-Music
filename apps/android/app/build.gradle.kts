@@ -83,6 +83,8 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:model"))
+    implementation(project(":core:playback"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:home"))
     implementation(project(":feature:profile"))

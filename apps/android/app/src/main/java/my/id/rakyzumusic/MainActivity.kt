@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
                     authRepository = rakyzuApplication.authRepository,
                     profileRepository = rakyzuApplication.profileRepository,
                     catalogRepository = rakyzuApplication.catalogRepository,
+                    playbackController = rakyzuApplication.playbackController,
                 )
             }
         }

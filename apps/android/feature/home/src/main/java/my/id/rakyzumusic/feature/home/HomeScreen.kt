@@ -67,6 +67,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 import my.id.rakyzumusic.core.model.Track
 
 private data class ShelfItem(
+    val track: Track,
     val title: String,
     val subtitle: String,
     val colors: List<Color>,
@@ -84,6 +85,7 @@ fun HomeRoute(
     versionName: String,
     displayName: String,
     modifier: Modifier = Modifier,
+    onTrackPlay: (Track) -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
     val homeViewModel: HomeViewModel = viewModel(
@@ -96,6 +98,7 @@ fun HomeRoute(
         state = state,
         modifier = modifier,
         onRetryCatalog = homeViewModel::refresh,
+        onTrackPlay = onTrackPlay,
         onProfileClick = onProfileClick,
     )
 }
@@ -108,6 +111,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
     onRetryCatalog: () -> Unit = {},
+    onTrackPlay: (Track) -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
@@ -140,7 +144,10 @@ fun HomeScreen(
             )
         }
         item {
-            FeaturedCard()
+            FeaturedCard(
+                track = state.catalog.tracks.firstOrNull(),
+                onTrackPlay = onTrackPlay,
+            )
         }
         if (state.isRefreshing || state.refreshMessage != null) {
             item {
@@ -155,6 +162,7 @@ fun HomeScreen(
                 Shelf(
                     title = "Rakyzu catalog",
                     items = state.catalog.tracks.toShelfItems(),
+                    onTrackPlay = onTrackPlay,
                 )
             }
         }
@@ -229,6 +237,7 @@ private fun CatalogStatus(
 
 private fun List<Track>.toShelfItems(): List<ShelfItem> = mapIndexed { index, track ->
     ShelfItem(
+        track = track,
         title = track.title,
         subtitle = listOf(track.artist, track.albumTitle)
             .filter(String::isNotBlank)
@@ -326,7 +335,10 @@ private fun FilterRow(
 }
 
 @Composable
-private fun FeaturedCard() {
+private fun FeaturedCard(
+    track: Track?,
+    onTrackPlay: (Track) -> Unit,
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -369,7 +381,8 @@ private fun FeaturedCard() {
                 )
                 Spacer(Modifier.height(10.dp))
                 Surface(
-                    onClick = {},
+                    onClick = { track?.let(onTrackPlay) },
+                    enabled = track != null,
                     modifier = Modifier.heightIn(min = 48.dp),
                     shape = CircleShape,
                     color = RakyzuAqua,
@@ -400,6 +413,7 @@ private fun FeaturedCard() {
 private fun Shelf(
     title: String,
     items: List<ShelfItem>,
+    onTrackPlay: (Track) -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = 28.dp)) {
         Text(
@@ -415,28 +429,34 @@ private fun Shelf(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(items) { item ->
-                Column(modifier = Modifier.width(156.dp)) {
-                    AlbumCover(
-                        colors = item.colors,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = item.title,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = item.subtitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Card(
+                    onClick = { onTrackPlay(item.track) },
+                    modifier = Modifier.width(156.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                ) {
+                    Column {
+                        AlbumCover(
+                            colors = item.colors,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = item.title,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = item.subtitle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
