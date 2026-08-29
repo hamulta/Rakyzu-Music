@@ -10,7 +10,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - `0.0.4` — complete: email authentication, PKCE callbacks, encrypted session lifecycle, and local logout.
 - `0.0.5` — complete: owner-scoped profile onboarding, account editing, and secure password recovery.
 - `0.0.6` — complete: published catalog schema, Room 3 source of truth, validated Supabase synchronization, and degraded offline Home state.
-- `0.0.7`: Worker API contract and authenticated R2 delivery spike.
+- `0.0.7` — complete: Supabase JWT/RLS-authorized Worker API, private R2 range streaming, automated deployment, and Android authenticated media-request boundary.
 - `0.0.8`: Media3 playback service and notification controls.
 - `0.0.9`: queue, mini player, Now Playing foundation.
 - `0.0.10`: foundation hardening, performance and security review.

@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.6`.
+Status: baseline for `0.0.7`.
 
 ## Goals
 
@@ -19,7 +19,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 ## Android modules
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
-- `core:data`: Supabase client assembly, authentication/profile repositories, catalog synchronization, session state mapping, and encrypted Android persistence.
+- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog synchronization, session state mapping, and encrypted Android persistence.
 - `core:database`: Room 3 catalog entities, transactional replacement DAO, schema history, and observable local data source.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
@@ -41,7 +41,11 @@ Password recovery uses a separate exact deep-link path and only marks recovery a
 
 The authenticated shell loads the current user's `profiles` row through Postgrest using the same short-lived Auth JWT. Both the explicit `id` filter and database RLS enforce ownership. New and existing incomplete profiles remain behind a profile gate until the listener saves a valid display name; profile network failures degrade to a retry surface rather than bypassing onboarding or crashing navigation.
 
-Published catalog tables expose only metadata to the authenticated role and allow no client mutations. Android fetches bounded columns, validates identifiers, parent relationships, durations, and album positions, then replaces the Room snapshot in one transaction. Room emits the canonical catalog as a Flow; failed or invalid refreshes never delete the previous verified snapshot. Media locations remain outside catalog rows and will be mediated by the Worker/R2 delivery boundary.
+Published catalog tables expose only metadata to the authenticated role and allow no client mutations. Android fetches bounded columns, validates identifiers, parent relationships, durations, and album positions, then replaces the Room snapshot in one transaction. Room emits the canonical catalog as a Flow; failed or invalid refreshes never delete the previous verified snapshot. Media locations remain outside catalog rows.
+
+`services/rakyzu-api` is the Cloudflare Worker delivery boundary. `GET /v1/health` is public; `GET` and `HEAD /v1/tracks/{uuid}/stream` require a Supabase bearer JWT. The Worker verifies ES256 signatures against the project's remote JWKS with a fixed issuer, `authenticated` audience and role, and a UUID subject. It then queries the track through PostgREST using that same session, so the database's published-only RLS policy is re-evaluated before any R2 access.
+
+The client supplies only a validated track UUID. The Worker derives `media/tracks/{uuid}/source.mp3`, reads the private `MEDIA` R2 binding, and streams the object body without buffering it. Full responses, `HEAD`, open-ended ranges, bounded ranges, suffix ranges, and `416` responses share strict private/no-store, CORS, request-ID, and security-header behavior. R2 S3 credentials and Supabase privileged keys never enter the Worker bundle or APK.
 
 ## Reliability
 
@@ -52,4 +56,4 @@ Published catalog tables expose only metadata to the authenticated role and allo
 
 ## Release topology
 
-GitHub Actions runs deterministic checks and publishes a branded debug APK artifact for every validated push. Signed release artifacts and Play Console delivery will be introduced only after signing secrets and the release channel are provisioned.
+GitHub Actions runs deterministic Android checks and publishes a branded debug APK artifact for every validated push. A separate path-filtered workflow type-checks, tests, checks generated Worker bindings, dry-runs the bundle, and deploys the API only after verification succeeds. Signed Android artifacts and Play Console delivery will be introduced only after signing secrets and the release channel are provisioned.

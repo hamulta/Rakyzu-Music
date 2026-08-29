@@ -13,6 +13,7 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - Android clients may contain only public/publishable configuration.
 - Supabase service-role credentials, Cloudflare API tokens, and R2 S3 credentials are server-only.
 - R2 media access must use an authenticated Worker, a public custom domain for intentionally public assets, or short-lived signed URLs.
+- Protected media is stored in a private R2 bucket and addressed only by server-derived object keys; clients cannot submit arbitrary R2 keys.
 - Every exposed credential must be revoked and replaced, then repository history and logs must be audited.
 - CI uses least-privilege GitHub permissions and protected environment secrets.
 - Supabase access/refresh tokens and PKCE verifiers are encrypted at rest with AES-GCM and a non-exportable Android Keystore key; they are never logged or included in backups.
@@ -27,5 +28,7 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - Catalog clients receive only published metadata through authenticated SELECT policies; anonymous reads and all client catalog mutations are denied.
 - The Room cache contains metadata only. It never stores database credentials, R2 keys, or privileged media URLs.
 - Storage and database authorization are verified server-side; client claims are never trusted directly.
+- The media Worker verifies Supabase ES256 JWT issuer, audience, role, and UUID subject through JWKS, then forwards the same bearer session to PostgREST so catalog RLS remains authoritative.
+- Media responses support one validated byte range, stream the R2 body without application buffering, use private/no-store caching, and return bounded errors that do not expose upstream details.
 - Schema changes use reviewed, reversible migrations.
 - Dependency, lint, unit, and build checks must pass before a push is considered releasable.
