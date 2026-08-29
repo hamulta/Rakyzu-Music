@@ -62,13 +62,14 @@ import my.id.rakyzumusic.core.data.auth.AuthActionResult
 import my.id.rakyzumusic.core.data.auth.AuthFailure
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
+import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.feature.auth.AuthRoute
-import my.id.rakyzumusic.feature.home.HomeScreen
+import my.id.rakyzumusic.feature.home.HomeRoute
 import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
@@ -94,6 +95,7 @@ fun RakyzuMusicApp(
     versionName: String,
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
+    catalogRepository: CatalogRepository,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -120,6 +122,7 @@ fun RakyzuMusicApp(
             email = state.email,
             authRepository = authRepository,
             profileRepository = profileRepository,
+            catalogRepository = catalogRepository,
             modifier = modifier,
         )
     }
@@ -132,6 +135,7 @@ private fun ProfileGatedRakyzuMusicApp(
     email: String?,
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
+    catalogRepository: CatalogRepository,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -166,6 +170,7 @@ private fun ProfileGatedRakyzuMusicApp(
             onSaveProfile = { profileViewModel.saveProfile(completeOnboarding = false) },
             onResetProfileDraft = profileViewModel::resetDraft,
             authRepository = authRepository,
+            catalogRepository = catalogRepository,
             modifier = modifier,
         )
     }
@@ -185,6 +190,7 @@ private fun AuthenticatedRakyzuMusicApp(
     onSaveProfile: () -> Unit,
     onResetProfileDraft: () -> Unit,
     authRepository: AuthRepository,
+    catalogRepository: CatalogRepository,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
@@ -261,7 +267,8 @@ private fun AuthenticatedRakyzuMusicApp(
                 backStack = backStack,
                 entryProvider = entryProvider {
                     entry<RakyzuRoute.Home> {
-                        HomeScreen(
+                        HomeRoute(
+                            repository = catalogRepository,
                             versionName = versionName,
                             displayName = displayName,
                             onProfileClick = {

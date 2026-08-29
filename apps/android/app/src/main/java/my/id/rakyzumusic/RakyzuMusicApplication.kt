@@ -5,6 +5,7 @@ import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
 import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
+import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,4 +30,7 @@ class RakyzuMusicApplication : Application() {
 
     val profileRepository: ProfileRepository
         get() = repositories.profileRepository
+
+    val catalogRepository: CatalogRepository
+        get() = repositories.catalogRepository
 }

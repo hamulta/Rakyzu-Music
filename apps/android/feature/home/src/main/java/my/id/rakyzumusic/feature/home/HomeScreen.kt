@@ -26,8 +26,12 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -51,12 +55,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
+import my.id.rakyzumusic.core.model.Track
 
 private data class ShelfItem(
     val title: String,
@@ -64,24 +72,42 @@ private data class ShelfItem(
     val colors: List<Color>,
 )
 
-private val recentlyPlayed = listOf(
-    ShelfItem("Midnight Signal", "Rakyzu Sessions", listOf(Color(0xFF3B1B75), RakyzuAqua)),
-    ShelfItem("Afterglow", "Fresh electronic", listOf(Color(0xFF7A2457), RakyzuPurpleSoft)),
-    ShelfItem("Focus Flow", "Instrumental mix", listOf(Color(0xFF123C5A), Color(0xFF59C7F1))),
+private val catalogGradients = listOf(
+    listOf(Color(0xFF3B1B75), RakyzuAqua),
+    listOf(Color(0xFF7A2457), RakyzuPurpleSoft),
+    listOf(Color(0xFF123C5A), Color(0xFF59C7F1)),
 )
 
-private val madeForYou = listOf(
-    ShelfItem("Daily Pulse", "Music shaped around you", listOf(Color(0xFF3D237A), Color(0xFFFF7AB6))),
-    ShelfItem("New Horizons", "Emerging sounds this week", listOf(Color(0xFF14394A), RakyzuAqua)),
-    ShelfItem("Night Drive", "Low light, high energy", listOf(Color(0xFF502567), Color(0xFFFF8B5C))),
-)
+@Composable
+fun HomeRoute(
+    repository: CatalogRepository,
+    versionName: String,
+    displayName: String,
+    modifier: Modifier = Modifier,
+    onProfileClick: () -> Unit = {},
+) {
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModel.factory(repository),
+    )
+    val state by homeViewModel.uiState.collectAsStateWithLifecycle()
+    HomeScreen(
+        versionName = versionName,
+        displayName = displayName,
+        state = state,
+        modifier = modifier,
+        onRetryCatalog = homeViewModel::refresh,
+        onProfileClick = onProfileClick,
+    )
+}
 
 @Composable
 fun HomeScreen(
     versionName: String,
     displayName: String = "Rakyzu Listener",
+    state: HomeUiState = HomeUiState(),
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
+    onRetryCatalog: () -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
@@ -116,19 +142,99 @@ fun HomeScreen(
         item {
             FeaturedCard()
         }
-        item {
-            Shelf(
-                title = "Jump back in",
-                items = recentlyPlayed,
-            )
+        if (state.isRefreshing || state.refreshMessage != null) {
+            item {
+                CatalogStatus(
+                    state = state,
+                    onRetry = onRetryCatalog,
+                )
+            }
         }
-        item {
-            Shelf(
-                title = "Made for you",
-                items = madeForYou,
-            )
+        if (state.catalog.tracks.isNotEmpty()) {
+            item {
+                Shelf(
+                    title = "Rakyzu catalog",
+                    items = state.catalog.tracks.toShelfItems(),
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun CatalogStatus(
+    state: HomeUiState,
+    onRetry: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 18.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = RakyzuSurfaceRaised.copy(alpha = 0.92f),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (state.isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = RakyzuAqua,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = null,
+                    tint = RakyzuAqua,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = when {
+                        state.isRefreshing && state.catalog.isEmpty -> "Loading the Rakyzu catalog"
+                        state.isRefreshing -> "Updating your saved catalog"
+                        state.isShowingSavedCatalog -> "Showing your saved catalog"
+                        else -> "Catalog unavailable"
+                    },
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                state.refreshMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            if (!state.isRefreshing) {
+                Button(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RakyzuAqua,
+                        contentColor = RakyzuBlack,
+                    ),
+                ) {
+                    Text("Retry")
+                }
+            }
+        }
+    }
+}
+
+private fun List<Track>.toShelfItems(): List<ShelfItem> = mapIndexed { index, track ->
+    ShelfItem(
+        title = track.title,
+        subtitle = listOf(track.artist, track.albumTitle)
+            .filter(String::isNotBlank)
+            .joinToString(" · "),
+        colors = catalogGradients[index % catalogGradients.size],
+    )
 }
 
 @Composable

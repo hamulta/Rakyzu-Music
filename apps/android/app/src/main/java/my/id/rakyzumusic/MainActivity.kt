@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
                     versionName = BuildConfig.VERSION_NAME,
                     authRepository = rakyzuApplication.authRepository,
                     profileRepository = rakyzuApplication.profileRepository,
+                    catalogRepository = rakyzuApplication.catalogRepository,
                 )
             }
         }
