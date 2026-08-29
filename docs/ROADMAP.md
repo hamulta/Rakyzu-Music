@@ -13,7 +13,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - `0.0.7` — complete: Supabase JWT/RLS-authorized Worker API, private R2 range streaming, automated deployment, and Android authenticated media-request boundary.
 - `0.0.8` — complete: secure Media3 playback service, authenticated ExoPlayer data source, audio focus, notification controls, and live compact-player state.
 - `0.0.9` — complete: Media3 queue state and controls, compact-player progress/actions, seeking, and branded Now Playing foundation.
-- `0.0.10`: foundation hardening, performance and security review.
+- `0.0.10` — complete: strict auth callback and cleartext defenses, idle playback/per-queue allocation reductions, immutable CI action pins, and automated R8 release validation.
 
 ## Product milestones
 

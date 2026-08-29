@@ -15,11 +15,12 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - R2 media access must use an authenticated Worker, a public custom domain for intentionally public assets, or short-lived signed URLs.
 - Protected media is stored in a private R2 bucket and addressed only by server-derived object keys; clients cannot submit arbitrary R2 keys.
 - Every exposed credential must be revoked and replaced, then repository history and logs must be audited.
-- CI uses least-privilege GitHub permissions and protected environment secrets.
+- CI uses least-privilege GitHub permissions, protected environment secrets, and full-length immutable commit pins for every Android workflow action.
 - Supabase access/refresh tokens and PKCE verifiers are encrypted at rest with AES-GCM and a non-exportable Android Keystore key; they are never logged or included in backups.
 - Authentication uses PKCE, mandatory email confirmation, rotating refresh tokens, and current-device logout by default.
-- Password recovery accepts only the exact branded callback containing a PKCE code; its required state is encrypted and cannot be skipped by restarting the app.
+- Password recovery accepts only the exact branded callback containing one bounded PKCE code and no unexpected query or fragment data; its required state is encrypted and cannot be skipped by restarting the app.
 - Recovery requests use a generic success response so the client does not disclose whether an email address is registered.
+- Android rejects cleartext traffic through both the application manifest and network security configuration, and trusts system certificate authorities for HTTPS delivery.
 
 ## Data controls
 
@@ -31,4 +32,4 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - The media Worker verifies Supabase ES256 JWT issuer, audience, role, and UUID subject through JWKS, then forwards the same bearer session to PostgREST so catalog RLS remains authoritative.
 - Media responses support one validated byte range, stream the R2 body without application buffering, use private/no-store caching, and return bounded errors that do not expose upstream details.
 - Schema changes use reviewed, reversible migrations.
-- Dependency, lint, unit, and build checks must pass before a push is considered releasable.
+- Dependency, lint, unit, debug/test APK, and minified R8 release-build checks must pass before a push is considered releasable.

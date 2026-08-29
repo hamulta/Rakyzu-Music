@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.9`.
+Status: baseline for `0.0.10`.
 
 ## Goals
 
@@ -39,7 +39,7 @@ Supabase schema changes are committed as ordered forward migrations. Client-faci
 
 The app observes Supabase `sessionStatus` as the sole authentication navigation source. Email confirmation callbacks use PKCE through the branded Android deep link. The SDK's session and verifier stores are replaced by AES-GCM persistence whose non-exportable key is generated in Android Keystore; corrupt or invalidated encrypted state is discarded and requires a new sign-in. Auth failures are mapped to bounded product errors so raw backend responses and tokens never reach the UI or logs.
 
-Password recovery uses a separate exact deep-link path and only marks recovery after receiving a PKCE authorization code. The recovery requirement is encrypted with the session state, survives process death, and is cleared only after a successful password update or local sign-out. Recovery-email responses do not reveal whether an account exists.
+Password recovery uses a separate exact deep-link path and only marks recovery after receiving one bounded PKCE authorization code. An application-owned parser rejects any callback whose scheme, raw authority, path, query shape, or fragment differs from the allowlist. `MainActivity` uses `singleTop` and applies the same parser to cold-start and `onNewIntent` callbacks. The recovery requirement is encrypted with the session state, survives process death, and is cleared only after a successful password update or local sign-out. Recovery-email responses do not reveal whether an account exists. The Android network security policy independently rejects cleartext traffic.
 
 The authenticated shell loads the current user's `profiles` row through Postgrest using the same short-lived Auth JWT. Both the explicit `id` filter and database RLS enforce ownership. New and existing incomplete profiles remain behind a profile gate until the listener saves a valid display name; profile network failures degrade to a retry surface rather than bypassing onboarding or crashing navigation.
 
@@ -51,7 +51,7 @@ The client supplies only a validated track UUID. The Worker derives `media/track
 
 Media3 owns playback inside `RakyzuPlaybackService`, independently of Compose and activity lifecycles. Catalog selections become internal `rakyzu://tracks/{uuid}` media items containing only public display metadata. A resolving data source validates that URI, asks the application data boundary for the current in-memory bearer session at request-open time, and accepts only an authenticated HTTPS response contract. Tokens are not embedded in the MediaItem, notification, queue metadata, or persisted state. Untrusted external media controllers are rejected; system-trusted controllers retain lock-screen, headset, Bluetooth, and notification interoperability.
 
-The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackController` maps its current item, queue metadata, transport availability, errors, and bounded position/buffer/duration values into one immutable `PlaybackSnapshot`. Media3 callbacks publish structural changes and a coroutine ticker samples progress only while playback is active. Compose consumes that snapshot in both the compact player and `feature:player`; seeking and queue selection return through controller commands rather than mutating UI-local playback state.
+The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackController` maps its current item, queue metadata, transport availability, errors, and bounded position/buffer/duration values into one immutable `PlaybackSnapshot`. Media3 callbacks publish structural changes; queue metadata is rebuilt only for a changed timeline or item count. A lifecycle-aware coroutine sampler starts only while playback is active, cannot create duplicate jobs, and is cancelled immediately for static playback or session clearing. Compose consumes that snapshot in both the compact player and `feature:player`; seeking and queue selection return through controller commands rather than mutating UI-local playback state.
 
 ## Reliability
 
@@ -63,4 +63,4 @@ The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackContro
 
 ## Release topology
 
-GitHub Actions runs deterministic Android checks and publishes a branded debug APK artifact for every validated push. A separate path-filtered workflow type-checks, tests, checks generated Worker bindings, dry-runs the bundle, and deploys the API only after verification succeeds. Signed Android artifacts and Play Console delivery will be introduced only after signing secrets and the release channel are provisioned.
+GitHub Actions runs deterministic Android checks and publishes a branded debug APK artifact for every validated push. Android workflow actions are pinned to verified full-length commits, wrapper validation is enabled, and every run also builds the minified/resource-shrunk release variant to exercise R8 before publication. A separate path-filtered workflow type-checks, tests, checks generated Worker bindings, dry-runs the bundle, and deploys the API only after verification succeeds. Signed Android artifacts and Play Console delivery will be introduced only after signing secrets and the release channel are provisioned.
