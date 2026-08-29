@@ -1,0 +1,75 @@
+name: Rakyzu Music Worker CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/worker-ci.yml"
+      - "services/rakyzu-api/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/worker-ci.yml"
+      - "services/rakyzu-api/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rakyzu-music-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/rakyzu-api
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/rakyzu-api/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run Worker quality gates
+        run: npm run check
+
+  deploy:
+    name: Deploy Worker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/rakyzu-api
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/rakyzu-api/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Deploy Rakyzu Music API
+        run: npm exec wrangler deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
