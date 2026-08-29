@@ -61,3 +61,54 @@ internal data class SyncMetadataEntity(
     @PrimaryKey val key: String,
     @ColumnInfo(name = "last_successful_sync_epoch_ms") val lastSuccessfulSyncEpochMs: Long,
 )
+
+@Entity(
+    tableName = "editorial_shelves",
+    indices = [Index(value = ["position"], unique = true)],
+)
+internal data class EditorialShelfEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val subtitle: String?,
+    val position: Int,
+)
+
+@Entity(
+    tableName = "editorial_shelf_tracks",
+    primaryKeys = ["shelf_id", "track_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = EditorialShelfEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["shelf_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = TrackEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["track_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index("shelf_id"),
+        Index("track_id"),
+        Index(value = ["shelf_id", "position"], unique = true),
+    ],
+)
+internal data class EditorialShelfTrackEntity(
+    @ColumnInfo(name = "shelf_id") val shelfId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    val position: Int,
+)
+
+@Entity(
+    tableName = "recently_played",
+    primaryKeys = ["user_id", "track_id"],
+    indices = [Index(value = ["user_id", "played_at_epoch_ms"])],
+)
+internal data class RecentlyPlayedEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    @ColumnInfo(name = "played_at_epoch_ms") val playedAtEpochMs: Long,
+)

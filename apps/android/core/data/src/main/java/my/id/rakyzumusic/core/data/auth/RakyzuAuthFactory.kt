@@ -29,6 +29,7 @@ import my.id.rakyzumusic.core.data.profile.ProfileResult
 import my.id.rakyzumusic.core.data.profile.SupabaseProfileRepository
 import my.id.rakyzumusic.core.database.catalog.createCatalogLocalDataSource
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 
 data class SupabasePublicConfiguration(
     val url: String,
@@ -149,16 +150,22 @@ private data object UnavailableProfileRepository : ProfileRepository {
 }
 
 private data object UnavailableCatalogRepository : CatalogRepository {
-    override fun observeCatalog() = flowOf(
-        CatalogSnapshot(
-            artists = emptyList(),
-            albums = emptyList(),
-            tracks = emptyList(),
-            lastSyncedAtEpochMillis = null,
-        ),
+    private val emptyCatalog = CatalogSnapshot(
+        artists = emptyList(),
+        albums = emptyList(),
+        tracks = emptyList(),
+        lastSyncedAtEpochMillis = null,
+    )
+
+    override fun observeCatalog() = flowOf(emptyCatalog)
+
+    override fun observeHomeFeed(userId: String) = flowOf(
+        HomeFeedSnapshot(catalog = emptyCatalog, recentlyPlayed = emptyList()),
     )
 
     override suspend fun refresh() = CatalogRefreshResult.Failure(
         CatalogRefreshFailure.ServiceUnavailable,
     )
+
+    override suspend fun recordRecentlyPlayed(userId: String, trackId: String) = false
 }

@@ -1,6 +1,7 @@
 package my.id.rakyzumusic.core.database.catalog
 
 import android.content.Context
+import androidx.room3.AutoMigration
 import androidx.room3.Database
 import androidx.room3.Room
 import androidx.room3.RoomDatabase
@@ -12,9 +13,13 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         AlbumEntity::class,
         TrackEntity::class,
         SyncMetadataEntity::class,
+        EditorialShelfEntity::class,
+        EditorialShelfTrackEntity::class,
+        RecentlyPlayedEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 internal abstract class RakyzuDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao

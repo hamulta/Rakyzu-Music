@@ -7,6 +7,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import my.id.rakyzumusic.core.database.catalog.CatalogLocalDataSource
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.HomeFeedSnapshot
+import my.id.rakyzumusic.core.model.Track
 
 internal interface CatalogRemoteDataSource {
     suspend fun fetchCatalog(): CatalogSnapshot
@@ -18,6 +20,16 @@ internal class OfflineFirstCatalogRepository(
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : CatalogRepository {
     override fun observeCatalog(): Flow<CatalogSnapshot> = localDataSource.observeCatalog()
+
+    override fun observeHomeFeed(userId: String): Flow<HomeFeedSnapshot> =
+        localDataSource.observeHomeFeed(userId)
+
+    override suspend fun recordRecentlyPlayed(userId: String, trackId: String): Boolean =
+        localDataSource.recordRecentlyPlayed(
+            userId = userId,
+            trackId = trackId,
+            playedAtEpochMillis = currentTimeMillis(),
+        )
 
     override suspend fun refresh(): CatalogRefreshResult = try {
         val snapshot = remoteDataSource.fetchCatalog()
@@ -54,7 +66,7 @@ private fun CatalogSnapshot.isValidCatalog(): Boolean {
     }
 
     val positions = mutableSetOf<Triple<String, Int, Int>>()
-    return tracks.all { track ->
+    val tracksAreValid = tracks.all { track ->
         val album = albumsById[track.albumId]
         val position = Triple(track.albumId, track.discNumber, track.trackNumber)
         track.id.isNotBlank() &&
@@ -65,6 +77,23 @@ private fun CatalogSnapshot.isValidCatalog(): Boolean {
             album != null &&
             track.artistId == album.artistId &&
             positions.add(position)
+    }
+    if (!tracksAreValid) return false
+
+    val trackIds = tracks.mapTo(mutableSetOf(), Track::id)
+    val shelfIds = mutableSetOf<String>()
+    val shelfPositions = mutableSetOf<Int>()
+    return editorialShelves.all { shelf ->
+        shelf.id.isNotBlank() &&
+            shelf.title.trim().length in 1..80 &&
+            (shelf.subtitle?.let { it.trim().length in 1..160 } ?: true) &&
+            shelf.position in 0..1_000 &&
+            shelf.tracks.isNotEmpty() &&
+            shelfIds.add(shelf.id) &&
+            shelfPositions.add(shelf.position) &&
+            shelf.tracks.map { it.id }.let { ids ->
+                ids.size == ids.toSet().size && ids.all(trackIds::contains)
+            }
     }
 }
 

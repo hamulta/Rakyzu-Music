@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -47,8 +48,32 @@ class RakyzuDatabaseTest {
 
         assertEquals("Rakyzu Sessions", stored.tracks.single().artist)
         assertEquals("Signal Zero", stored.tracks.single().albumTitle)
+        assertEquals("Rakyzu Essentials", stored.editorialShelves.single().title)
+        assertEquals("Midnight Signal", stored.editorialShelves.single().tracks.single().title)
         assertEquals(1234L, stored.lastSyncedAtEpochMillis)
         assertFalse(stored.isEmpty)
+    }
+
+    @Test
+    fun recentlyPlayedIsValidatedAndIsolatedByUser() = runTest {
+        dataSource.replaceCatalog(CATALOG, syncedAtEpochMillis = 1234L)
+
+        assertEquals(
+            true,
+            dataSource.recordRecentlyPlayed("listener-1", "track-1", playedAtEpochMillis = 55L),
+        )
+        assertEquals(
+            false,
+            dataSource.recordRecentlyPlayed("listener-1", "missing", playedAtEpochMillis = 56L),
+        )
+
+        val listenerOne = dataSource.observeHomeFeed("listener-1").first {
+            it.recentlyPlayed.isNotEmpty()
+        }
+        val listenerTwo = dataSource.observeHomeFeed("listener-2").first()
+
+        assertEquals(listOf("track-1"), listenerOne.recentlyPlayed.map(Track::id))
+        assertEquals(emptyList<Track>(), listenerTwo.recentlyPlayed)
     }
 
     private companion object {
@@ -64,6 +89,25 @@ class RakyzuDatabaseTest {
                     artistId = "artist-1",
                     albumId = "album-1",
                     albumTitle = "Signal Zero",
+                ),
+            ),
+            editorialShelves = listOf(
+                EditorialShelf(
+                    id = "shelf-1",
+                    title = "Rakyzu Essentials",
+                    subtitle = "Selected by Rakyzu Music",
+                    position = 0,
+                    tracks = listOf(
+                        Track(
+                            id = "track-1",
+                            title = "Midnight Signal",
+                            artist = "Rakyzu Sessions",
+                            durationMs = 185900,
+                            artistId = "artist-1",
+                            albumId = "album-1",
+                            albumTitle = "Signal Zero",
+                        ),
+                    ),
                 ),
             ),
             lastSyncedAtEpochMillis = null,
