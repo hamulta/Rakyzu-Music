@@ -34,4 +34,8 @@ Every client-facing table must explicitly enable and force RLS, revoke default a
 
 `public.profiles` stores the listener's required `display_name` and non-null `onboarding_completed` state. Authenticated clients may select and update only their own row; profile inserts and deletes remain lifecycle operations controlled by the Auth trigger and privileged backend. The onboarding migration defaults existing and new rows to incomplete without deleting or rewriting profile data.
 
+`public.artists`, `public.albums`, and `public.tracks` contain published catalog metadata. Authenticated listeners receive SELECT-only access to rows whose `is_published` flag is true; anonymous reads and all client writes are denied. Foreign keys, positive duration/position checks, unique album positions, and pgTAP policy tests protect the server catalog. The initial synthetic Rakyzu Sessions fixtures are owned development content and include no third-party catalog or media.
+
+Android mirrors those tables in Room 3 using a checked-in version-1 schema. Refresh validates the complete remote graph before a single transaction replaces artists, albums, tracks, and the successful-sync timestamp. If network, service, or validation fails, the existing local snapshot remains untouched.
+
 Credentials belong only in local ignored files or GitHub encrypted secrets. Neither SQL migrations nor the Android build may contain privileged keys.

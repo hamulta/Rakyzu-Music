@@ -24,6 +24,8 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 
 - Row Level Security is mandatory on all exposed Supabase tables.
 - Listener profile reads and updates are restricted to the active `auth.uid()` and covered by owner/cross-owner pgTAP tests.
+- Catalog clients receive only published metadata through authenticated SELECT policies; anonymous reads and all client catalog mutations are denied.
+- The Room cache contains metadata only. It never stores database credentials, R2 keys, or privileged media URLs.
 - Storage and database authorization are verified server-side; client claims are never trusted directly.
 - Schema changes use reviewed, reversible migrations.
 - Dependency, lint, unit, and build checks must pass before a push is considered releasable.

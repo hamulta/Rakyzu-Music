@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.5`.
+Status: baseline for `0.0.6`.
 
 ## Goals
 
@@ -19,14 +19,15 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 ## Android modules
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
-- `core:data`: Supabase client assembly, authentication repository, session state mapping, and encrypted Android persistence.
+- `core:data`: Supabase client assembly, authentication/profile repositories, catalog synchronization, session state mapping, and encrypted Android persistence.
+- `core:database`: Room 3 catalog entities, transactional replacement DAO, schema history, and observable local data source.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
 - `feature:home`: the first independently owned feature surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
 
-Planned boundaries include `core:database`, `core:network`, `core:playback`, `feature:search`, `feature:library`, and `feature:player`.
+Planned boundaries include `core:network`, `core:playback`, `feature:search`, `feature:library`, and `feature:player`.
 
 ## Data and media security
 
@@ -40,10 +41,12 @@ Password recovery uses a separate exact deep-link path and only marks recovery a
 
 The authenticated shell loads the current user's `profiles` row through Postgrest using the same short-lived Auth JWT. Both the explicit `id` filter and database RLS enforce ownership. New and existing incomplete profiles remain behind a profile gate until the listener saves a valid display name; profile network failures degrade to a retry surface rather than bypassing onboarding or crashing navigation.
 
+Published catalog tables expose only metadata to the authenticated role and allow no client mutations. Android fetches bounded columns, validates identifiers, parent relationships, durations, and album positions, then replaces the Room snapshot in one transaction. Room emits the canonical catalog as a Flow; failed or invalid refreshes never delete the previous verified snapshot. Media locations remain outside catalog rows and will be mediated by the Worker/R2 delivery boundary.
+
 ## Reliability
 
-- A local database becomes the single source of truth for cached catalog/library data.
-- Remote synchronization is incremental, paginated, and retry-aware.
+- Room is the single source of truth for cached catalog data; library persistence follows at its roadmap milestone.
+- Catalog synchronization currently uses a validated full snapshot. Pagination and incremental cursors are introduced when catalog scale requires them.
 - Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes.
 - Each feature exposes immutable UI state and handles unavailable dependencies as a degraded state rather than crashing the entire client.
 
