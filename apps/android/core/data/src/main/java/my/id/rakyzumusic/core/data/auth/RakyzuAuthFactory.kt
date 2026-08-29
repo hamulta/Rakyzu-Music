@@ -11,11 +11,19 @@ import java.net.URI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.Json
+import my.id.rakyzumusic.core.data.catalog.CatalogRefreshFailure
+import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
+import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.catalog.OfflineFirstCatalogRepository
+import my.id.rakyzumusic.core.data.catalog.SupabaseCatalogRemoteDataSource
 import my.id.rakyzumusic.core.data.profile.ProfileFailure
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
 import my.id.rakyzumusic.core.data.profile.SupabaseProfileRepository
+import my.id.rakyzumusic.core.database.catalog.createCatalogLocalDataSource
+import my.id.rakyzumusic.core.model.CatalogSnapshot
 
 data class SupabasePublicConfiguration(
     val url: String,
@@ -46,6 +54,7 @@ object RakyzuAuthFactory {
         if (!configuration.isValid()) return RakyzuRepositories(
             authRepository = UnavailableAuthRepository,
             profileRepository = UnavailableProfileRepository,
+            catalogRepository = UnavailableCatalogRepository,
         )
 
         val encryptedStore = EncryptedAuthStore(context)
@@ -78,6 +87,10 @@ object RakyzuAuthFactory {
                 applicationScope = applicationScope,
             ),
             profileRepository = SupabaseProfileRepository(client.auth, client.postgrest),
+            catalogRepository = OfflineFirstCatalogRepository(
+                localDataSource = createCatalogLocalDataSource(context),
+                remoteDataSource = SupabaseCatalogRemoteDataSource(client.postgrest),
+            ),
         )
     }
 }
@@ -85,6 +98,7 @@ object RakyzuAuthFactory {
 data class RakyzuRepositories(
     val authRepository: AuthRepository,
     val profileRepository: ProfileRepository,
+    val catalogRepository: CatalogRepository,
 )
 
 private data object UnavailableAuthRepository : AuthRepository {
@@ -116,4 +130,19 @@ private data object UnavailableProfileRepository : ProfileRepository {
     ): ProfileResult = unavailable()
 
     private fun unavailable() = ProfileResult.Failure(ProfileFailure.ServiceUnavailable)
+}
+
+private data object UnavailableCatalogRepository : CatalogRepository {
+    override fun observeCatalog() = flowOf(
+        CatalogSnapshot(
+            artists = emptyList(),
+            albums = emptyList(),
+            tracks = emptyList(),
+            lastSyncedAtEpochMillis = null,
+        ),
+    )
+
+    override suspend fun refresh() = CatalogRefreshResult.Failure(
+        CatalogRefreshFailure.ServiceUnavailable,
+    )
 }

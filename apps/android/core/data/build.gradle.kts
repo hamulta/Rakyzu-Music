@@ -18,6 +18,9 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:database"))
+    implementation(project(":core:model"))
+
     val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.8.0")
     implementation(supabaseBom)
     implementation("io.github.jan-tennert.supabase:auth-kt")
@@ -27,4 +30,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
