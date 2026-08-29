@@ -2,12 +2,12 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.0.7**
+Current version: **0.0.8**
 
 ## Technology baseline
 
 - Android: Kotlin, Jetpack Compose, Material 3, AndroidX, Gradle Kotlin DSL
-- Playback: AndroidX Media3 (introduced in a later playback milestone)
+- Playback: AndroidX Media3 ExoPlayer, MediaSessionService, and system notification controls
 - Data and identity: Supabase Postgres, Auth, Realtime, and Row Level Security
 - API and delivery: Cloudflare Workers, Pages, and R2
 - Automation: GitHub Actions
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.7-debug.apk`.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.0.8-debug.apk`.
 
 ## Configuration and security
 
@@ -51,5 +51,7 @@ Password recovery uses the exact callback `my.id.rakyzumusic://auth/recovery`, a
 Published artist, album, and track metadata is read through authenticated Supabase RLS and synchronized into Room 3. The local database is the Home screen's observable source of truth, so the last verified catalog remains available when refresh fails.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
+
+Playback runs in a Media3 `MediaSessionService` with automatic MediaStyle notification controls, audio-focus handling, and noisy-output protection. The player receives only an internal track UUID URI; the current bearer session is resolved into an HTTPS Worker request just before each data-source open and is never placed in media metadata, logs, or a persisted queue. The compact player reflects the live MediaSession and clears when the listener session is no longer signed in.
 
 See [Architecture](docs/ARCHITECTURE.md), [Database](docs/DATABASE.md), [Roadmap](docs/ROADMAP.md), and [Security](SECURITY.md).

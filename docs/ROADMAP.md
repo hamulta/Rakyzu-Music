@@ -11,8 +11,8 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - `0.0.5` — complete: owner-scoped profile onboarding, account editing, and secure password recovery.
 - `0.0.6` — complete: published catalog schema, Room 3 source of truth, validated Supabase synchronization, and degraded offline Home state.
 - `0.0.7` — complete: Supabase JWT/RLS-authorized Worker API, private R2 range streaming, automated deployment, and Android authenticated media-request boundary.
-- `0.0.8`: Media3 playback service and notification controls.
-- `0.0.9`: queue, mini player, Now Playing foundation.
+- `0.0.8` — complete: secure Media3 playback service, authenticated ExoPlayer data source, audio focus, notification controls, and live compact-player state.
+- `0.0.9`: queue, compact-player progress/actions, and Now Playing foundation.
 - `0.0.10`: foundation hardening, performance and security review.
 
 ## Product milestones

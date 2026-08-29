@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.7`.
+Status: baseline for `0.0.8`.
 
 ## Goals
 
@@ -22,12 +22,13 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog synchronization, session state mapping, and encrypted Android persistence.
 - `core:database`: Room 3 catalog entities, transactional replacement DAO, schema history, and observable local data source.
 - `core:model`: platform-independent product models and formatting rules.
+- `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
 - `feature:home`: the first independently owned feature surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
 
-Planned boundaries include `core:network`, `core:playback`, `feature:search`, `feature:library`, and `feature:player`.
+Planned boundaries include `core:network`, `feature:search`, `feature:library`, and `feature:player`.
 
 ## Data and media security
 
@@ -47,11 +48,13 @@ Published catalog tables expose only metadata to the authenticated role and allo
 
 The client supplies only a validated track UUID. The Worker derives `media/tracks/{uuid}/source.mp3`, reads the private `MEDIA` R2 binding, and streams the object body without buffering it. Full responses, `HEAD`, open-ended ranges, bounded ranges, suffix ranges, and `416` responses share strict private/no-store, CORS, request-ID, and security-header behavior. R2 S3 credentials and Supabase privileged keys never enter the Worker bundle or APK.
 
+Media3 owns playback inside `RakyzuPlaybackService`, independently of Compose and activity lifecycles. Catalog selections become internal `rakyzu://tracks/{uuid}` media items containing only public display metadata. A resolving data source validates that URI, asks the application data boundary for the current in-memory bearer session at request-open time, and accepts only an authenticated HTTPS response contract. Tokens are not embedded in the MediaItem, notification, queue metadata, or persisted state. Untrusted external media controllers are rejected; system-trusted controllers retain lock-screen, headset, Bluetooth, and notification interoperability.
+
 ## Reliability
 
 - Room is the single source of truth for cached catalog data; library persistence follows at its roadmap milestone.
 - Catalog synchronization currently uses a validated full snapshot. Pagination and incremental cursors are introduced when catalog scale requires them.
-- Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes.
+- Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes; ExoPlayer owns audio focus and pauses for noisy-output events.
 - Each feature exposes immutable UI state and handles unavailable dependencies as a degraded state rather than crashing the entire client.
 
 ## Release topology
