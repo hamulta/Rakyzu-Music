@@ -12,6 +12,7 @@ internal fun Track.toPlaybackMediaItem(): MediaItem = MediaItem.Builder()
             .setTitle(title)
             .setArtist(artist)
             .setAlbumTitle(albumTitle.takeIf(String::isNotBlank))
+            .setDurationMs(durationMs.coerceAtLeast(0L))
             .setIsPlayable(true)
             .build(),
     )
