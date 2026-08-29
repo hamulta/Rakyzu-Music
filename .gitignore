@@ -20,6 +20,11 @@ captures/
 *.apk
 *.aab
 
+# Node / Cloudflare Worker
+**/node_modules/
+**/.wrangler/
+**/coverage/
+
 # IDE / OS
 .idea/
 *.iml

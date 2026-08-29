@@ -1,0 +1,27 @@
+{
+  "name": "@rakyzu/music-api",
+  "version": "0.0.7",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run types:check && npm run typecheck && npm test && npm run check:deploy",
+    "check:deploy": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit --project tsconfig.test.json",
+    "types": "wrangler types --include-runtime=false",
+    "types:check": "wrangler types --include-runtime=false --check"
+  },
+  "dependencies": {
+    "jose": "6.2.10"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260829.1",
+    "@types/node": "24.10.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.1"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
