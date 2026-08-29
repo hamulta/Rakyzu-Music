@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.8`.
+Status: baseline for `0.0.9`.
 
 ## Goals
 
@@ -26,9 +26,10 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
 - `feature:home`: the first independently owned feature surface.
+- `feature:player`: branded Now Playing, seek controls, transport actions, and the current Media3 queue surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
 
-Planned boundaries include `core:network`, `feature:search`, `feature:library`, and `feature:player`.
+Planned boundaries include `core:network`, `feature:search`, and `feature:library`.
 
 ## Data and media security
 
@@ -50,11 +51,14 @@ The client supplies only a validated track UUID. The Worker derives `media/track
 
 Media3 owns playback inside `RakyzuPlaybackService`, independently of Compose and activity lifecycles. Catalog selections become internal `rakyzu://tracks/{uuid}` media items containing only public display metadata. A resolving data source validates that URI, asks the application data boundary for the current in-memory bearer session at request-open time, and accepts only an authenticated HTTPS response contract. Tokens are not embedded in the MediaItem, notification, queue metadata, or persisted state. Untrusted external media controllers are rejected; system-trusted controllers retain lock-screen, headset, Bluetooth, and notification interoperability.
 
+The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackController` maps its current item, queue metadata, transport availability, errors, and bounded position/buffer/duration values into one immutable `PlaybackSnapshot`. Media3 callbacks publish structural changes and a coroutine ticker samples progress only while playback is active. Compose consumes that snapshot in both the compact player and `feature:player`; seeking and queue selection return through controller commands rather than mutating UI-local playback state.
+
 ## Reliability
 
 - Room is the single source of truth for cached catalog data; library persistence follows at its roadmap milestone.
 - Catalog synchronization currently uses a validated full snapshot. Pagination and incremental cursors are introduced when catalog scale requires them.
 - Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes; ExoPlayer owns audio focus and pauses for noisy-output events.
+- Queue order, current index, transport availability, and playback progress come from the Media3 timeline; UI-local slider state exists only during a seek gesture.
 - Each feature exposes immutable UI state and handles unavailable dependencies as a degraded state rather than crashing the entire client.
 
 ## Release topology
