@@ -1,5 +1,6 @@
 package my.id.rakyzumusic
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,12 +12,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val rakyzuApplication = application as RakyzuMusicApplication
-        if (
-            intent?.data?.path == PASSWORD_RECOVERY_PATH &&
-            !intent?.data?.getQueryParameter(AUTH_CODE_PARAMETER).isNullOrBlank()
-        ) {
-            rakyzuApplication.authRepository.markPasswordRecoveryCallback()
-        }
+        handleAuthCallback(intent, rakyzuApplication)
         setContent {
             RakyzuMusicTheme(darkTheme = true) {
                 RakyzuMusicApp(
@@ -30,8 +26,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private companion object {
-        const val AUTH_CODE_PARAMETER = "code"
-        const val PASSWORD_RECOVERY_PATH = "/recovery"
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAuthCallback(intent, application as RakyzuMusicApplication)
+    }
+
+    private fun handleAuthCallback(
+        intent: Intent?,
+        application: RakyzuMusicApplication,
+    ) {
+        if (isPasswordRecoveryCallback(intent?.dataString)) {
+            application.authRepository.markPasswordRecoveryCallback()
+        }
     }
 }
