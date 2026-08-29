@@ -13,6 +13,9 @@ sealed interface RakyzuRoute : NavKey {
 
     @Serializable
     data object Library : RakyzuRoute
+
+    @Serializable
+    data object NowPlaying : RakyzuRoute
 }
 
 internal fun selectTopLevelRoute(
@@ -23,4 +26,16 @@ internal fun selectTopLevelRoute(
 
     backStack.clear()
     backStack.add(route)
+}
+
+internal fun openNowPlaying(backStack: MutableList<NavKey>) {
+    if (backStack.lastOrNull() != RakyzuRoute.NowPlaying) {
+        backStack.add(RakyzuRoute.NowPlaying)
+    }
+}
+
+internal fun dismissNowPlaying(backStack: MutableList<NavKey>) {
+    if (backStack.size > 1 && backStack.lastOrNull() == RakyzuRoute.NowPlaying) {
+        backStack.removeAt(backStack.lastIndex)
+    }
 }

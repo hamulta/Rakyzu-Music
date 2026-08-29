@@ -67,7 +67,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 import my.id.rakyzumusic.core.model.Track
 
 private data class ShelfItem(
-    val track: Track,
+    val queueIndex: Int,
     val title: String,
     val subtitle: String,
     val colors: List<Color>,
@@ -85,7 +85,7 @@ fun HomeRoute(
     versionName: String,
     displayName: String,
     modifier: Modifier = Modifier,
-    onTrackPlay: (Track) -> Unit = {},
+    onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
 ) {
     val homeViewModel: HomeViewModel = viewModel(
@@ -111,7 +111,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
     onRetryCatalog: () -> Unit = {},
-    onTrackPlay: (Track) -> Unit = {},
+    onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
@@ -146,7 +146,9 @@ fun HomeScreen(
         item {
             FeaturedCard(
                 track = state.catalog.tracks.firstOrNull(),
-                onTrackPlay = onTrackPlay,
+                onTrackPlay = {
+                    onTrackPlay(state.catalog.tracks, 0)
+                },
             )
         }
         if (state.isRefreshing || state.refreshMessage != null) {
@@ -162,7 +164,9 @@ fun HomeScreen(
                 Shelf(
                     title = "Rakyzu catalog",
                     items = state.catalog.tracks.toShelfItems(),
-                    onTrackPlay = onTrackPlay,
+                    onTrackPlay = { index ->
+                        onTrackPlay(state.catalog.tracks, index)
+                    },
                 )
             }
         }
@@ -237,7 +241,7 @@ private fun CatalogStatus(
 
 private fun List<Track>.toShelfItems(): List<ShelfItem> = mapIndexed { index, track ->
     ShelfItem(
-        track = track,
+        queueIndex = index,
         title = track.title,
         subtitle = listOf(track.artist, track.albumTitle)
             .filter(String::isNotBlank)
@@ -337,7 +341,7 @@ private fun FilterRow(
 @Composable
 private fun FeaturedCard(
     track: Track?,
-    onTrackPlay: (Track) -> Unit,
+    onTrackPlay: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -381,7 +385,7 @@ private fun FeaturedCard(
                 )
                 Spacer(Modifier.height(10.dp))
                 Surface(
-                    onClick = { track?.let(onTrackPlay) },
+                    onClick = onTrackPlay,
                     enabled = track != null,
                     modifier = Modifier.heightIn(min = 48.dp),
                     shape = CircleShape,
@@ -413,7 +417,7 @@ private fun FeaturedCard(
 private fun Shelf(
     title: String,
     items: List<ShelfItem>,
-    onTrackPlay: (Track) -> Unit,
+    onTrackPlay: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = 28.dp)) {
         Text(
@@ -430,7 +434,7 @@ private fun Shelf(
         ) {
             items(items) { item ->
                 Card(
-                    onClick = { onTrackPlay(item.track) },
+                    onClick = { onTrackPlay(item.queueIndex) },
                     modifier = Modifier.width(156.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {

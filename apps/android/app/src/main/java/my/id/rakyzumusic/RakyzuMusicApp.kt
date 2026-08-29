@@ -1,6 +1,7 @@
 package my.id.rakyzumusic
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -23,12 +25,14 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -74,11 +78,14 @@ import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.feature.auth.AuthRoute
 import my.id.rakyzumusic.feature.home.HomeRoute
+import my.id.rakyzumusic.feature.player.NowPlayingScreen
 import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
 import my.id.rakyzumusic.navigation.RakyzuRoute
+import my.id.rakyzumusic.navigation.dismissNowPlaying
+import my.id.rakyzumusic.navigation.openNowPlaying
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
 import kotlinx.coroutines.launch
 
@@ -287,7 +294,7 @@ private fun AuthenticatedRakyzuMusicApp(
                             repository = catalogRepository,
                             versionName = versionName,
                             displayName = displayName,
-                            onTrackPlay = playbackController::play,
+                            onTrackPlay = playbackController::playQueue,
                             onProfileClick = {
                                 signOutMessage = null
                                 showAccount = true
@@ -308,14 +315,30 @@ private fun AuthenticatedRakyzuMusicApp(
                             icon = Icons.Rounded.LibraryMusic,
                         )
                     }
+                    entry<RakyzuRoute.NowPlaying> {
+                        NowPlayingScreen(
+                            snapshot = playbackSnapshot,
+                            onDismiss = { dismissNowPlaying(backStack) },
+                            onTogglePlayPause = playbackController::togglePlayPause,
+                            onPrevious = playbackController::skipToPrevious,
+                            onNext = playbackController::skipToNext,
+                            onSeek = playbackController::seekTo,
+                            onQueueItemClick = playbackController::skipToQueueItem,
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
 
-            if (playbackSnapshot.mediaId != null) {
+            if (
+                playbackSnapshot.mediaId != null &&
+                currentRoute != RakyzuRoute.NowPlaying
+            ) {
                 PlaybackBar(
                     snapshot = playbackSnapshot,
+                    onOpenNowPlaying = { openNowPlaying(backStack) },
                     onTogglePlayPause = playbackController::togglePlayPause,
+                    onNext = playbackController::skipToNext,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -534,7 +557,9 @@ private fun FoundationDestination(
 @Composable
 private fun PlaybackBar(
     snapshot: PlaybackSnapshot,
+    onOpenNowPlaying: () -> Unit,
     onTogglePlayPause: () -> Unit,
+    onNext: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = snapshot.title ?: "Rakyzu Music"
@@ -550,65 +575,95 @@ private fun PlaybackBar(
         shape = RoundedCornerShape(14.dp),
         shadowElevation = 8.dp,
     ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua))),
-                contentAlignment = Alignment.Center,
+        Column {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.MusicNote,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (snapshot.error != null) {
-                        "Playback unavailable"
-                    } else {
-                        snapshot.artist ?: "Rakyzu Music"
-                    },
-                    color = Color.White.copy(alpha = 0.72f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (isBuffering) {
-                CircularProgressIndicator(
+                Row(
                     modifier = Modifier
-                        .padding(12.dp)
-                        .size(24.dp),
-                    color = RakyzuAqua,
-                    strokeWidth = 2.dp,
-                )
-            } else {
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(onClick = onOpenNowPlaying)
+                        .padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua))),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MusicNote,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = if (snapshot.error != null) {
+                                "Playback unavailable"
+                            } else {
+                                snapshot.artist ?: "Rakyzu Music"
+                            },
+                            color = Color.White.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (isBuffering) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .size(24.dp),
+                        color = RakyzuAqua,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        enabled = snapshot.error == null,
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause $title" else "Play $title",
+                            tint = Color.White,
+                        )
+                    }
+                }
                 IconButton(
-                    onClick = onTogglePlayPause,
-                    enabled = snapshot.error == null,
+                    onClick = onNext,
+                    enabled = snapshot.canSkipNext,
                 ) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause $title" else "Play $title",
+                        imageVector = Icons.Rounded.SkipNext,
+                        contentDescription = "Next track",
                         tint = Color.White,
                     )
                 }
             }
+            LinearProgressIndicator(
+                progress = { snapshot.progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp),
+                color = RakyzuAqua,
+                trackColor = Color.White.copy(alpha = 0.16f),
+                drawStopIndicator = {},
+            )
         }
     }
 }
