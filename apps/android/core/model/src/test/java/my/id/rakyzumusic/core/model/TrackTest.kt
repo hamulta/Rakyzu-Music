@@ -22,4 +22,15 @@ class TrackTest {
 
         assertEquals("0:00", track.formattedDuration())
     }
+
+    @Test
+    fun catalogSnapshotReportsWhetherItHasLocalContent() {
+        val empty = CatalogSnapshot(emptyList(), emptyList(), emptyList(), null)
+        val cached = empty.copy(
+            artists = listOf(Artist("artist-1", "Rakyzu Sessions")),
+        )
+
+        assertEquals(true, empty.isEmpty)
+        assertEquals(false, cached.isEmpty)
+    }
 }
