@@ -18,6 +18,11 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.catalog.OfflineFirstCatalogRepository
 import my.id.rakyzumusic.core.data.catalog.SupabaseCatalogRemoteDataSource
+import my.id.rakyzumusic.core.data.media.AccessTokenProvider
+import my.id.rakyzumusic.core.data.media.AuthenticatedMediaDeliveryRepository
+import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
+import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
+import my.id.rakyzumusic.core.data.media.UnavailableMediaDeliveryRepository
 import my.id.rakyzumusic.core.data.profile.ProfileFailure
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
@@ -50,11 +55,13 @@ object RakyzuAuthFactory {
         context: Context,
         configuration: SupabasePublicConfiguration,
         applicationScope: CoroutineScope,
+        apiConfiguration: RakyzuApiConfiguration = RakyzuApiConfiguration(""),
     ): RakyzuRepositories {
         if (!configuration.isValid()) return RakyzuRepositories(
             authRepository = UnavailableAuthRepository,
             profileRepository = UnavailableProfileRepository,
             catalogRepository = UnavailableCatalogRepository,
+            mediaDeliveryRepository = UnavailableMediaDeliveryRepository,
         )
 
         val encryptedStore = EncryptedAuthStore(context)
@@ -91,6 +98,14 @@ object RakyzuAuthFactory {
                 localDataSource = createCatalogLocalDataSource(context),
                 remoteDataSource = SupabaseCatalogRemoteDataSource(client.postgrest),
             ),
+            mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
+                UnavailableMediaDeliveryRepository
+            } else {
+                AuthenticatedMediaDeliveryRepository(
+                    configuration = apiConfiguration,
+                    accessTokenProvider = AccessTokenProvider(client.auth::currentAccessTokenOrNull),
+                )
+            },
         )
     }
 }
@@ -99,6 +114,7 @@ data class RakyzuRepositories(
     val authRepository: AuthRepository,
     val profileRepository: ProfileRepository,
     val catalogRepository: CatalogRepository,
+    val mediaDeliveryRepository: MediaDeliveryRepository,
 )
 
 private data object UnavailableAuthRepository : AuthRepository {

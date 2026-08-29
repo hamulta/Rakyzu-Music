@@ -21,6 +21,7 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      RAKYZU_API_BASE_URL: ${{ secrets.RAKYZU_API_BASE_URL }}
     defaults:
       run:
         working-directory: apps/android

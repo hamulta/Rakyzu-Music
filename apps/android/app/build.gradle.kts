@@ -15,6 +15,9 @@ val supabaseUrl = providers.gradleProperty("SUPABASE_URL")
 val supabasePublishableKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY")
     .orElse(providers.environmentVariable("SUPABASE_PUBLISHABLE_KEY"))
     .getOrElse("")
+val rakyzuApiBaseUrl = providers.gradleProperty("RAKYZU_API_BASE_URL")
+    .orElse(providers.environmentVariable("RAKYZU_API_BASE_URL"))
+    .getOrElse("")
 
 android {
     namespace = "my.id.rakyzumusic"
@@ -32,6 +35,11 @@ android {
             "String",
             "SUPABASE_PUBLISHABLE_KEY",
             supabasePublishableKey.asBuildConfigString(),
+        )
+        buildConfigField(
+            "String",
+            "RAKYZU_API_BASE_URL",
+            rakyzuApiBaseUrl.asBuildConfigString(),
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

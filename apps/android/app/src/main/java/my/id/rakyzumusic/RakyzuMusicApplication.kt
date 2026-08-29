@@ -6,6 +6,8 @@ import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
 import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
+import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +24,7 @@ class RakyzuMusicApplication : Application() {
                 publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
             ),
             applicationScope = applicationScope,
+            apiConfiguration = RakyzuApiConfiguration(BuildConfig.RAKYZU_API_BASE_URL),
         )
     }
 
@@ -33,4 +36,7 @@ class RakyzuMusicApplication : Application() {
 
     val catalogRepository: CatalogRepository
         get() = repositories.catalogRepository
+
+    val mediaDeliveryRepository: MediaDeliveryRepository
+        get() = repositories.mediaDeliveryRepository
 }
