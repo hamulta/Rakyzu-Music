@@ -18,6 +18,7 @@ rootProject.name = "RakyzuMusicAndroid"
 
 include(":app")
 include(":core:data")
+include(":core:database")
 include(":core:designsystem")
 include(":core:model")
 include(":feature:auth")
