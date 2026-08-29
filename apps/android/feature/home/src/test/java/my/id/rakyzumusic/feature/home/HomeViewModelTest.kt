@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -15,6 +16,7 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -40,7 +42,7 @@ class HomeViewModelTest {
     @Test
     fun initialRefreshPublishesCatalogFromLocalSource() = runTest(dispatcher) {
         val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
-        val viewModel = HomeViewModel(repository)
+        val viewModel = HomeViewModel("listener-1", repository)
         repository.catalog.value = CATALOG
         testScheduler.advanceUntilIdle()
 
@@ -55,7 +57,7 @@ class HomeViewModelTest {
             initial = CATALOG,
             refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable),
         )
-        val viewModel = HomeViewModel(repository)
+        val viewModel = HomeViewModel("listener-1", repository)
         testScheduler.advanceUntilIdle()
 
         assertEquals(CATALOG, viewModel.uiState.value.catalog)
@@ -63,15 +65,40 @@ class HomeViewModelTest {
         assertTrue(viewModel.uiState.value.refreshMessage?.contains("offline") == true)
     }
 
+    @Test
+    fun homeFeedPublishesRecentlyPlayedForRequestedListener() = runTest(dispatcher) {
+        val recent = CATALOG.tracks.single().copy(title = "Played most recently")
+        val repository = FakeCatalogRepository(
+            initial = CATALOG,
+            recentlyPlayed = listOf(recent),
+            refreshResult = CatalogRefreshResult.Success(42L),
+        )
+
+        val viewModel = HomeViewModel("listener-73", repository)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("listener-73", repository.observedUserId)
+        assertEquals(listOf(recent), viewModel.uiState.value.recentlyPlayed)
+    }
+
     private class FakeCatalogRepository(
         initial: CatalogSnapshot = EMPTY,
+        private val recentlyPlayed: List<Track> = emptyList(),
         private val refreshResult: CatalogRefreshResult,
     ) : CatalogRepository {
         val catalog = MutableStateFlow(initial)
+        var observedUserId: String? = null
 
         override fun observeCatalog(): Flow<CatalogSnapshot> = catalog
 
+        override fun observeHomeFeed(userId: String): Flow<HomeFeedSnapshot> = catalog.map {
+            observedUserId = userId
+            HomeFeedSnapshot(catalog = it, recentlyPlayed = recentlyPlayed)
+        }
+
         override suspend fun refresh(): CatalogRefreshResult = refreshResult
+
+        override suspend fun recordRecentlyPlayed(userId: String, trackId: String) = false
     }
 
     private companion object {

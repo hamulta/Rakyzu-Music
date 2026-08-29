@@ -2,6 +2,7 @@ package my.id.rakyzumusic
 
 import android.app.Application
 import my.id.rakyzumusic.core.data.auth.AuthRepository
+import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
 import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
@@ -20,6 +21,7 @@ import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class RakyzuMusicApplication : Application(), PlaybackDependencies {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -55,7 +57,14 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies {
     }
 
     val playbackController: RakyzuPlaybackController by lazy {
-        RakyzuPlaybackController(this)
+        RakyzuPlaybackController(this) { trackId ->
+            val signedIn = authRepository.sessionState.value as? AuthSessionState.SignedIn
+            if (signedIn != null) {
+                applicationScope.launch {
+                    catalogRepository.recordRecentlyPlayed(signedIn.userId, trackId)
+                }
+            }
+        }
     }
 }
 

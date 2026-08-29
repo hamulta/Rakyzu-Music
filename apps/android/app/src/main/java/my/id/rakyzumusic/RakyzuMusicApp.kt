@@ -180,6 +180,7 @@ private fun ProfileGatedRakyzuMusicApp(
         )
         else -> AuthenticatedRakyzuMusicApp(
             versionName = versionName,
+            userId = userId,
             email = email,
             displayName = profile.displayName,
             profileDisplayNameDraft = profileState.displayName,
@@ -201,6 +202,7 @@ private fun ProfileGatedRakyzuMusicApp(
 @Composable
 private fun AuthenticatedRakyzuMusicApp(
     versionName: String,
+    userId: String,
     email: String?,
     displayName: String,
     profileDisplayNameDraft: String,
@@ -291,6 +293,7 @@ private fun AuthenticatedRakyzuMusicApp(
                 entryProvider = entryProvider {
                     entry<RakyzuRoute.Home> {
                         HomeRoute(
+                            userId = userId,
                             repository = catalogRepository,
                             versionName = versionName,
                             displayName = displayName,

@@ -12,9 +12,11 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRefreshFailure
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.Track
 
 data class HomeUiState(
     val catalog: CatalogSnapshot = EMPTY_CATALOG,
+    val recentlyPlayed: List<Track> = emptyList(),
     val isRefreshing: Boolean = true,
     val refreshMessage: String? = null,
 ) {
@@ -23,6 +25,7 @@ data class HomeUiState(
 }
 
 class HomeViewModel(
+    private val userId: String,
     private val repository: CatalogRepository,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(HomeUiState())
@@ -31,8 +34,13 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
-            repository.observeCatalog().collect { catalog ->
-                mutableUiState.update { it.copy(catalog = catalog) }
+            repository.observeHomeFeed(userId).collect { feed ->
+                mutableUiState.update {
+                    it.copy(
+                        catalog = feed.catalog,
+                        recentlyPlayed = feed.recentlyPlayed,
+                    )
+                }
             }
         }
         refresh()
@@ -59,12 +67,12 @@ class HomeViewModel(
     }
 
     companion object {
-        fun factory(repository: CatalogRepository): ViewModelProvider.Factory =
+        fun factory(userId: String, repository: CatalogRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(HomeViewModel::class.java))
-                    return HomeViewModel(repository) as T
+                    return HomeViewModel(userId, repository) as T
                 }
             }
     }

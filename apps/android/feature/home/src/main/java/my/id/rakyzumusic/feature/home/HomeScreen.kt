@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -66,13 +67,6 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 import my.id.rakyzumusic.core.model.Track
 
-private data class ShelfItem(
-    val queueIndex: Int,
-    val title: String,
-    val subtitle: String,
-    val colors: List<Color>,
-)
-
 private val catalogGradients = listOf(
     listOf(Color(0xFF3B1B75), RakyzuAqua),
     listOf(Color(0xFF7A2457), RakyzuPurpleSoft),
@@ -81,6 +75,7 @@ private val catalogGradients = listOf(
 
 @Composable
 fun HomeRoute(
+    userId: String,
     repository: CatalogRepository,
     versionName: String,
     displayName: String,
@@ -89,7 +84,8 @@ fun HomeRoute(
     onProfileClick: () -> Unit = {},
 ) {
     val homeViewModel: HomeViewModel = viewModel(
-        factory = HomeViewModel.factory(repository),
+        key = "home-$userId",
+        factory = HomeViewModel.factory(userId, repository),
     )
     val state by homeViewModel.uiState.collectAsStateWithLifecycle()
     HomeScreen(
@@ -115,6 +111,12 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
+    val newReleaseTracks = remember(state.catalog.albums, state.catalog.tracks) {
+        val tracksByAlbum = state.catalog.tracks.groupBy(Track::albumId)
+        state.catalog.albums
+            .sortedWith(compareByDescending { it.releaseDate })
+            .flatMap { album -> tracksByAlbum[album.id].orEmpty() }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -145,9 +147,13 @@ fun HomeScreen(
         }
         item {
             FeaturedCard(
-                track = state.catalog.tracks.firstOrNull(),
+                track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
+                    ?: state.catalog.tracks.firstOrNull(),
                 onTrackPlay = {
-                    onTrackPlay(state.catalog.tracks, 0)
+                    val queue = state.catalog.editorialShelves.firstOrNull()?.tracks
+                        .orEmpty()
+                        .ifEmpty { state.catalog.tracks }
+                    onTrackPlay(queue, 0)
                 },
             )
         }
@@ -159,14 +165,46 @@ fun HomeScreen(
                 )
             }
         }
-        if (state.catalog.tracks.isNotEmpty()) {
+        if (selectedFilter == "Music" && state.recentlyPlayed.isNotEmpty()) {
             item {
-                Shelf(
-                    title = "Rakyzu catalog",
-                    items = state.catalog.tracks.toShelfItems(),
-                    onTrackPlay = { index ->
-                        onTrackPlay(state.catalog.tracks, index)
-                    },
+                TrackShelf(
+                    title = "Recently played",
+                    subtitle = "Continue from your latest listening on this device.",
+                    tracks = state.recentlyPlayed,
+                    onTrackPlay = onTrackPlay,
+                )
+            }
+        }
+        if (selectedFilter == "Music") {
+            items(
+                items = state.catalog.editorialShelves,
+                key = { "editorial-${it.id}" },
+            ) { shelf ->
+                TrackShelf(
+                    title = shelf.title,
+                    subtitle = shelf.subtitle,
+                    tracks = shelf.tracks,
+                    onTrackPlay = onTrackPlay,
+                )
+            }
+        }
+        if (newReleaseTracks.isNotEmpty()) {
+            item {
+                TrackShelf(
+                    title = "New releases",
+                    subtitle = "The latest published sounds on Rakyzu Music.",
+                    tracks = newReleaseTracks,
+                    onTrackPlay = onTrackPlay,
+                )
+            }
+        }
+        if (selectedFilter == "Music" && state.catalog.tracks.isNotEmpty()) {
+            item {
+                TrackShelf(
+                    title = "All tracks",
+                    subtitle = "Explore the complete verified catalog.",
+                    tracks = state.catalog.tracks,
+                    onTrackPlay = onTrackPlay,
                 )
             }
         }
@@ -239,17 +277,6 @@ private fun CatalogStatus(
     }
 }
 
-private fun List<Track>.toShelfItems(): List<ShelfItem> = mapIndexed { index, track ->
-    ShelfItem(
-        queueIndex = index,
-        title = track.title,
-        subtitle = listOf(track.artist, track.albumTitle)
-            .filter(String::isNotBlank)
-            .joinToString(" · "),
-        colors = catalogGradients[index % catalogGradients.size],
-    )
-}
-
 @Composable
 private fun HomeHeader(
     versionName: String,
@@ -315,7 +342,7 @@ private fun FilterRow(
     selectedFilter: String,
     onFilterSelected: (String) -> Unit,
 ) {
-    val filters = listOf("Music", "Podcasts", "New releases")
+    val filters = listOf("Music", "New releases")
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -414,10 +441,11 @@ private fun FeaturedCard(
 }
 
 @Composable
-private fun Shelf(
+private fun TrackShelf(
     title: String,
-    items: List<ShelfItem>,
-    onTrackPlay: (Int) -> Unit,
+    subtitle: String?,
+    tracks: List<Track>,
+    onTrackPlay: (List<Track>, Int) -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = 28.dp)) {
         Text(
@@ -428,33 +456,46 @@ private fun Shelf(
                 .padding(horizontal = 20.dp, vertical = 10.dp)
                 .semantics { heading() },
         )
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 10.dp),
+            )
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            items(items) { item ->
+            itemsIndexed(
+                items = tracks,
+                key = { _, track -> track.id },
+            ) { index, track ->
                 Card(
-                    onClick = { onTrackPlay(item.queueIndex) },
+                    onClick = { onTrackPlay(tracks, index) },
                     modifier = Modifier.width(156.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {
                     Column {
                         AlbumCover(
-                            colors = item.colors,
+                            colors = catalogGradients[index % catalogGradients.size],
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f),
                         )
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            text = item.title,
+                            text = track.title,
                             color = MaterialTheme.colorScheme.onBackground,
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = item.subtitle,
+                            text = listOf(track.artist, track.albumTitle)
+                                .filter(String::isNotBlank)
+                                .joinToString(" · "),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
@@ -499,6 +540,6 @@ private fun AlbumCover(
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.0.10")
+        HomeScreen(versionName = "0.1.0")
     }
 }

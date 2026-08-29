@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -16,7 +17,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import my.id.rakyzumusic.core.model.Track
 
-class RakyzuPlaybackController(context: Context) {
+class RakyzuPlaybackController(
+    context: Context,
+    private val onMediaItemTransition: (String) -> Unit = {},
+) {
     private val appContext = context.applicationContext
     private val mainExecutor = ContextCompat.getMainExecutor(appContext)
     private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -213,6 +217,12 @@ class RakyzuPlaybackController(context: Context) {
     }
 
     private inner class ControllerListener : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            mediaItem?.mediaId
+                ?.takeIf(String::isNotBlank)
+                ?.let(onMediaItemTransition)
+        }
+
         override fun onEvents(player: Player, events: Player.Events) {
             publishSnapshot(
                 player = player,
