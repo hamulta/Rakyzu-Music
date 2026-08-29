@@ -53,6 +53,19 @@ data class PlaybackError(
     val code: String,
 )
 
+internal fun resolvePlaybackQueue(
+    cachedQueue: List<PlaybackQueueItem>,
+    mediaItemCount: Int,
+    timelineChanged: Boolean,
+    readQueue: () -> List<PlaybackQueueItem>,
+): List<PlaybackQueueItem> = if (
+    timelineChanged || cachedQueue.size != mediaItemCount
+) {
+    readQueue()
+} else {
+    cachedQueue
+}
+
 fun Long.toPlaybackTimeLabel(): String {
     val totalSeconds = coerceAtLeast(0L) / 1_000L
     val hours = totalSeconds / 3_600L

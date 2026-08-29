@@ -10,14 +10,10 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.model.Track
 
 class RakyzuPlaybackController(context: Context) {
@@ -31,7 +27,7 @@ class RakyzuPlaybackController(context: Context) {
 
     private val mutableSnapshot = MutableStateFlow(PlaybackSnapshot(status = PlaybackStatus.Connecting))
     val snapshot: StateFlow<PlaybackSnapshot> = mutableSnapshot.asStateFlow()
-    private var progressJob: Job? = null
+    private var progressSampler: PlaybackProgressSampler? = null
     private var playerError: PlaybackException? = null
 
     init {
@@ -40,10 +36,11 @@ class RakyzuPlaybackController(context: Context) {
                 runCatching { controllerFuture.get() }
                     .onSuccess { controller ->
                         controller.addListener(ControllerListener())
-                        publishSnapshot(controller)
-                        startProgressUpdates(controller)
+                        publishSnapshot(controller, timelineChanged = true)
+                        synchronizeProgressUpdates(controller)
                     }
                     .onFailure {
+                        progressSampler?.stop()
                         mutableSnapshot.value = PlaybackSnapshot(
                             error = PlaybackError("CONTROLLER_CONNECTION_FAILED"),
                         )
@@ -133,6 +130,7 @@ class RakyzuPlaybackController(context: Context) {
     }
 
     fun stopAndClear() {
+        progressSampler?.stop()
         withController { controller ->
             controller.stop()
             controller.clearMediaItems()
@@ -156,7 +154,11 @@ class RakyzuPlaybackController(context: Context) {
         )
     }
 
-    private fun publishSnapshot(player: Player, error: PlaybackException? = null) {
+    private fun publishSnapshot(
+        player: Player,
+        error: PlaybackException? = null,
+        timelineChanged: Boolean = false,
+    ) {
         val mediaItem = player.currentMediaItem
         val metadata = mediaItem?.mediaMetadata
         val durationMs = player.duration
@@ -165,8 +167,14 @@ class RakyzuPlaybackController(context: Context) {
             ?: metadata?.durationMs?.coerceAtLeast(0L)
             ?: 0L
         val positionMs = player.currentPosition.coerceAtLeast(0L)
-        val queue = (0 until player.mediaItemCount).map { index ->
-            player.getMediaItemAt(index).toPlaybackQueueItem()
+        val queue = resolvePlaybackQueue(
+            cachedQueue = mutableSnapshot.value.queue,
+            mediaItemCount = player.mediaItemCount,
+            timelineChanged = timelineChanged,
+        ) {
+            (0 until player.mediaItemCount).map { index ->
+                player.getMediaItemAt(index).toPlaybackQueueItem()
+            }
         }
         val status = when {
             mediaItem == null -> PlaybackStatus.Idle
@@ -192,26 +200,33 @@ class RakyzuPlaybackController(context: Context) {
         )
     }
 
-    private fun startProgressUpdates(controller: MediaController) {
-        progressJob?.cancel()
-        progressJob = controllerScope.launch {
-            while (isActive) {
-                if (controller.isPlaying) {
-                    publishSnapshot(controller)
-                }
-                delay(PROGRESS_UPDATE_INTERVAL_MS)
-            }
+    private fun synchronizeProgressUpdates(controller: MediaController) {
+        val sampler = progressSampler ?: PlaybackProgressSampler(
+            scope = controllerScope,
+            intervalMs = PROGRESS_UPDATE_INTERVAL_MS,
+            isPlaybackActive = controller::isPlaying,
+            sample = { publishSnapshot(controller) },
+        ).also {
+            progressSampler = it
         }
+        sampler.synchronize()
     }
 
     private inner class ControllerListener : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            publishSnapshot(player)
+            publishSnapshot(
+                player = player,
+                timelineChanged = events.contains(Player.EVENT_TIMELINE_CHANGED),
+            )
+            (player as? MediaController)?.let(::synchronizeProgressUpdates)
         }
 
         override fun onPlayerErrorChanged(error: PlaybackException?) {
             playerError = error
-            controllerFuture.get().let { publishSnapshot(it, error) }
+            controllerFuture.get().let {
+                publishSnapshot(it, error)
+                synchronizeProgressUpdates(it)
+            }
         }
     }
 
