@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -50,7 +49,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -139,23 +140,25 @@ fun HomeScreen(
                 onProfileClick = onProfileClick,
             )
         }
-        item {
-            FilterRow(
-                selectedFilter = selectedFilter,
-                onFilterSelected = { selectedFilter = it },
-            )
-        }
-        item {
-            FeaturedCard(
-                track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
-                    ?: state.catalog.tracks.firstOrNull(),
-                onTrackPlay = {
-                    val queue = state.catalog.editorialShelves.firstOrNull()?.tracks
-                        .orEmpty()
-                        .ifEmpty { state.catalog.tracks }
-                    onTrackPlay(queue, 0)
-                },
-            )
+        if (state.hasPlayableContent) {
+            item {
+                FilterRow(
+                    selectedFilter = selectedFilter,
+                    onFilterSelected = { selectedFilter = it },
+                )
+            }
+            item {
+                FeaturedCard(
+                    track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
+                        ?: state.catalog.tracks.first(),
+                    onTrackPlay = {
+                        val queue = state.catalog.editorialShelves.firstOrNull()?.tracks
+                            .orEmpty()
+                            .ifEmpty { state.catalog.tracks }
+                        onTrackPlay(queue, 0)
+                    },
+                )
+            }
         }
         if (state.isRefreshing || state.refreshMessage != null) {
             item {
@@ -163,6 +166,11 @@ fun HomeScreen(
                     state = state,
                     onRetry = onRetryCatalog,
                 )
+            }
+        }
+        if (state.isEmptyAfterRefresh) {
+            item {
+                EmptyHomeState(onRefresh = onRetryCatalog)
             }
         }
         if (selectedFilter == "Music" && state.recentlyPlayed.isNotEmpty()) {
@@ -220,7 +228,8 @@ private fun CatalogStatus(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .padding(bottom = 18.dp),
+            .padding(bottom = 18.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
         shape = RoundedCornerShape(18.dp),
         color = RakyzuSurfaceRaised.copy(alpha = 0.92f),
     ) {
@@ -245,7 +254,7 @@ private fun CatalogStatus(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = when {
-                        state.isRefreshing && state.catalog.isEmpty -> "Loading the Rakyzu catalog"
+                        state.isRefreshing && !state.hasPlayableContent -> "Loading your Home feed"
                         state.isRefreshing -> "Updating your saved catalog"
                         state.isShowingSavedCatalog -> "Showing your saved catalog"
                         else -> "Catalog unavailable"
@@ -272,6 +281,60 @@ private fun CatalogStatus(
                 ) {
                     Text("Retry")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyHomeState(
+    onRefresh: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 22.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        shape = RoundedCornerShape(24.dp),
+        color = RakyzuSurfaceRaised.copy(alpha = 0.92f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.MusicNote,
+                contentDescription = null,
+                tint = RakyzuAqua,
+                modifier = Modifier.size(40.dp),
+            )
+            Text(
+                text = "Your Home feed is empty",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = "Published music will appear here when it is available.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(
+                onClick = onRefresh,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RakyzuAqua,
+                    contentColor = RakyzuBlack,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Refresh")
             }
         }
     }
@@ -318,13 +381,6 @@ private fun HomeHeader(
                 text = "Rakyzu Music · v$versionName",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        IconButton(onClick = {}) {
-            Icon(
-                imageVector = Icons.Rounded.NotificationsNone,
-                contentDescription = "Notifications",
-                tint = MaterialTheme.colorScheme.onBackground,
             )
         }
         IconButton(onClick = onProfileClick) {

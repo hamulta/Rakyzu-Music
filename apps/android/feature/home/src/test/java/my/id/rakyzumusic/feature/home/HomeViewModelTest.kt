@@ -63,6 +63,30 @@ class HomeViewModelTest {
         assertEquals(CATALOG, viewModel.uiState.value.catalog)
         assertTrue(viewModel.uiState.value.isShowingSavedCatalog)
         assertTrue(viewModel.uiState.value.refreshMessage?.contains("offline") == true)
+        assertFalse(viewModel.uiState.value.isEmptyAfterRefresh)
+    }
+
+    @Test
+    fun successfulEmptyRefreshPublishesExplicitEmptyState() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
+
+        val viewModel = HomeViewModel("listener-1", repository)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertFalse(viewModel.uiState.value.hasPlayableContent)
+        assertTrue(viewModel.uiState.value.isEmptyAfterRefresh)
+    }
+
+    @Test
+    fun refreshWhileRequestIsRunningIsIgnored() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
+
+        val viewModel = HomeViewModel("listener-1", repository)
+        viewModel.refresh()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.refreshCalls)
     }
 
     @Test
@@ -88,6 +112,7 @@ class HomeViewModelTest {
     ) : CatalogRepository {
         val catalog = MutableStateFlow(initial)
         var observedUserId: String? = null
+        var refreshCalls: Int = 0
 
         override fun observeCatalog(): Flow<CatalogSnapshot> = catalog
 
@@ -96,7 +121,10 @@ class HomeViewModelTest {
             HomeFeedSnapshot(catalog = it, recentlyPlayed = recentlyPlayed)
         }
 
-        override suspend fun refresh(): CatalogRefreshResult = refreshResult
+        override suspend fun refresh(): CatalogRefreshResult {
+            refreshCalls += 1
+            return refreshResult
+        }
 
         override suspend fun recordRecentlyPlayed(userId: String, trackId: String) = false
     }

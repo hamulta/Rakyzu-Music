@@ -20,8 +20,14 @@ data class HomeUiState(
     val isRefreshing: Boolean = true,
     val refreshMessage: String? = null,
 ) {
+    val hasPlayableContent: Boolean
+        get() = catalog.tracks.isNotEmpty()
+
     val isShowingSavedCatalog: Boolean
-        get() = refreshMessage != null && !catalog.isEmpty
+        get() = refreshMessage != null && hasPlayableContent
+
+    val isEmptyAfterRefresh: Boolean
+        get() = !isRefreshing && refreshMessage == null && !hasPlayableContent
 }
 
 class HomeViewModel(
