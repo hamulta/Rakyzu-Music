@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.1.5**
+Current version: **0.1.6**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.5-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.6-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -48,7 +48,7 @@ Email/password authentication uses Supabase Auth with mandatory email confirmati
 
 Password recovery uses the exact callback `my.id.rakyzumusic://auth/recovery`, a persisted encrypted recovery requirement, and a non-enumerating email response. Incoming recovery callbacks are allowlisted by exact scheme, authority, path, query shape, and bounded authorization code before changing local state. Android explicitly rejects cleartext network traffic. Authenticated listener profiles are owner-scoped by RLS; the Android shell remains gated until required display-name onboarding completes.
 
-Published artist, album, track, and editorial-shelf metadata is read through authenticated Supabase RLS and synchronized into Room 3. The local database is the Home screen's observable source of truth, so the last verified feed remains available when refresh fails. Home presents ordered editorial shelves, recently played tracks isolated by listener account, new releases, and the complete catalog. It exposes relative feed freshness from persisted sync metadata and clearly warns when a failed refresh leaves a saved catalog at least 24 hours old. Screens narrower than 360dp or using font scale 1.3x and above switch to an adaptive shelf layout with a stacked hero, wider cards, and additional text lines. Structurally equal Room snapshots retain their canonical references, while featured and new-release sections are derived only when catalog content changes; status and listening-history updates therefore avoid rebuilding unrelated shelf content. An empty successful refresh renders an explicit accessible state with a refresh action instead of inactive playback controls; loading and degraded status changes are announced as polite accessibility live regions. Shelf playback exposes track-specific TalkBack action labels and deterministic queue-order traversal, while every Home interaction maintains an explicit minimum 48dp target.
+Published artist, album, track, and editorial-shelf metadata is read through authenticated Supabase RLS and synchronized into Room 3. The local database is the Home screen's observable source of truth, so the last verified feed remains available when refresh fails. Home presents ordered editorial shelves, recently played tracks isolated by listener account, new releases, and the complete catalog. It exposes relative feed freshness from persisted sync metadata and clearly warns when a failed refresh leaves a saved catalog at least 24 hours old. Screens narrower than 360dp or using font scale 1.3x and above switch to an adaptive shelf layout with a stacked hero, wider cards, and additional text lines. Structurally equal Room snapshots retain their canonical references, while featured and new-release sections are derived only when catalog content changes; status and listening-history updates therefore avoid rebuilding unrelated shelf content. Catalog refresh retries transient failures twice with bounded 1-second and 3-second backoffs, never retries an invalid payload, and waits for validated Android connectivity before an immediate recovery attempt. An empty successful refresh renders an explicit accessible state with a refresh action instead of inactive playback controls; loading and degraded status changes are announced as polite accessibility live regions. Shelf playback exposes track-specific TalkBack action labels and deterministic queue-order traversal, while every Home interaction maintains an explicit minimum 48dp target.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

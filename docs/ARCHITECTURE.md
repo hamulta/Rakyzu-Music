@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.1.5`.
+Status: baseline for `0.1.6`.
 
 ## Goals
 
@@ -66,6 +66,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Home derives relative feed freshness from Room's persisted catalog synchronization timestamp. Unknown and future timestamps fail safely, while a failed refresh distinguishes a recent saved catalog from one at least 24 hours old and exposes the stale warning alongside accessible freshness metadata.
 - Home resolves one immutable layout policy from the current width and font scale. Widths below 360dp or font scales from 1.3x use compact horizontal padding, a vertically stacked featured card, shelf cards up to 220dp wide, and two text lines; standard screens retain the denser shelf presentation.
 - Home canonicalizes structurally equal catalog and listening-history snapshots at the state-holder boundary. Featured playback and new-release ordering are cached derived sections rebuilt only for a real catalog change; scalar status inputs, stable callbacks, and remembered card labels keep unrelated refresh recompositions outside shelf content.
+- Catalog refresh coalesces concurrent triggers and applies two bounded transient retries after 1 second and 3 seconds. Invalid payloads fail immediately; loss of validated Android connectivity cancels further backoff, exposes an accessible waiting state, and causes one immediate recovery refresh when the default network is validated again. The process-scoped monitor registers callbacks only while collected and never polls.
 - Each Home shelf is an accessibility traversal group. Track controls preserve the Media3 queue order through explicit traversal indices, expose a track-specific `Play` action with button semantics, and forward the same list/index pair used by visual taps. Profile, filters, retry/refresh, featured playback, and track cards enforce a minimum 48dp interactive height; Compose instrumentation coverage guards those contracts.
 
 ## Release topology
