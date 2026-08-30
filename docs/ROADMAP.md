@@ -19,7 +19,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 
 - [x] `0.1.0` — offline-first Home feed, Supabase-curated editorial shelves, account-isolated recently played, new releases, and playback-transition history capture.
 - [x] `0.1.1` — resilient successful-empty Home state, accessible refresh/status announcements, inactive-control cleanup, and duplicate-refresh protection.
-- [ ] `0.1.2` — Home shelf playback semantics, focus order, and touch-target audit.
+- [x] `0.1.2` — Home shelf playback semantics, deterministic focus order, 48dp touch targets, and Compose accessibility coverage.
 - [ ] `0.1.3` — feed freshness metadata and saved-catalog staleness messaging.
 - [ ] `0.1.4` — adaptive Home shelf layouts for large text and compact screens.
 - [ ] `0.1.5` — derived-section allocation and recomposition performance hardening.
