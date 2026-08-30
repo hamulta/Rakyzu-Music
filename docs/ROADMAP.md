@@ -22,7 +22,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.1.2` — Home shelf playback semantics, deterministic focus order, 48dp touch targets, and Compose accessibility coverage.
 - [x] `0.1.3` — feed freshness metadata and saved-catalog staleness messaging.
 - [x] `0.1.4` — adaptive Home shelf layouts for large text and compact screens.
-- [ ] `0.1.5` — derived-section allocation and recomposition performance hardening.
+- [x] `0.1.5` — derived-section allocation and recomposition performance hardening.
 - [ ] `0.1.6` — catalog refresh retry policy and connectivity recovery.
 - [ ] `0.1.7` — artwork loading, cache policy, placeholders, and failure states.
 - [ ] `0.1.8` — Home filter and scroll state restoration across recreation.

@@ -771,6 +771,6 @@ private fun AlbumCover(
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.1.4")
+        HomeScreen(versionName = "0.1.5")
     }
 }
