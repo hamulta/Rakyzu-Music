@@ -27,7 +27,9 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - Row Level Security is mandatory on all exposed Supabase tables.
 - Listener profile reads and updates are restricted to the active `auth.uid()` and covered by owner/cross-owner pgTAP tests.
 - Catalog clients receive only published metadata through authenticated SELECT policies; anonymous reads and all client catalog mutations are denied.
+- Editorial shelf clients receive only published shelves whose referenced tracks are also published; anonymous access and listener mutations are denied by RLS and grants.
 - The Room cache contains metadata only. It never stores database credentials, R2 keys, or privileged media URLs.
+- Recently played metadata is bounded, remains local to the device, is keyed by the authenticated listener ID, and accepts only track IDs present in the verified Room catalog.
 - Storage and database authorization are verified server-side; client claims are never trusted directly.
 - The media Worker verifies Supabase ES256 JWT issuer, audience, role, and UUID subject through JWKS, then forwards the same bearer session to PostgREST so catalog RLS remains authoritative.
 - Media responses support one validated byte range, stream the R2 body without application buffering, use private/no-store caching, and return bounded errors that do not expose upstream details.

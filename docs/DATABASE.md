@@ -36,6 +36,10 @@ Every client-facing table must explicitly enable and force RLS, revoke default a
 
 `public.artists`, `public.albums`, and `public.tracks` contain published catalog metadata. Authenticated listeners receive SELECT-only access to rows whose `is_published` flag is true; anonymous reads and all client writes are denied. Foreign keys, positive duration/position checks, unique album positions, and pgTAP policy tests protect the server catalog. The initial synthetic Rakyzu Sessions fixtures are owned development content and include no third-party catalog or media.
 
-Android mirrors those tables in Room 3 using a checked-in version-1 schema. Refresh validates the complete remote graph before a single transaction replaces artists, albums, tracks, and the successful-sync timestamp. If network, service, or validation fails, the existing local snapshot remains untouched.
+`public.editorial_shelves` and `public.editorial_shelf_tracks` define ordered Home programming. Authenticated listeners can select only published shelves whose referenced tracks are also published. Anonymous reads and every client mutation are denied. Titles, subtitles, ordering, foreign keys, uniqueness, and RLS behavior are covered by transactional pgTAP tests.
+
+Android mirrors the catalog and editorial graph in Room 3 using checked-in schema version 2 and an automatic forward migration from version 1. Refresh validates the complete remote graph before a single transaction replaces artists, albums, tracks, shelves, entries, and the successful-sync timestamp. If network, service, or validation fails, the existing local snapshot remains untouched.
+
+`recently_played` is device-local metadata keyed by `(user_id, track_id)`. Writes are accepted only for a track in the verified Room catalog, capped at the 20 most recent entries per listener, and intentionally survive catalog replacement without creating a destructive foreign-key path. Home resolves retained IDs back through the current verified catalog and omits tracks no longer available.
 
 Credentials belong only in local ignored files or GitHub encrypted secrets. Neither SQL migrations nor the Android build may contain privileged keys.

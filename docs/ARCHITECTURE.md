@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.0.10`.
+Status: baseline for `0.1.0`.
 
 ## Goals
 
@@ -20,12 +20,12 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
 - `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog synchronization, session state mapping, and encrypted Android persistence.
-- `core:database`: Room 3 catalog entities, transactional replacement DAO, schema history, and observable local data source.
+- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, transactional replacement DAO, schema history, and observable local data source.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
-- `feature:home`: the first independently owned feature surface.
+- `feature:home`: offline-first editorial feed, recently played, new releases, and complete-catalog shelves.
 - `feature:player`: branded Now Playing, seek controls, transport actions, and the current Media3 queue surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
 
@@ -43,7 +43,7 @@ Password recovery uses a separate exact deep-link path and only marks recovery a
 
 The authenticated shell loads the current user's `profiles` row through Postgrest using the same short-lived Auth JWT. Both the explicit `id` filter and database RLS enforce ownership. New and existing incomplete profiles remain behind a profile gate until the listener saves a valid display name; profile network failures degrade to a retry surface rather than bypassing onboarding or crashing navigation.
 
-Published catalog tables expose only metadata to the authenticated role and allow no client mutations. Android fetches bounded columns, validates identifiers, parent relationships, durations, and album positions, then replaces the Room snapshot in one transaction. Room emits the canonical catalog as a Flow; failed or invalid refreshes never delete the previous verified snapshot. Media locations remain outside catalog rows.
+Published catalog and editorial tables expose only metadata to the authenticated role and allow no client mutations. Editorial entry policies require both their shelf and referenced track to remain published. Android fetches bounded columns, validates identifiers, parent relationships, durations, album positions, shelf limits/order, and track membership, then replaces the Room snapshot in one transaction. Room emits the canonical Home graph as a Flow; failed or invalid refreshes never delete the previous verified snapshot. Media locations remain outside catalog rows.
 
 `services/rakyzu-api` is the Cloudflare Worker delivery boundary. `GET /v1/health` is public; `GET` and `HEAD /v1/tracks/{uuid}/stream` require a Supabase bearer JWT. The Worker verifies ES256 signatures against the project's remote JWKS with a fixed issuer, `authenticated` audience and role, and a UUID subject. It then queries the track through PostgREST using that same session, so the database's published-only RLS policy is re-evaluated before any R2 access.
 
@@ -53,9 +53,11 @@ Media3 owns playback inside `RakyzuPlaybackService`, independently of Compose an
 
 The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackController` maps its current item, queue metadata, transport availability, errors, and bounded position/buffer/duration values into one immutable `PlaybackSnapshot`. Media3 callbacks publish structural changes; queue metadata is rebuilt only for a changed timeline or item count. A lifecycle-aware coroutine sampler starts only while playback is active, cannot create duplicate jobs, and is cancelled immediately for static playback or session clearing. Compose consumes that snapshot in both the compact player and `feature:player`; seeking and queue selection return through controller commands rather than mutating UI-local playback state.
 
+Media3 item transitions are the listening-history event source, so manual selection, queue navigation, and automatic advance share one path. The application resolves the current authenticated listener at event time and writes only the track ID and timestamp to Room. History is capped at 20 entries per listener, survives catalog snapshot replacement, and is joined back to the current verified track graph before Home renders it.
+
 ## Reliability
 
-- Room is the single source of truth for cached catalog data; library persistence follows at its roadmap milestone.
+- Room is the single source of truth for cached Home/catalog data and device-local recently played; library persistence follows at its roadmap milestone.
 - Catalog synchronization currently uses a validated full snapshot. Pagination and incremental cursors are introduced when catalog scale requires them.
 - Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes; ExoPlayer owns audio focus and pauses for noisy-output events.
 - Queue order, current index, transport availability, and playback progress come from the Media3 timeline; UI-local slider state exists only during a seek gesture.

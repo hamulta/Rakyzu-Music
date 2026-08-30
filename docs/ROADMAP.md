@@ -17,7 +17,8 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 
 ## Product milestones
 
-- `0.1.x`: Home feed, recently played, editorial shelves.
+- `0.1.0` — complete: offline-first Home feed, Supabase-curated editorial shelves, account-isolated recently played, new releases, and playback-transition history capture.
+- `0.1.1` through `0.1.10`: incremental Home-feed quality, accessibility, performance, and resilience updates before Search begins.
 - `0.2.x`: Search, browse, artists, albums, and tracks.
 - `0.3.x`: Library, liked songs, saved albums, follows.
 - `0.4.x`: Playlist create/edit/order/share and concurrency handling.
