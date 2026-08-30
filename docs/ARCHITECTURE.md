@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.1.3`.
+Status: baseline for `0.1.4`.
 
 ## Goals
 
@@ -64,6 +64,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Each feature exposes immutable UI state and handles unavailable dependencies as a degraded state rather than crashing the entire client.
 - Home derives playable, saved, and successful-empty states from its immutable catalog state. Empty feeds suppress inactive filters and hero playback, expose one refresh action, and announce loading or degraded transitions through polite accessibility live regions. Concurrent refresh requests are coalesced by the Home state holder.
 - Home derives relative feed freshness from Room's persisted catalog synchronization timestamp. Unknown and future timestamps fail safely, while a failed refresh distinguishes a recent saved catalog from one at least 24 hours old and exposes the stale warning alongside accessible freshness metadata.
+- Home resolves one immutable layout policy from the current width and font scale. Widths below 360dp or font scales from 1.3x use compact horizontal padding, a vertically stacked featured card, shelf cards up to 220dp wide, and two text lines; standard screens retain the denser shelf presentation.
 - Each Home shelf is an accessibility traversal group. Track controls preserve the Media3 queue order through explicit traversal indices, expose a track-specific `Play` action with button semantics, and forward the same list/index pair used by visual taps. Profile, filters, retry/refresh, featured playback, and track cards enforce a minimum 48dp interactive height; Compose instrumentation coverage guards those contracts.
 
 ## Release topology
