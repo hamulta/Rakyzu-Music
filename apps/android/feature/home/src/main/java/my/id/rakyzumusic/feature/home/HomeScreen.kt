@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -50,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -61,6 +63,7 @@ import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -78,6 +81,40 @@ private val catalogGradients = listOf(
     listOf(Color(0xFF7A2457), RakyzuPurpleSoft),
     listOf(Color(0xFF123C5A), Color(0xFF59C7F1)),
 )
+
+internal data class HomeLayoutSpec(
+    val horizontalPadding: Dp,
+    val trackCardWidth: Dp,
+    val trackTextMaxLines: Int,
+    val useStackedFeaturedCard: Boolean,
+) {
+    companion object {
+        val Standard = HomeLayoutSpec(
+            horizontalPadding = 20.dp,
+            trackCardWidth = 156.dp,
+            trackTextMaxLines = 1,
+            useStackedFeaturedCard = false,
+        )
+    }
+}
+
+internal fun resolveHomeLayoutSpec(
+    availableWidth: Dp,
+    fontScale: Float,
+): HomeLayoutSpec {
+    val isCompactScreen = availableWidth < 360.dp
+    val usesLargeText = fontScale >= 1.3f
+    if (!isCompactScreen && !usesLargeText) return HomeLayoutSpec.Standard
+
+    val horizontalPadding = if (isCompactScreen) 16.dp else 20.dp
+    val availableCardWidth = availableWidth - (horizontalPadding * 2)
+    return HomeLayoutSpec(
+        horizontalPadding = horizontalPadding,
+        trackCardWidth = availableCardWidth.coerceIn(156.dp, 220.dp),
+        trackTextMaxLines = 2,
+        useStackedFeaturedCard = true,
+    )
+}
 
 @Composable
 fun HomeRoute(
@@ -124,104 +161,127 @@ fun HomeScreen(
             .flatMap { album -> tracksByAlbum[album.id].orEmpty() }
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to Color(0xFF211240),
-                        0.28f to RakyzuBlack,
-                        1f to RakyzuBlack,
-                    ),
-                ),
-            ),
-        contentPadding = contentPadding,
-    ) {
-        item {
-            HomeHeader(
-                versionName = versionName,
-                displayName = displayName,
-                onProfileClick = onProfileClick,
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val fontScale = LocalDensity.current.fontScale
+        val layoutSpec = remember(maxWidth, fontScale) {
+            resolveHomeLayoutSpec(
+                availableWidth = maxWidth,
+                fontScale = fontScale,
             )
         }
-        if (state.hasPlayableContent) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color(0xFF211240),
+                            0.28f to RakyzuBlack,
+                            1f to RakyzuBlack,
+                        ),
+                    ),
+                ),
+            contentPadding = contentPadding,
+        ) {
             item {
-                FilterRow(
-                    selectedFilter = selectedFilter,
-                    onFilterSelected = { selectedFilter = it },
+                HomeHeader(
+                    versionName = versionName,
+                    displayName = displayName,
+                    horizontalPadding = layoutSpec.horizontalPadding,
+                    onProfileClick = onProfileClick,
                 )
             }
-            item {
-                CatalogFreshnessMetadata(freshness = state.catalogFreshness)
+            if (state.hasPlayableContent) {
+                item {
+                    FilterRow(
+                        selectedFilter = selectedFilter,
+                        horizontalPadding = layoutSpec.horizontalPadding,
+                        onFilterSelected = { selectedFilter = it },
+                    )
+                }
+                item {
+                    CatalogFreshnessMetadata(
+                        freshness = state.catalogFreshness,
+                        horizontalPadding = layoutSpec.horizontalPadding,
+                    )
+                }
+                item {
+                    FeaturedCard(
+                        track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
+                            ?: state.catalog.tracks.first(),
+                        layoutSpec = layoutSpec,
+                        onTrackPlay = {
+                            val queue = state.catalog.editorialShelves.firstOrNull()?.tracks
+                                .orEmpty()
+                                .ifEmpty { state.catalog.tracks }
+                            onTrackPlay(queue, 0)
+                        },
+                    )
+                }
             }
-            item {
-                FeaturedCard(
-                    track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
-                        ?: state.catalog.tracks.first(),
-                    onTrackPlay = {
-                        val queue = state.catalog.editorialShelves.firstOrNull()?.tracks
-                            .orEmpty()
-                            .ifEmpty { state.catalog.tracks }
-                        onTrackPlay(queue, 0)
-                    },
-                )
+            if (state.isRefreshing || state.refreshMessage != null) {
+                item {
+                    CatalogStatus(
+                        state = state,
+                        horizontalPadding = layoutSpec.horizontalPadding,
+                        onRetry = onRetryCatalog,
+                    )
+                }
             }
-        }
-        if (state.isRefreshing || state.refreshMessage != null) {
-            item {
-                CatalogStatus(
-                    state = state,
-                    onRetry = onRetryCatalog,
-                )
+            if (state.isEmptyAfterRefresh) {
+                item {
+                    EmptyHomeState(
+                        horizontalPadding = layoutSpec.horizontalPadding,
+                        onRefresh = onRetryCatalog,
+                    )
+                }
             }
-        }
-        if (state.isEmptyAfterRefresh) {
-            item {
-                EmptyHomeState(onRefresh = onRetryCatalog)
+            if (selectedFilter == "Music" && state.recentlyPlayed.isNotEmpty()) {
+                item {
+                    TrackShelf(
+                        title = "Recently played",
+                        subtitle = "Continue from your latest listening on this device.",
+                        tracks = state.recentlyPlayed,
+                        layoutSpec = layoutSpec,
+                        onTrackPlay = onTrackPlay,
+                    )
+                }
             }
-        }
-        if (selectedFilter == "Music" && state.recentlyPlayed.isNotEmpty()) {
-            item {
-                TrackShelf(
-                    title = "Recently played",
-                    subtitle = "Continue from your latest listening on this device.",
-                    tracks = state.recentlyPlayed,
-                    onTrackPlay = onTrackPlay,
-                )
+            if (selectedFilter == "Music") {
+                items(
+                    items = state.catalog.editorialShelves,
+                    key = { "editorial-${it.id}" },
+                ) { shelf ->
+                    TrackShelf(
+                        title = shelf.title,
+                        subtitle = shelf.subtitle,
+                        tracks = shelf.tracks,
+                        layoutSpec = layoutSpec,
+                        onTrackPlay = onTrackPlay,
+                    )
+                }
             }
-        }
-        if (selectedFilter == "Music") {
-            items(
-                items = state.catalog.editorialShelves,
-                key = { "editorial-${it.id}" },
-            ) { shelf ->
-                TrackShelf(
-                    title = shelf.title,
-                    subtitle = shelf.subtitle,
-                    tracks = shelf.tracks,
-                    onTrackPlay = onTrackPlay,
-                )
+            if (newReleaseTracks.isNotEmpty()) {
+                item {
+                    TrackShelf(
+                        title = "New releases",
+                        subtitle = "The latest published sounds on Rakyzu Music.",
+                        tracks = newReleaseTracks,
+                        layoutSpec = layoutSpec,
+                        onTrackPlay = onTrackPlay,
+                    )
+                }
             }
-        }
-        if (newReleaseTracks.isNotEmpty()) {
-            item {
-                TrackShelf(
-                    title = "New releases",
-                    subtitle = "The latest published sounds on Rakyzu Music.",
-                    tracks = newReleaseTracks,
-                    onTrackPlay = onTrackPlay,
-                )
-            }
-        }
-        if (selectedFilter == "Music" && state.catalog.tracks.isNotEmpty()) {
-            item {
-                TrackShelf(
-                    title = "All tracks",
-                    subtitle = "Explore the complete verified catalog.",
-                    tracks = state.catalog.tracks,
-                    onTrackPlay = onTrackPlay,
-                )
+            if (selectedFilter == "Music" && state.catalog.tracks.isNotEmpty()) {
+                item {
+                    TrackShelf(
+                        title = "All tracks",
+                        subtitle = "Explore the complete verified catalog.",
+                        tracks = state.catalog.tracks,
+                        layoutSpec = layoutSpec,
+                        onTrackPlay = onTrackPlay,
+                    )
+                }
             }
         }
     }
@@ -230,12 +290,13 @@ fun HomeScreen(
 @Composable
 private fun CatalogFreshnessMetadata(
     freshness: CatalogFreshness,
+    horizontalPadding: Dp,
 ) {
     val statusColor = if (freshness.isStale) Color(0xFFFFC857) else RakyzuAqua
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = horizontalPadding)
             .padding(top = 8.dp)
             .semantics {
                 contentDescription = "Catalog freshness: ${freshness.label}"
@@ -260,12 +321,13 @@ private fun CatalogFreshnessMetadata(
 @Composable
 private fun CatalogStatus(
     state: HomeUiState,
+    horizontalPadding: Dp,
     onRetry: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = horizontalPadding)
             .padding(bottom = 18.dp)
             .semantics { liveRegion = LiveRegionMode.Polite },
         shape = RoundedCornerShape(18.dp),
@@ -328,12 +390,13 @@ private fun CatalogStatus(
 
 @Composable
 private fun EmptyHomeState(
+    horizontalPadding: Dp,
     onRefresh: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 22.dp)
+            .padding(horizontal = horizontalPadding, vertical = 22.dp)
             .semantics { liveRegion = LiveRegionMode.Polite },
         shape = RoundedCornerShape(24.dp),
         color = RakyzuSurfaceRaised.copy(alpha = 0.92f),
@@ -385,13 +448,14 @@ private fun EmptyHomeState(
 private fun HomeHeader(
     versionName: String,
     displayName: String,
+    horizontalPadding: Dp,
     onProfileClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = horizontalPadding, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -440,11 +504,12 @@ private fun HomeHeader(
 @Composable
 private fun FilterRow(
     selectedFilter: String,
+    horizontalPadding: Dp,
     onFilterSelected: (String) -> Unit,
 ) {
     val filters = listOf("Music", "New releases")
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(filters) { filter ->
@@ -469,78 +534,106 @@ private fun FilterRow(
 @Composable
 private fun FeaturedCard(
     track: Track?,
+    layoutSpec: HomeLayoutSpec,
     onTrackPlay: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 22.dp),
+            .padding(horizontal = layoutSpec.horizontalPadding, vertical = 22.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
     ) {
-        Row(
-            modifier = Modifier
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF4B248A), Color(0xFF1E6572)),
-                    ),
-                )
-                .padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AlbumCover(
-                colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
-                modifier = Modifier.size(112.dp),
+        val contentModifier = Modifier
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xFF4B248A), Color(0xFF1E6572)),
+                ),
             )
-            Spacer(Modifier.width(18.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            .padding(18.dp)
+        if (layoutSpec.useStackedFeaturedCard) {
+            Column(modifier = contentModifier) {
+                AlbumCover(
+                    colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
+                    modifier = Modifier.size(128.dp),
+                )
+                Spacer(Modifier.height(16.dp))
+                FeaturedDetails(
+                    track = track,
+                    onTrackPlay = onTrackPlay,
+                )
+            }
+        } else {
+            Row(
+                modifier = contentModifier,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AlbumCover(
+                    colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
+                    modifier = Modifier.size(112.dp),
+                )
+                Spacer(Modifier.width(18.dp))
+                FeaturedDetails(
+                    track = track,
+                    onTrackPlay = onTrackPlay,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturedDetails(
+    track: Track?,
+    onTrackPlay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = "RAKYZU ORIGINAL",
+            color = RakyzuAqua,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Sound without limits",
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            text = "Your new listening space starts here.",
+            color = Color.White.copy(alpha = 0.78f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(10.dp))
+        Surface(
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .clickable(
+                    enabled = track != null,
+                    onClickLabel = track?.homePlayActionLabel(),
+                    role = Role.Button,
+                    onClick = onTrackPlay,
+                ),
+            shape = CircleShape,
+            color = RakyzuAqua,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = RakyzuBlack,
+                    modifier = Modifier.size(18.dp),
+                )
                 Text(
-                    text = "RAKYZU ORIGINAL",
-                    color = RakyzuAqua,
+                    text = "Play",
+                    color = RakyzuBlack,
                     style = MaterialTheme.typography.labelLarge,
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Sound without limits",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Text(
-                    text = "Your new listening space starts here.",
-                    color = Color.White.copy(alpha = 0.78f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                )
-                Spacer(Modifier.height(10.dp))
-                Surface(
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .clickable(
-                            enabled = track != null,
-                            onClickLabel = track?.homePlayActionLabel(),
-                            role = Role.Button,
-                            onClick = onTrackPlay,
-                        ),
-                    shape = CircleShape,
-                    color = RakyzuAqua,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = RakyzuBlack,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = "Play",
-                            color = RakyzuBlack,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                }
             }
         }
     }
@@ -551,6 +644,7 @@ internal fun TrackShelf(
     title: String,
     subtitle: String?,
     tracks: List<Track>,
+    layoutSpec: HomeLayoutSpec = HomeLayoutSpec.Standard,
     onTrackPlay: (List<Track>, Int) -> Unit,
 ) {
     Column(
@@ -563,7 +657,7 @@ internal fun TrackShelf(
             color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier
-                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .padding(horizontal = layoutSpec.horizontalPadding, vertical = 10.dp)
                 .semantics { heading() },
         )
         if (!subtitle.isNullOrBlank()) {
@@ -571,12 +665,14 @@ internal fun TrackShelf(
                 text = subtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 10.dp),
+                modifier = Modifier
+                    .padding(horizontal = layoutSpec.horizontalPadding)
+                    .padding(bottom = 10.dp),
             )
         }
         LazyRow(
             modifier = Modifier.semantics { isTraversalGroup = true },
-            contentPadding = PaddingValues(horizontal = 20.dp),
+            contentPadding = PaddingValues(horizontal = layoutSpec.horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             itemsIndexed(
@@ -585,7 +681,7 @@ internal fun TrackShelf(
             ) { index, track ->
                 Card(
                     modifier = Modifier
-                        .width(156.dp)
+                        .width(layoutSpec.trackCardWidth)
                         .heightIn(min = 48.dp)
                         .clickable(
                             onClickLabel = track.homePlayActionLabel(),
@@ -607,7 +703,7 @@ internal fun TrackShelf(
                             text = track.title,
                             color = MaterialTheme.colorScheme.onBackground,
                             style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
+                            maxLines = layoutSpec.trackTextMaxLines,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
@@ -616,7 +712,7 @@ internal fun TrackShelf(
                                 .joinToString(" · "),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
+                            maxLines = layoutSpec.trackTextMaxLines,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }

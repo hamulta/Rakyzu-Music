@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -116,6 +117,32 @@ class HomeShelfAccessibilityTest {
             "Catalog freshness: Updated 1 day ago",
         ).assertExists()
         composeRule.onNodeWithText("Saved catalog may be out of date").assertExists()
+    }
+
+    @Test
+    fun adaptiveShelfGivesTrackTextMoreHorizontalSpace() {
+        val track = track(
+            id = "track-1",
+            title = "A deliberately long track title for large text",
+        )
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                TrackShelf(
+                    title = "All tracks",
+                    subtitle = "Adaptive shelf",
+                    tracks = listOf(track),
+                    layoutSpec = resolveHomeLayoutSpec(
+                        availableWidth = 320.dp,
+                        fontScale = 2f,
+                    ),
+                    onTrackPlay = { _, _ -> },
+                )
+            }
+        }
+
+        composeRule.onNode(hasPlayAction(track.homePlayActionLabel()))
+            .assertWidthIsAtLeast(220.dp)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     private fun hasPlayAction(expectedLabel: String? = null): SemanticsMatcher =
