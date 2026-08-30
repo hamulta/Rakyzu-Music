@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.1.0`.
+Status: baseline for `0.1.1`.
 
 ## Goals
 
@@ -62,6 +62,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes; ExoPlayer owns audio focus and pauses for noisy-output events.
 - Queue order, current index, transport availability, and playback progress come from the Media3 timeline; UI-local slider state exists only during a seek gesture.
 - Each feature exposes immutable UI state and handles unavailable dependencies as a degraded state rather than crashing the entire client.
+- Home derives playable, saved, and successful-empty states from its immutable catalog state. Empty feeds suppress inactive filters and hero playback, expose one refresh action, and announce loading or degraded transitions through polite accessibility live regions. Concurrent refresh requests are coalesced by the Home state holder.
 
 ## Release topology
 
