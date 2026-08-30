@@ -11,12 +11,15 @@ import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshFailure
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
 
 data class HomeUiState(
     val catalog: CatalogSnapshot = EMPTY_CATALOG,
     val recentlyPlayed: List<Track> = emptyList(),
+    val derivedSections: HomeDerivedSections = catalog.toHomeDerivedSections(),
     val catalogFreshness: CatalogFreshness = CatalogFreshness(),
     val isRefreshing: Boolean = true,
     val refreshMessage: String? = null,
@@ -32,6 +35,14 @@ data class HomeUiState(
 
     val isEmptyAfterRefresh: Boolean
         get() = !isRefreshing && refreshMessage == null && !hasPlayableContent
+}
+
+data class HomeDerivedSections(
+    val featuredQueue: List<Track> = emptyList(),
+    val newReleaseTracks: List<Track> = emptyList(),
+) {
+    val featuredTrack: Track?
+        get() = featuredQueue.firstOrNull()
 }
 
 data class CatalogFreshness(
@@ -74,12 +85,9 @@ class HomeViewModel(
         viewModelScope.launch {
             repository.observeHomeFeed(userId).collect { feed ->
                 mutableUiState.update {
-                    it.copy(
-                        catalog = feed.catalog,
-                        recentlyPlayed = feed.recentlyPlayed,
-                        catalogFreshness = feed.catalog.lastSyncedAtEpochMillis.toCatalogFreshness(
-                            currentTimeMillis = currentTimeMillis(),
-                        ),
+                    it.withHomeFeed(
+                        feed = feed,
+                        currentTimeMillis = currentTimeMillis(),
                     )
                 }
             }
@@ -128,6 +136,50 @@ class HomeViewModel(
     }
 }
 
+internal fun HomeUiState.withHomeFeed(
+    feed: HomeFeedSnapshot,
+    currentTimeMillis: Long,
+): HomeUiState {
+    val stableCatalog = catalog.reuseWhenEqual(feed.catalog)
+    val stableRecentlyPlayed = recentlyPlayed.reuseWhenEqual(feed.recentlyPlayed)
+    return copy(
+        catalog = stableCatalog,
+        recentlyPlayed = stableRecentlyPlayed,
+        derivedSections = if (stableCatalog === catalog) {
+            derivedSections
+        } else {
+            stableCatalog.toHomeDerivedSections()
+        },
+        catalogFreshness = stableCatalog.lastSyncedAtEpochMillis.toCatalogFreshness(
+            currentTimeMillis = currentTimeMillis,
+        ),
+    )
+}
+
+internal fun CatalogSnapshot.toHomeDerivedSections(): HomeDerivedSections {
+    val featuredQueue = editorialShelves
+        .firstOrNull()
+        ?.tracks
+        ?.takeIf(List<Track>::isNotEmpty)
+        ?: tracks
+    if (albums.isEmpty() || tracks.isEmpty()) {
+        return HomeDerivedSections(featuredQueue = featuredQueue)
+    }
+
+    val tracksByAlbum = tracks.groupBy(Track::albumId)
+    val newReleaseTracks = buildList(tracks.size) {
+        albums.sortedWith(NEW_RELEASE_ALBUM_ORDER).forEach { album ->
+            addAll(tracksByAlbum[album.id].orEmpty())
+        }
+    }
+    return HomeDerivedSections(
+        featuredQueue = featuredQueue,
+        newReleaseTracks = newReleaseTracks,
+    )
+}
+
+private fun <T> T.reuseWhenEqual(candidate: T): T = if (this == candidate) this else candidate
+
 internal fun Long?.toCatalogFreshness(currentTimeMillis: Long): CatalogFreshness {
     if (this == null) return CatalogFreshness()
     val ageMillis = (currentTimeMillis - this).coerceAtLeast(0L)
@@ -148,3 +200,5 @@ private val EMPTY_CATALOG = CatalogSnapshot(
 )
 
 private const val MILLIS_PER_MINUTE = 60_000L
+
+private val NEW_RELEASE_ALBUM_ORDER = compareByDescending<Album> { it.releaseDate }

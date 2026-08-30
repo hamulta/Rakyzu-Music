@@ -82,6 +82,8 @@ private val catalogGradients = listOf(
     listOf(Color(0xFF123C5A), Color(0xFF59C7F1)),
 )
 
+private val homeFilters = listOf("Music", "New releases")
+
 internal data class HomeLayoutSpec(
     val horizontalPadding: Dp,
     val trackCardWidth: Dp,
@@ -154,11 +156,9 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
-    val newReleaseTracks = remember(state.catalog.albums, state.catalog.tracks) {
-        val tracksByAlbum = state.catalog.tracks.groupBy(Track::albumId)
-        state.catalog.albums
-            .sortedWith(compareByDescending { it.releaseDate })
-            .flatMap { album -> tracksByAlbum[album.id].orEmpty() }
+    val featuredQueue = state.derivedSections.featuredQueue
+    val onFeaturedTrackPlay = remember(featuredQueue, onTrackPlay) {
+        { onTrackPlay(featuredQueue, 0) }
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -207,22 +207,20 @@ fun HomeScreen(
                 }
                 item {
                     FeaturedCard(
-                        track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
-                            ?: state.catalog.tracks.first(),
+                        track = state.derivedSections.featuredTrack,
                         layoutSpec = layoutSpec,
-                        onTrackPlay = {
-                            val queue = state.catalog.editorialShelves.firstOrNull()?.tracks
-                                .orEmpty()
-                                .ifEmpty { state.catalog.tracks }
-                            onTrackPlay(queue, 0)
-                        },
+                        onTrackPlay = onFeaturedTrackPlay,
                     )
                 }
             }
             if (state.isRefreshing || state.refreshMessage != null) {
                 item {
                     CatalogStatus(
-                        state = state,
+                        isRefreshing = state.isRefreshing,
+                        hasPlayableContent = state.hasPlayableContent,
+                        isShowingStaleSavedCatalog = state.isShowingStaleSavedCatalog,
+                        isShowingSavedCatalog = state.isShowingSavedCatalog,
+                        refreshMessage = state.refreshMessage,
                         horizontalPadding = layoutSpec.horizontalPadding,
                         onRetry = onRetryCatalog,
                     )
@@ -261,12 +259,12 @@ fun HomeScreen(
                     )
                 }
             }
-            if (newReleaseTracks.isNotEmpty()) {
+            if (state.derivedSections.newReleaseTracks.isNotEmpty()) {
                 item {
                     TrackShelf(
                         title = "New releases",
                         subtitle = "The latest published sounds on Rakyzu Music.",
-                        tracks = newReleaseTracks,
+                        tracks = state.derivedSections.newReleaseTracks,
                         layoutSpec = layoutSpec,
                         onTrackPlay = onTrackPlay,
                     )
@@ -320,7 +318,11 @@ private fun CatalogFreshnessMetadata(
 
 @Composable
 private fun CatalogStatus(
-    state: HomeUiState,
+    isRefreshing: Boolean,
+    hasPlayableContent: Boolean,
+    isShowingStaleSavedCatalog: Boolean,
+    isShowingSavedCatalog: Boolean,
+    refreshMessage: String?,
     horizontalPadding: Dp,
     onRetry: () -> Unit,
 ) {
@@ -338,7 +340,7 @@ private fun CatalogStatus(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (state.isRefreshing) {
+            if (isRefreshing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     color = RakyzuAqua,
@@ -354,17 +356,17 @@ private fun CatalogStatus(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = when {
-                        state.isRefreshing && !state.hasPlayableContent -> "Loading your Home feed"
-                        state.isRefreshing -> "Updating your saved catalog"
-                        state.isShowingStaleSavedCatalog -> "Saved catalog may be out of date"
-                        state.isShowingSavedCatalog -> "Showing your saved catalog"
+                        isRefreshing && !hasPlayableContent -> "Loading your Home feed"
+                        isRefreshing -> "Updating your saved catalog"
+                        isShowingStaleSavedCatalog -> "Saved catalog may be out of date"
+                        isShowingSavedCatalog -> "Showing your saved catalog"
                         else -> "Catalog unavailable"
                     },
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                 )
-                state.refreshMessage?.let { message ->
+                refreshMessage?.let { message ->
                     Text(
                         text = message,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -372,7 +374,7 @@ private fun CatalogStatus(
                     )
                 }
             }
-            if (!state.isRefreshing) {
+            if (!isRefreshing) {
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.heightIn(min = 48.dp),
@@ -507,12 +509,11 @@ private fun FilterRow(
     horizontalPadding: Dp,
     onFilterSelected: (String) -> Unit,
 ) {
-    val filters = listOf("Music", "New releases")
     LazyRow(
         contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(filters) { filter ->
+        items(homeFilters) { filter ->
             val selected = filter == selectedFilter
             FilterChip(
                 selected = selected,
@@ -679,12 +680,18 @@ internal fun TrackShelf(
                 items = tracks,
                 key = { _, track -> track.id },
             ) { index, track ->
+                val playActionLabel = remember(track.id, track.title) {
+                    track.homePlayActionLabel()
+                }
+                val subtitle = remember(track.artist, track.albumTitle) {
+                    track.homeSubtitle()
+                }
                 Card(
                     modifier = Modifier
                         .width(layoutSpec.trackCardWidth)
                         .heightIn(min = 48.dp)
                         .clickable(
-                            onClickLabel = track.homePlayActionLabel(),
+                            onClickLabel = playActionLabel,
                             role = Role.Button,
                             onClick = { onTrackPlay(tracks, index) },
                         )
@@ -707,9 +714,7 @@ internal fun TrackShelf(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = listOf(track.artist, track.albumTitle)
-                                .filter(String::isNotBlank)
-                                .joinToString(" · "),
+                            text = subtitle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = layoutSpec.trackTextMaxLines,
@@ -723,6 +728,16 @@ internal fun TrackShelf(
 }
 
 internal fun Track.homePlayActionLabel(): String = "Play ${title.trim()}"
+
+internal fun Track.homeSubtitle(): String {
+    val artistLabel = artist.trim()
+    val albumLabel = albumTitle.trim()
+    return when {
+        artistLabel.isEmpty() -> albumLabel
+        albumLabel.isEmpty() -> artistLabel
+        else -> "$artistLabel · $albumLabel"
+    }
+}
 
 @Composable
 private fun AlbumCover(

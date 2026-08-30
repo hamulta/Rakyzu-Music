@@ -21,6 +21,8 @@ import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -128,10 +130,97 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun equivalentFeedReusesCatalogAndDerivedSectionReferences() {
+        val recent = CATALOG.tracks.single().copy(title = "Played most recently")
+        val state = HomeUiState(
+            catalog = CATALOG,
+            recentlyPlayed = listOf(recent),
+            isRefreshing = false,
+        )
+
+        val updated = state.withHomeFeed(
+            feed = HomeFeedSnapshot(
+                catalog = CATALOG.copy(
+                    artists = CATALOG.artists.toList(),
+                    albums = CATALOG.albums.toList(),
+                    tracks = CATALOG.tracks.toList(),
+                ),
+                recentlyPlayed = listOf(recent.copy()),
+            ),
+            currentTimeMillis = NOW,
+        )
+
+        assertSame(state.catalog, updated.catalog)
+        assertSame(state.recentlyPlayed, updated.recentlyPlayed)
+        assertSame(state.derivedSections, updated.derivedSections)
+    }
+
+    @Test
+    fun changedCatalogRebuildsDerivedSectionsInReleaseOrder() {
+        val olderTrack = CATALOG.tracks.single()
+        val newerTrack = olderTrack.copy(
+            id = "track-2",
+            title = "Tomorrow's Signal",
+            albumId = "album-2",
+            albumTitle = "Signal One",
+        )
+        val changedCatalog = CATALOG.copy(
+            albums = CATALOG.albums + Album(
+                id = "album-2",
+                artistId = "artist-1",
+                title = "Signal One",
+                releaseDate = "2026-08-30",
+            ),
+            tracks = CATALOG.tracks + newerTrack,
+        )
+        val state = HomeUiState(catalog = CATALOG, isRefreshing = false)
+
+        val updated = state.withHomeFeed(
+            feed = HomeFeedSnapshot(changedCatalog, emptyList()),
+            currentTimeMillis = NOW,
+        )
+
+        assertSame(changedCatalog, updated.catalog)
+        assertNotSame(state.derivedSections, updated.derivedSections)
+        assertEquals(
+            listOf("track-2", "track-1"),
+            updated.derivedSections.newReleaseTracks.map(Track::id),
+        )
+        assertEquals(
+            listOf("track-1", "track-2"),
+            updated.derivedSections.featuredQueue.map(Track::id),
+        )
+    }
+
+    @Test
+    fun recentlyPlayedOnlyUpdateKeepsCatalogSectionsStable() {
+        val recent = listOf(CATALOG.tracks.single())
+        val state = HomeUiState(catalog = CATALOG, isRefreshing = false)
+
+        val updated = state.withHomeFeed(
+            feed = HomeFeedSnapshot(CATALOG.copy(), recent),
+            currentTimeMillis = NOW,
+        )
+
+        assertSame(state.catalog, updated.catalog)
+        assertSame(state.derivedSections, updated.derivedSections)
+        assertSame(recent, updated.recentlyPlayed)
+    }
+
+    @Test
     fun playActionLabelUsesTrimmedTrackTitle() {
         val track = CATALOG.tracks.single().copy(title = "  Midnight Signal  ")
 
         assertEquals("Play Midnight Signal", track.homePlayActionLabel())
+    }
+
+    @Test
+    fun homeSubtitleAvoidsEmptyMetadataSeparators() {
+        val track = CATALOG.tracks.single()
+
+        assertEquals("Rakyzu Sessions · Signal Zero", track.homeSubtitle())
+        assertEquals("Signal Zero", track.copy(artist = "  ").homeSubtitle())
+        assertEquals("Rakyzu Sessions", track.copy(albumTitle = "").homeSubtitle())
     }
 
     private class FakeCatalogRepository(
