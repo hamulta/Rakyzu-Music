@@ -54,16 +54,38 @@ class HomeViewModelTest {
     @Test
     fun failedRefreshKeepsCacheAndMarksSavedCatalog() = runTest(dispatcher) {
         val repository = FakeCatalogRepository(
-            initial = CATALOG,
+            initial = CATALOG.copy(lastSyncedAtEpochMillis = NOW - (25L * 60L * 60L * 1_000L)),
             refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable),
         )
-        val viewModel = HomeViewModel("listener-1", repository)
+        val viewModel = HomeViewModel("listener-1", repository, currentTimeMillis = { NOW })
         testScheduler.advanceUntilIdle()
 
-        assertEquals(CATALOG, viewModel.uiState.value.catalog)
+        assertEquals(repository.catalog.value, viewModel.uiState.value.catalog)
         assertTrue(viewModel.uiState.value.isShowingSavedCatalog)
+        assertTrue(viewModel.uiState.value.isShowingStaleSavedCatalog)
+        assertEquals("Updated 1 day ago", viewModel.uiState.value.catalogFreshness.label)
         assertTrue(viewModel.uiState.value.refreshMessage?.contains("offline") == true)
         assertFalse(viewModel.uiState.value.isEmptyAfterRefresh)
+    }
+
+    @Test
+    fun recentSavedCatalogIsNotMarkedStaleAfterRefreshFailure() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(
+            initial = CATALOG.copy(lastSyncedAtEpochMillis = NOW - (3L * 60L * 60L * 1_000L)),
+            refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable),
+        )
+        val viewModel = HomeViewModel("listener-1", repository, currentTimeMillis = { NOW })
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isShowingSavedCatalog)
+        assertFalse(viewModel.uiState.value.isShowingStaleSavedCatalog)
+        assertEquals("Updated 3 hours ago", viewModel.uiState.value.catalogFreshness.label)
+    }
+
+    @Test
+    fun catalogFreshnessHandlesUnknownAndFutureTimestamps() {
+        assertEquals("Update time unavailable", null.toCatalogFreshness(NOW).label)
+        assertEquals("Updated just now", (NOW + 60_000L).toCatalogFreshness(NOW).label)
     }
 
     @Test
@@ -137,6 +159,7 @@ class HomeViewModelTest {
     }
 
     private companion object {
+        const val NOW = 1_800_000_000_000L
         val EMPTY = CatalogSnapshot(emptyList(), emptyList(), emptyList(), null)
         val CATALOG = CatalogSnapshot(
             artists = listOf(Artist("artist-1", "Rakyzu Sessions")),

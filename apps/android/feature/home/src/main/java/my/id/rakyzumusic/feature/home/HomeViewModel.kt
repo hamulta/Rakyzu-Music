@@ -17,6 +17,7 @@ import my.id.rakyzumusic.core.model.Track
 data class HomeUiState(
     val catalog: CatalogSnapshot = EMPTY_CATALOG,
     val recentlyPlayed: List<Track> = emptyList(),
+    val catalogFreshness: CatalogFreshness = CatalogFreshness(),
     val isRefreshing: Boolean = true,
     val refreshMessage: String? = null,
 ) {
@@ -26,13 +27,44 @@ data class HomeUiState(
     val isShowingSavedCatalog: Boolean
         get() = refreshMessage != null && hasPlayableContent
 
+    val isShowingStaleSavedCatalog: Boolean
+        get() = isShowingSavedCatalog && catalogFreshness.isStale
+
     val isEmptyAfterRefresh: Boolean
         get() = !isRefreshing && refreshMessage == null && !hasPlayableContent
+}
+
+data class CatalogFreshness(
+    val ageMinutes: Long? = null,
+) {
+    val isStale: Boolean
+        get() = ageMinutes != null && ageMinutes >= STALE_AFTER_MINUTES
+
+    val label: String
+        get() = when (val age = ageMinutes) {
+            null -> "Update time unavailable"
+            0L -> "Updated just now"
+            1L -> "Updated 1 minute ago"
+            in 2L..<MINUTES_PER_HOUR -> "Updated $age minutes ago"
+            in MINUTES_PER_HOUR..<(2L * MINUTES_PER_HOUR) -> "Updated 1 hour ago"
+            in (2L * MINUTES_PER_HOUR)..<MINUTES_PER_DAY -> {
+                "Updated ${age / MINUTES_PER_HOUR} hours ago"
+            }
+            in MINUTES_PER_DAY..<(2L * MINUTES_PER_DAY) -> "Updated 1 day ago"
+            else -> "Updated ${age / MINUTES_PER_DAY} days ago"
+        }
+
+    private companion object {
+        const val MINUTES_PER_HOUR = 60L
+        const val MINUTES_PER_DAY = 24L * MINUTES_PER_HOUR
+        const val STALE_AFTER_MINUTES = MINUTES_PER_DAY
+    }
 }
 
 class HomeViewModel(
     private val userId: String,
     private val repository: CatalogRepository,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = mutableUiState.asStateFlow()
@@ -45,6 +77,9 @@ class HomeViewModel(
                     it.copy(
                         catalog = feed.catalog,
                         recentlyPlayed = feed.recentlyPlayed,
+                        catalogFreshness = feed.catalog.lastSyncedAtEpochMillis.toCatalogFreshness(
+                            currentTimeMillis = currentTimeMillis(),
+                        ),
                     )
                 }
             }
@@ -59,10 +94,19 @@ class HomeViewModel(
         viewModelScope.launch {
             when (val result = repository.refresh()) {
                 is CatalogRefreshResult.Success -> mutableUiState.update {
-                    it.copy(isRefreshing = false, refreshMessage = null)
+                    it.copy(
+                        catalogFreshness = result.syncedAtEpochMillis.toCatalogFreshness(
+                            currentTimeMillis = currentTimeMillis(),
+                        ),
+                        isRefreshing = false,
+                        refreshMessage = null,
+                    )
                 }
                 is CatalogRefreshResult.Failure -> mutableUiState.update {
                     it.copy(
+                        catalogFreshness = it.catalog.lastSyncedAtEpochMillis.toCatalogFreshness(
+                            currentTimeMillis = currentTimeMillis(),
+                        ),
                         isRefreshing = false,
                         refreshMessage = result.reason.toSafeMessage(),
                     )
@@ -84,6 +128,12 @@ class HomeViewModel(
     }
 }
 
+internal fun Long?.toCatalogFreshness(currentTimeMillis: Long): CatalogFreshness {
+    if (this == null) return CatalogFreshness()
+    val ageMillis = (currentTimeMillis - this).coerceAtLeast(0L)
+    return CatalogFreshness(ageMinutes = ageMillis / MILLIS_PER_MINUTE)
+}
+
 private fun CatalogRefreshFailure.toSafeMessage(): String = when (this) {
     CatalogRefreshFailure.NetworkUnavailable -> "You're offline. Check your connection and try again."
     CatalogRefreshFailure.ServiceUnavailable -> "The Rakyzu catalog is temporarily unavailable."
@@ -96,3 +146,5 @@ private val EMPTY_CATALOG = CatalogSnapshot(
     tracks = emptyList(),
     lastSyncedAtEpochMillis = null,
 )
+
+private const val MILLIS_PER_MINUTE = 60_000L

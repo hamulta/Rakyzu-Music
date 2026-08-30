@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
@@ -152,6 +153,9 @@ fun HomeScreen(
                 )
             }
             item {
+                CatalogFreshnessMetadata(freshness = state.catalogFreshness)
+            }
+            item {
                 FeaturedCard(
                     track = state.catalog.editorialShelves.firstOrNull()?.tracks?.firstOrNull()
                         ?: state.catalog.tracks.first(),
@@ -224,6 +228,36 @@ fun HomeScreen(
 }
 
 @Composable
+private fun CatalogFreshnessMetadata(
+    freshness: CatalogFreshness,
+) {
+    val statusColor = if (freshness.isStale) Color(0xFFFFC857) else RakyzuAqua
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(top = 8.dp)
+            .semantics {
+                contentDescription = "Catalog freshness: ${freshness.label}"
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(statusColor),
+        )
+        Text(
+            text = freshness.label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+@Composable
 private fun CatalogStatus(
     state: HomeUiState,
     onRetry: () -> Unit,
@@ -260,6 +294,7 @@ private fun CatalogStatus(
                     text = when {
                         state.isRefreshing && !state.hasPlayableContent -> "Loading your Home feed"
                         state.isRefreshing -> "Updating your saved catalog"
+                        state.isShowingStaleSavedCatalog -> "Saved catalog may be out of date"
                         state.isShowingSavedCatalog -> "Showing your saved catalog"
                         else -> "Catalog unavailable"
                     },

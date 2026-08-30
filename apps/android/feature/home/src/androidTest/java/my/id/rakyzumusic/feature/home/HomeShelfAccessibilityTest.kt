@@ -90,6 +90,34 @@ class HomeShelfAccessibilityTest {
             .assertHeightIsAtLeast(48.dp)
     }
 
+    @Test
+    fun staleSavedCatalogExposesFreshnessAndWarning() {
+        val track = track(id = "track-1", title = "Midnight Signal")
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                HomeScreen(
+                    versionName = "test",
+                    state = HomeUiState(
+                        catalog = CatalogSnapshot(
+                            artists = emptyList(),
+                            albums = emptyList(),
+                            tracks = listOf(track),
+                            lastSyncedAtEpochMillis = 42L,
+                        ),
+                        catalogFreshness = CatalogFreshness(ageMinutes = 1_500L),
+                        isRefreshing = false,
+                        refreshMessage = "You're offline. Check your connection and try again.",
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(
+            "Catalog freshness: Updated 1 day ago",
+        ).assertExists()
+        composeRule.onNodeWithText("Saved catalog may be out of date").assertExists()
+    }
+
     private fun hasPlayAction(expectedLabel: String? = null): SemanticsMatcher =
         SemanticsMatcher("has a labeled Home playback action") { node ->
             val label = if (node.config.contains(SemanticsActions.OnClick)) {
