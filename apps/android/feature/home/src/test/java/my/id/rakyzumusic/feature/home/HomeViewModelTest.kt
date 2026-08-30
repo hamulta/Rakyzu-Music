@@ -7,12 +7,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshFailure
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
@@ -44,7 +47,7 @@ class HomeViewModelTest {
     @Test
     fun initialRefreshPublishesCatalogFromLocalSource() = runTest(dispatcher) {
         val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
-        val viewModel = HomeViewModel("listener-1", repository)
+        val viewModel = HomeViewModel("listener-1", repository, FakeConnectivityMonitor(true))
         repository.catalog.value = CATALOG
         testScheduler.advanceUntilIdle()
 
@@ -59,7 +62,12 @@ class HomeViewModelTest {
             initial = CATALOG.copy(lastSyncedAtEpochMillis = NOW - (25L * 60L * 60L * 1_000L)),
             refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable),
         )
-        val viewModel = HomeViewModel("listener-1", repository, currentTimeMillis = { NOW })
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(false),
+            currentTimeMillis = { NOW },
+        )
         testScheduler.advanceUntilIdle()
 
         assertEquals(repository.catalog.value, viewModel.uiState.value.catalog)
@@ -67,6 +75,7 @@ class HomeViewModelTest {
         assertTrue(viewModel.uiState.value.isShowingStaleSavedCatalog)
         assertEquals("Updated 1 day ago", viewModel.uiState.value.catalogFreshness.label)
         assertTrue(viewModel.uiState.value.refreshMessage?.contains("offline") == true)
+        assertTrue(viewModel.uiState.value.isWaitingForConnection)
         assertFalse(viewModel.uiState.value.isEmptyAfterRefresh)
     }
 
@@ -76,7 +85,12 @@ class HomeViewModelTest {
             initial = CATALOG.copy(lastSyncedAtEpochMillis = NOW - (3L * 60L * 60L * 1_000L)),
             refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable),
         )
-        val viewModel = HomeViewModel("listener-1", repository, currentTimeMillis = { NOW })
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(true),
+            currentTimeMillis = { NOW },
+        )
         testScheduler.advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.isShowingSavedCatalog)
@@ -94,7 +108,7 @@ class HomeViewModelTest {
     fun successfulEmptyRefreshPublishesExplicitEmptyState() = runTest(dispatcher) {
         val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
 
-        val viewModel = HomeViewModel("listener-1", repository)
+        val viewModel = HomeViewModel("listener-1", repository, FakeConnectivityMonitor(true))
         testScheduler.advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isRefreshing)
@@ -106,7 +120,7 @@ class HomeViewModelTest {
     fun refreshWhileRequestIsRunningIsIgnored() = runTest(dispatcher) {
         val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
 
-        val viewModel = HomeViewModel("listener-1", repository)
+        val viewModel = HomeViewModel("listener-1", repository, FakeConnectivityMonitor(true))
         viewModel.refresh()
         testScheduler.advanceUntilIdle()
 
@@ -122,11 +136,131 @@ class HomeViewModelTest {
             refreshResult = CatalogRefreshResult.Success(42L),
         )
 
-        val viewModel = HomeViewModel("listener-73", repository)
+        val viewModel = HomeViewModel("listener-73", repository, FakeConnectivityMonitor(true))
         testScheduler.advanceUntilIdle()
 
         assertEquals("listener-73", repository.observedUserId)
         assertEquals(listOf(recent), viewModel.uiState.value.recentlyPlayed)
+    }
+
+    @Test
+    fun transientServiceFailuresUseBoundedBackoffBeforeSuccess() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(
+            refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable),
+            additionalRefreshResults = listOf(
+                CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable),
+                CatalogRefreshResult.Success(NOW),
+            ),
+        )
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(true),
+            currentTimeMillis = { NOW },
+        )
+
+        runCurrent()
+        assertEquals(1, repository.refreshCalls)
+        advanceTimeBy(1_000L)
+        runCurrent()
+        assertEquals(2, repository.refreshCalls)
+        advanceTimeBy(3_000L)
+        runCurrent()
+
+        assertEquals(3, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertEquals(null, viewModel.uiState.value.refreshMessage)
+    }
+
+    @Test
+    fun transientRetryStopsAfterConfiguredBudget() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(
+            refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable),
+        )
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(true),
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(3, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertTrue(viewModel.uiState.value.refreshMessage?.contains("after retrying") == true)
+    }
+
+    @Test
+    fun manualRefreshStartsNewAttemptAfterAutomaticRetryBudgetIsExhausted() = runTest(dispatcher) {
+        val failure = CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable)
+        val repository = FakeCatalogRepository(
+            refreshResult = failure,
+            additionalRefreshResults = listOf(
+                failure,
+                failure,
+                CatalogRefreshResult.Success(NOW),
+            ),
+        )
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(true),
+            currentTimeMillis = { NOW },
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(3, repository.refreshCalls)
+        assertTrue(viewModel.uiState.value.refreshMessage != null)
+
+        viewModel.refresh()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(4, repository.refreshCalls)
+        assertEquals(null, viewModel.uiState.value.refreshMessage)
+    }
+
+    @Test
+    fun invalidPayloadIsNeverRetried() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(
+            refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.InvalidPayload),
+        )
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(true),
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.refreshCalls)
+        assertTrue(viewModel.uiState.value.refreshMessage?.contains("verified") == true)
+    }
+
+    @Test
+    fun offlineFailureRecoversImmediatelyWhenConnectivityReturns() = runTest(dispatcher) {
+        val connectivityMonitor = FakeConnectivityMonitor(false)
+        val repository = FakeCatalogRepository(
+            refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable),
+            additionalRefreshResults = listOf(CatalogRefreshResult.Success(NOW)),
+        )
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            connectivityMonitor,
+            currentTimeMillis = { NOW },
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.refreshCalls)
+        assertTrue(viewModel.uiState.value.isWaitingForConnection)
+        assertTrue(viewModel.uiState.value.refreshMessage?.contains("will retry") == true)
+
+        connectivityMonitor.online.value = true
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isWaitingForConnection)
+        assertEquals(null, viewModel.uiState.value.refreshMessage)
     }
 
     @Test
@@ -226,11 +360,15 @@ class HomeViewModelTest {
     private class FakeCatalogRepository(
         initial: CatalogSnapshot = EMPTY,
         private val recentlyPlayed: List<Track> = emptyList(),
-        private val refreshResult: CatalogRefreshResult,
+        refreshResult: CatalogRefreshResult,
+        additionalRefreshResults: List<CatalogRefreshResult> = emptyList(),
     ) : CatalogRepository {
         val catalog = MutableStateFlow(initial)
         var observedUserId: String? = null
         var refreshCalls: Int = 0
+        private val refreshResults = ArrayDeque(
+            listOf(refreshResult) + additionalRefreshResults,
+        )
 
         override fun observeCatalog(): Flow<CatalogSnapshot> = catalog
 
@@ -241,10 +379,22 @@ class HomeViewModelTest {
 
         override suspend fun refresh(): CatalogRefreshResult {
             refreshCalls += 1
-            return refreshResult
+            return if (refreshResults.size > 1) {
+                refreshResults.removeFirst()
+            } else {
+                refreshResults.first()
+            }
         }
 
         override suspend fun recordRecentlyPlayed(userId: String, trackId: String) = false
+    }
+
+    private class FakeConnectivityMonitor(initiallyOnline: Boolean) : ConnectivityMonitor {
+        val online = MutableStateFlow(initiallyOnline)
+
+        override val isOnline: Flow<Boolean> = online
+
+        override fun isCurrentlyOnline(): Boolean = online.value
     }
 
     private companion object {

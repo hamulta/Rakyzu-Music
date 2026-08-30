@@ -3,6 +3,7 @@ package my.id.rakyzumusic.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshFailure
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
@@ -22,6 +24,7 @@ data class HomeUiState(
     val derivedSections: HomeDerivedSections = catalog.toHomeDerivedSections(),
     val catalogFreshness: CatalogFreshness = CatalogFreshness(),
     val isRefreshing: Boolean = true,
+    val isWaitingForConnection: Boolean = false,
     val refreshMessage: String? = null,
 ) {
     val hasPlayableContent: Boolean
@@ -75,13 +78,19 @@ data class CatalogFreshness(
 class HomeViewModel(
     private val userId: String,
     private val repository: CatalogRepository,
+    private val connectivityMonitor: ConnectivityMonitor,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
+    private val retryDelaysMillis: List<Long> = DEFAULT_RETRY_DELAYS_MILLIS,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = mutableUiState.asStateFlow()
     private var refreshInProgress = false
+    private var isOnline = connectivityMonitor.isCurrentlyOnline()
+    private var waitingForConnectivity = false
+    private var lastRefreshFailure: CatalogRefreshFailure? = null
 
     init {
+        require(retryDelaysMillis.all { it >= 0L })
         viewModelScope.launch {
             repository.observeHomeFeed(userId).collect { feed ->
                 mutableUiState.update {
@@ -92,45 +101,121 @@ class HomeViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            connectivityMonitor.isOnline.collect { connectivityAvailable ->
+                isOnline = connectivityAvailable
+                if (
+                    !connectivityAvailable &&
+                    lastRefreshFailure == CatalogRefreshFailure.NetworkUnavailable &&
+                    !refreshInProgress
+                ) {
+                    waitingForConnectivity = true
+                    mutableUiState.update {
+                        it.copy(
+                            isWaitingForConnection = true,
+                            refreshMessage = CatalogRefreshFailure.NetworkUnavailable.toSafeMessage(
+                                isWaitingForConnection = true,
+                            ),
+                        )
+                    }
+                }
+                if (connectivityAvailable && waitingForConnectivity) {
+                    startRefresh()
+                }
+            }
+        }
         refresh()
     }
 
-    fun refresh() {
+    fun refresh() = startRefresh()
+
+    private fun startRefresh() {
         if (refreshInProgress) return
         refreshInProgress = true
-        mutableUiState.update { it.copy(isRefreshing = true, refreshMessage = null) }
+        waitingForConnectivity = false
+        lastRefreshFailure = null
+        mutableUiState.update {
+            it.copy(
+                isRefreshing = true,
+                isWaitingForConnection = false,
+                refreshMessage = null,
+            )
+        }
         viewModelScope.launch {
-            when (val result = repository.refresh()) {
-                is CatalogRefreshResult.Success -> mutableUiState.update {
-                    it.copy(
-                        catalogFreshness = result.syncedAtEpochMillis.toCatalogFreshness(
-                            currentTimeMillis = currentTimeMillis(),
-                        ),
-                        isRefreshing = false,
-                        refreshMessage = null,
-                    )
+            var recoverAfterCompletion = false
+            try {
+                when (val result = refreshWithRetry()) {
+                    is CatalogRefreshResult.Success -> mutableUiState.update {
+                        it.copy(
+                            catalogFreshness = result.syncedAtEpochMillis.toCatalogFreshness(
+                                currentTimeMillis = currentTimeMillis(),
+                            ),
+                            isRefreshing = false,
+                            isWaitingForConnection = false,
+                            refreshMessage = null,
+                        )
+                    }
+                    is CatalogRefreshResult.Failure -> {
+                        lastRefreshFailure = result.reason
+                        waitingForConnectivity =
+                            result.reason == CatalogRefreshFailure.NetworkUnavailable && !isOnline
+                        recoverAfterCompletion = waitingForConnectivity
+                        mutableUiState.update {
+                            it.copy(
+                                catalogFreshness = it.catalog.lastSyncedAtEpochMillis.toCatalogFreshness(
+                                    currentTimeMillis = currentTimeMillis(),
+                                ),
+                                isRefreshing = false,
+                                isWaitingForConnection = waitingForConnectivity,
+                                refreshMessage = result.reason.toSafeMessage(
+                                    isWaitingForConnection = waitingForConnectivity,
+                                ),
+                            )
+                        }
+                    }
                 }
-                is CatalogRefreshResult.Failure -> mutableUiState.update {
-                    it.copy(
-                        catalogFreshness = it.catalog.lastSyncedAtEpochMillis.toCatalogFreshness(
-                            currentTimeMillis = currentTimeMillis(),
-                        ),
-                        isRefreshing = false,
-                        refreshMessage = result.reason.toSafeMessage(),
-                    )
-                }
+            } finally {
+                refreshInProgress = false
             }
-            refreshInProgress = false
+            if (recoverAfterCompletion && isOnline) {
+                startRefresh()
+            }
+        }
+    }
+
+    private suspend fun refreshWithRetry(): CatalogRefreshResult {
+        var retryIndex = 0
+        while (true) {
+            val result = repository.refresh()
+            if (result is CatalogRefreshResult.Success) return result
+            val failure = result as CatalogRefreshResult.Failure
+            val retryDelayMillis = if (
+                isOnline && failure.reason != CatalogRefreshFailure.InvalidPayload
+            ) {
+                retryDelaysMillis.getOrNull(retryIndex)
+            } else {
+                null
+            } ?: return failure
+
+            delay(retryDelayMillis)
+            if (!isOnline) {
+                return CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable)
+            }
+            retryIndex += 1
         }
     }
 
     companion object {
-        fun factory(userId: String, repository: CatalogRepository): ViewModelProvider.Factory =
+        fun factory(
+            userId: String,
+            repository: CatalogRepository,
+            connectivityMonitor: ConnectivityMonitor,
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(HomeViewModel::class.java))
-                    return HomeViewModel(userId, repository) as T
+                    return HomeViewModel(userId, repository, connectivityMonitor) as T
                 }
             }
     }
@@ -186,9 +271,14 @@ internal fun Long?.toCatalogFreshness(currentTimeMillis: Long): CatalogFreshness
     return CatalogFreshness(ageMinutes = ageMillis / MILLIS_PER_MINUTE)
 }
 
-private fun CatalogRefreshFailure.toSafeMessage(): String = when (this) {
-    CatalogRefreshFailure.NetworkUnavailable -> "You're offline. Check your connection and try again."
-    CatalogRefreshFailure.ServiceUnavailable -> "The Rakyzu catalog is temporarily unavailable."
+private fun CatalogRefreshFailure.toSafeMessage(isWaitingForConnection: Boolean): String = when (this) {
+    CatalogRefreshFailure.NetworkUnavailable -> if (isWaitingForConnection) {
+        "You're offline. Rakyzu Music will retry when your connection returns."
+    } else {
+        "The catalog could not be refreshed after retrying. Check your connection and try again."
+    }
+    CatalogRefreshFailure.ServiceUnavailable ->
+        "The Rakyzu catalog is temporarily unavailable after retrying."
     CatalogRefreshFailure.InvalidPayload -> "The latest catalog update could not be verified."
 }
 
@@ -200,5 +290,7 @@ private val EMPTY_CATALOG = CatalogSnapshot(
 )
 
 private const val MILLIS_PER_MINUTE = 60_000L
+
+private val DEFAULT_RETRY_DELAYS_MILLIS = listOf(1_000L, 3_000L)
 
 private val NEW_RELEASE_ALBUM_ORDER = compareByDescending<Album> { it.releaseDate }

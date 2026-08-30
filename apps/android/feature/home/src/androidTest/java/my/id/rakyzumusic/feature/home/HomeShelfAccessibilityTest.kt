@@ -120,6 +120,32 @@ class HomeShelfAccessibilityTest {
     }
 
     @Test
+    fun offlineRecoveryStatusKeepsManualRetryAccessible() {
+        var retryCalls = 0
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                HomeScreen(
+                    versionName = "test",
+                    state = HomeUiState(
+                        isRefreshing = false,
+                        isWaitingForConnection = true,
+                        refreshMessage =
+                            "You're offline. Rakyzu Music will retry when your connection returns.",
+                    ),
+                    onRetryCatalog = { retryCalls += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Waiting for connection").assertExists()
+        composeRule.onNodeWithText("Retry")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, retryCalls) }
+    }
+
+    @Test
     fun adaptiveShelfGivesTrackTextMoreHorizontalSpace() {
         val track = track(
             id = "track-1",

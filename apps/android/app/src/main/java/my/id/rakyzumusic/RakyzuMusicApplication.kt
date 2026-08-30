@@ -11,6 +11,7 @@ import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
 import my.id.rakyzumusic.core.data.media.MediaStreamRequestFailure
 import my.id.rakyzumusic.core.data.media.MediaStreamRequestResult
+import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.playback.PlaybackDependencies
 import my.id.rakyzumusic.core.playback.PlaybackNetworkRequest
@@ -49,6 +50,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies {
 
     val mediaDeliveryRepository: MediaDeliveryRepository
         get() = repositories.mediaDeliveryRepository
+
+    val connectivityMonitor: ConnectivityMonitor
+        get() = repositories.connectivityMonitor
 
     override val playbackStreamRequestProvider: PlaybackStreamRequestProvider by lazy {
         PlaybackStreamRequestProvider { trackId ->

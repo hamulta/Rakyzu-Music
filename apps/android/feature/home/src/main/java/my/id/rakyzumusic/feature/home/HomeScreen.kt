@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
@@ -122,6 +123,7 @@ internal fun resolveHomeLayoutSpec(
 fun HomeRoute(
     userId: String,
     repository: CatalogRepository,
+    connectivityMonitor: ConnectivityMonitor,
     versionName: String,
     displayName: String,
     modifier: Modifier = Modifier,
@@ -130,7 +132,7 @@ fun HomeRoute(
 ) {
     val homeViewModel: HomeViewModel = viewModel(
         key = "home-$userId",
-        factory = HomeViewModel.factory(userId, repository),
+        factory = HomeViewModel.factory(userId, repository, connectivityMonitor),
     )
     val state by homeViewModel.uiState.collectAsStateWithLifecycle()
     HomeScreen(
@@ -217,6 +219,7 @@ fun HomeScreen(
                 item {
                     CatalogStatus(
                         isRefreshing = state.isRefreshing,
+                        isWaitingForConnection = state.isWaitingForConnection,
                         hasPlayableContent = state.hasPlayableContent,
                         isShowingStaleSavedCatalog = state.isShowingStaleSavedCatalog,
                         isShowingSavedCatalog = state.isShowingSavedCatalog,
@@ -319,6 +322,7 @@ private fun CatalogFreshnessMetadata(
 @Composable
 private fun CatalogStatus(
     isRefreshing: Boolean,
+    isWaitingForConnection: Boolean,
     hasPlayableContent: Boolean,
     isShowingStaleSavedCatalog: Boolean,
     isShowingSavedCatalog: Boolean,
@@ -358,6 +362,7 @@ private fun CatalogStatus(
                     text = when {
                         isRefreshing && !hasPlayableContent -> "Loading your Home feed"
                         isRefreshing -> "Updating your saved catalog"
+                        isWaitingForConnection -> "Waiting for connection"
                         isShowingStaleSavedCatalog -> "Saved catalog may be out of date"
                         isShowingSavedCatalog -> "Showing your saved catalog"
                         else -> "Catalog unavailable"
