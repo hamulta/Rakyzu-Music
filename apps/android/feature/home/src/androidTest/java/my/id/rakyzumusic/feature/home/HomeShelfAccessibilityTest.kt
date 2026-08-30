@@ -1,0 +1,109 @@
+package my.id.rakyzumusic.feature.home
+
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
+import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.Track
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class HomeShelfAccessibilityTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun trackCardsExposeOrderedPlayActionsAndMinimumTouchTargets() {
+        val tracks = listOf(
+            track(id = "track-1", title = "Midnight Signal"),
+            track(id = "track-2", title = "Afterglow Circuit"),
+        )
+        var playedIndex: Int? = null
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                TrackShelf(
+                    title = "All tracks",
+                    subtitle = null,
+                    tracks = tracks,
+                    onTrackPlay = { _, index -> playedIndex = index },
+                )
+            }
+        }
+
+        val playActions = composeRule.onAllNodes(hasPlayAction())
+            .fetchSemanticsNodes()
+        assertEquals(
+            listOf("Play Midnight Signal", "Play Afterglow Circuit"),
+            playActions.map { it.config[SemanticsActions.OnClick].label },
+        )
+        assertEquals(
+            listOf(0f, 1f),
+            playActions.map { it.config[SemanticsProperties.TraversalIndex] },
+        )
+
+        composeRule.onNode(hasPlayAction("Play Afterglow Circuit"))
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, playedIndex) }
+    }
+
+    @Test
+    fun interactiveHomeControlsMeetMinimumTouchTarget() {
+        val track = track(id = "track-1", title = "Midnight Signal")
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                HomeScreen(
+                    versionName = "test",
+                    state = HomeUiState(
+                        catalog = CatalogSnapshot(
+                            artists = emptyList(),
+                            albums = emptyList(),
+                            tracks = listOf(track),
+                            lastSyncedAtEpochMillis = 42L,
+                        ),
+                        isRefreshing = false,
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Profile")
+            .assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("Music")
+            .assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("New releases")
+            .assertHeightIsAtLeast(48.dp)
+        composeRule.onAllNodes(hasPlayAction("Play Midnight Signal"))[0]
+            .assertHeightIsAtLeast(48.dp)
+    }
+
+    private fun hasPlayAction(expectedLabel: String? = null): SemanticsMatcher =
+        SemanticsMatcher("has a labeled Home playback action") { node ->
+            val label = if (node.config.contains(SemanticsActions.OnClick)) {
+                node.config[SemanticsActions.OnClick].label
+            } else {
+                null
+            }
+            label != null && (expectedLabel == null || label == expectedLabel)
+        }
+
+    private fun track(id: String, title: String) = Track(
+        id = id,
+        title = title,
+        artist = "Rakyzu Sessions",
+        durationMs = 180_000L,
+    )
+}

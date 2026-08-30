@@ -1,6 +1,7 @@
 package my.id.rakyzumusic.feature.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,9 +51,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -274,6 +278,7 @@ private fun CatalogStatus(
             if (!state.isRefreshing) {
                 Button(
                     onClick = onRetry,
+                    modifier = Modifier.heightIn(min = 48.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RakyzuAqua,
                         contentColor = RakyzuBlack,
@@ -323,6 +328,7 @@ private fun EmptyHomeState(
             )
             Button(
                 onClick = onRefresh,
+                modifier = Modifier.heightIn(min = 48.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = RakyzuAqua,
                     contentColor = RakyzuBlack,
@@ -383,7 +389,10 @@ private fun HomeHeader(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        IconButton(onClick = onProfileClick) {
+        IconButton(
+            onClick = onProfileClick,
+            modifier = Modifier.size(48.dp),
+        ) {
             Icon(
                 imageVector = Icons.Rounded.Person,
                 contentDescription = "Profile",
@@ -408,6 +417,7 @@ private fun FilterRow(
             FilterChip(
                 selected = selected,
                 onClick = { onFilterSelected(filter) },
+                modifier = Modifier.heightIn(min = 48.dp),
                 label = { Text(filter) },
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = RakyzuSurfaceRaised.copy(alpha = 0.82f),
@@ -468,9 +478,14 @@ private fun FeaturedCard(
                 )
                 Spacer(Modifier.height(10.dp))
                 Surface(
-                    onClick = onTrackPlay,
-                    enabled = track != null,
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .clickable(
+                            enabled = track != null,
+                            onClickLabel = track?.homePlayActionLabel(),
+                            role = Role.Button,
+                            onClick = onTrackPlay,
+                        ),
                     shape = CircleShape,
                     color = RakyzuAqua,
                 ) {
@@ -497,13 +512,17 @@ private fun FeaturedCard(
 }
 
 @Composable
-private fun TrackShelf(
+internal fun TrackShelf(
     title: String,
     subtitle: String?,
     tracks: List<Track>,
     onTrackPlay: (List<Track>, Int) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(bottom = 28.dp)) {
+    Column(
+        modifier = Modifier
+            .padding(bottom = 28.dp)
+            .semantics { isTraversalGroup = true },
+    ) {
         Text(
             text = title,
             color = MaterialTheme.colorScheme.onBackground,
@@ -521,6 +540,7 @@ private fun TrackShelf(
             )
         }
         LazyRow(
+            modifier = Modifier.semantics { isTraversalGroup = true },
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -529,8 +549,15 @@ private fun TrackShelf(
                 key = { _, track -> track.id },
             ) { index, track ->
                 Card(
-                    onClick = { onTrackPlay(tracks, index) },
-                    modifier = Modifier.width(156.dp),
+                    modifier = Modifier
+                        .width(156.dp)
+                        .heightIn(min = 48.dp)
+                        .clickable(
+                            onClickLabel = track.homePlayActionLabel(),
+                            role = Role.Button,
+                            onClick = { onTrackPlay(tracks, index) },
+                        )
+                        .semantics { traversalIndex = index.toFloat() },
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {
                     Column {
@@ -563,6 +590,8 @@ private fun TrackShelf(
         }
     }
 }
+
+internal fun Track.homePlayActionLabel(): String = "Play ${title.trim()}"
 
 @Composable
 private fun AlbumCover(

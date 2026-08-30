@@ -105,6 +105,13 @@ class HomeViewModelTest {
         assertEquals(listOf(recent), viewModel.uiState.value.recentlyPlayed)
     }
 
+    @Test
+    fun playActionLabelUsesTrimmedTrackTitle() {
+        val track = CATALOG.tracks.single().copy(title = "  Midnight Signal  ")
+
+        assertEquals("Play Midnight Signal", track.homePlayActionLabel())
+    }
+
     private class FakeCatalogRepository(
         initial: CatalogSnapshot = EMPTY,
         private val recentlyPlayed: List<Track> = emptyList(),
