@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.1.10`.
+Status: baseline for `0.2.0`.
 
 ## Goals
 
@@ -28,8 +28,9 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `feature:home`: offline-first editorial feed, recently played, new releases, and complete-catalog shelves.
 - `feature:player`: branded Now Playing, seek controls, transport actions, and the current Media3 queue surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
+- `feature:search`: offline-first catalog discovery, deterministic local relevance, browse states, and track-result playback.
 
-Planned boundaries include `core:network`, `feature:search`, and `feature:library`.
+Planned boundaries include `core:network` and `feature:library`.
 
 ## Data and media security
 
@@ -74,6 +75,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Home persists its filter as a version-tolerant stable key and restores unknown values to Music. Compose `LazyListState` savers retain the vertical feed, filter row, and every horizontal shelf position across saved-instance recreation. Explicit section, shelf, and track keys preserve identity when refresh status or catalog rows change, and the complete saveable subtree is keyed by listener ID so one account never inherits another account's navigation position.
 - Home records process-local structured diagnostics for feed-shape emissions, connectivity transitions, refresh triggers, coalesced requests, scheduled retries, outcomes, bounded attempt ordinals, and monotonic duration buckets. Content quantities are reduced to fixed buckets; listener/catalog identifiers, titles, URLs, tokens, payloads, and raw exceptions are absent by construction. The FIFO keeps 32 events with a hard ceiling of 64, rendered lines are capped at 240 characters, and sink failures are isolated from product state.
 - Home's final milestone gate centralizes shelf visibility as a testable contract, compiles Compose accessibility regressions for loading, empty, and cached-refresh states, verifies that connectivity loss during retry backoff waits and recovers exactly once, and bounds stable unique derivation for a 5,000-track catalog. GitHub Actions runs this focused Home gate before the global Android validation and APK upload.
+- Search observes the canonical Room-backed catalog and never refreshes or transmits text while the listener types. Normalization is locale-stable and accent-insensitive; exact, prefix, token-prefix, and contains matches have deterministic ordering, while artist/album association matches rank below primary-name matches. Each result type is capped at 50 after ranking with exact totals retained, and a 5,000-track unit guard bounds the local operation. Loading, browse, empty-catalog, no-results, grouped headings, polite result announcements, clear actions, and track playback targets have explicit accessibility contracts. GitHub Actions runs a focused Search unit/lint/instrumentation-APK gate before global Android validation.
 
 ## Release topology
 

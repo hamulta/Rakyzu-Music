@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.1.10**
+Current version: **0.2.0**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.10-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.2.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -55,6 +55,8 @@ Home restores the selected feed filter, vertical feed position, filter-row posit
 Home feed observability emits structured Logcat events for feed shape, connectivity, refresh triggers, coalescing, retries, duration buckets, and outcomes. Diagnostics use only fixed enums, booleans, and bucketed counts; they never include listener IDs, catalog IDs or titles, URLs, tokens, raw exceptions, or backend payloads. A process-local FIFO retains at most 32 events, log lines are capped at 240 characters, and diagnostic transport failure cannot alter Home state or refresh behavior.
 
 The completed Home milestone has an explicit CI gate for its unit tests, lint, and Compose instrumentation APK. Regression contracts cover shelf visibility for every filter and empty feed, polite loading/refresh announcements, one accessible 48dp empty-state action, connectivity loss during retry backoff, and stable unique derivation for a 5,000-track catalog before the Search milestone begins.
+
+Search observes that same verified Room catalog without issuing a query-time network request. It finds artists, albums, and tracks with case-, whitespace-, and accent-insensitive matching, deterministic exact/prefix/token/contains relevance, and lower-priority association matches through artist and album metadata. Results are capped at 50 per type while exact totals remain visible; browse, loading, empty-catalog, and no-result states remain explicit and accessible. Track results start the displayed queue at the selected position, and the listener's query stays process-local with no telemetry or persistence in this milestone.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 
