@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.2.0`.
+Status: baseline for `0.2.1`.
 
 ## Goals
 
@@ -76,6 +76,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Home records process-local structured diagnostics for feed-shape emissions, connectivity transitions, refresh triggers, coalesced requests, scheduled retries, outcomes, bounded attempt ordinals, and monotonic duration buckets. Content quantities are reduced to fixed buckets; listener/catalog identifiers, titles, URLs, tokens, payloads, and raw exceptions are absent by construction. The FIFO keeps 32 events with a hard ceiling of 64, rendered lines are capped at 240 characters, and sink failures are isolated from product state.
 - Home's final milestone gate centralizes shelf visibility as a testable contract, compiles Compose accessibility regressions for loading, empty, and cached-refresh states, verifies that connectivity loss during retry backoff waits and recovers exactly once, and bounds stable unique derivation for a 5,000-track catalog. GitHub Actions runs this focused Home gate before the global Android validation and APK upload.
 - Search observes the canonical Room-backed catalog and never refreshes or transmits text while the listener types. Normalization is locale-stable and accent-insensitive; exact, prefix, token-prefix, and contains matches have deterministic ordering, while artist/album association matches rank below primary-name matches. Each result type is capped at 50 after ranking with exact totals retained, and a 5,000-track unit guard bounds the local operation. Loading, browse, empty-catalog, no-results, grouped headings, polite result announcements, clear actions, and track playback targets have explicit accessibility contracts. GitHub Actions runs a focused Search unit/lint/instrumentation-APK gate before global Android validation.
+- The Search state holder is scoped to the authenticated listener shell rather than a disposable top-level navigation entry. A bounded query is mirrored into `SavedStateHandle`, preserving results across tab changes and Android Activity/process recreation without storing catalog output, transmitting text, or adding telemetry. The field requests focus when Search enters composition, submits through the IME Search action, dismisses focus/keyboard on submission, and restores focus after Clear; Compose instrumentation guards these interaction contracts.
 
 ## Release topology
 

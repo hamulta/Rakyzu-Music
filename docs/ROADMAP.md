@@ -29,7 +29,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.1.9` — Home feed observability and bounded diagnostics.
 - [x] `0.1.10` — final Home regression, accessibility, resilience, and performance gate before Search.
 - [x] `0.2.0` — offline-first artist, album, and track search with deterministic relevance, accessible browse/results states, and track queue playback.
-- [ ] `0.2.1` — search query restoration, focus, and keyboard ergonomics.
+- [x] `0.2.1` — search query restoration, focus, and keyboard ergonomics.
 - [ ] `0.2.2` — artist detail and catalog navigation.
 - [ ] `0.2.3` — album detail, ordered track listing, and playback.
 - [ ] `0.2.4` — track context and safe metadata actions.
