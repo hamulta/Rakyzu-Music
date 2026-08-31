@@ -804,6 +804,6 @@ internal fun Track.homeSubtitle(): String {
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.1.7")
+        HomeScreen(versionName = "0.1.8")
     }
 }
