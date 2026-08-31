@@ -8,12 +8,16 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
@@ -100,6 +104,53 @@ class SearchAccessibilityTest {
             .assertHeightIsAtLeast(64.dp)
             .performClick()
         composeRule.runOnIdle { assertEquals(1, playedIndex) }
+    }
+
+    @Test
+    fun searchFieldAutofocusesAndImeSearchClearsFocus() {
+        var submitCalls = 0
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                SearchScreen(
+                    state = SearchUiState(catalog = CATALOG, hasObservedCatalog = true),
+                    onQueryChange = {},
+                    onClearQuery = {},
+                    onTrackPlay = { _, _ -> },
+                    onSearchSubmit = { submitCalls += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(SEARCH_FIELD_TAG).assertIsFocused()
+        composeRule.onNodeWithTag(SEARCH_FIELD_TAG).performImeAction()
+        composeRule.onNodeWithTag(SEARCH_FIELD_TAG).assertIsNotFocused()
+        composeRule.runOnIdle { assertEquals(1, submitCalls) }
+    }
+
+    @Test
+    fun clearActionReturnsFocusToSearchField() {
+        var clearCalls = 0
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                SearchScreen(
+                    state = SearchUiState(
+                        query = "signal",
+                        catalog = CATALOG,
+                        hasObservedCatalog = true,
+                    ),
+                    onQueryChange = {},
+                    onClearQuery = { clearCalls += 1 },
+                    onTrackPlay = { _, _ -> },
+                )
+            }
+        }
+        composeRule.onNodeWithTag(SEARCH_FIELD_TAG).performImeAction()
+        composeRule.onNodeWithTag(SEARCH_FIELD_TAG).assertIsNotFocused()
+
+        composeRule.onNodeWithContentDescription("Clear search").performClick()
+
+        composeRule.onNodeWithTag(SEARCH_FIELD_TAG).assertIsFocused()
+        composeRule.runOnIdle { assertEquals(1, clearCalls) }
     }
 
     private fun setSearchContent(

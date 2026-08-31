@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.feature.search
 
+import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +87,33 @@ class SearchViewModelTest {
         viewModel.clearQuery()
         assertEquals("", viewModel.uiState.value.query)
         assertTrue(viewModel.uiState.value.isReadyToBrowse)
+    }
+
+    @Test
+    fun savedQueryIsRestoredAndAppliedToTheFirstCatalog() = runTest(dispatcher) {
+        val savedState = SavedStateHandle(mapOf(SAVED_SEARCH_QUERY_KEY to "midnight"))
+        val viewModel = SearchViewModel(FakeCatalogRepository(CATALOG), savedState)
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("midnight", viewModel.uiState.value.query)
+        assertEquals(listOf("track-1"), viewModel.uiState.value.results.tracks.map(Track::id))
+    }
+
+    @Test
+    fun boundedQueryAndClearAreWrittenToSavedState() = runTest(dispatcher) {
+        val savedState = SavedStateHandle()
+        val viewModel = SearchViewModel(FakeCatalogRepository(CATALOG), savedState)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.updateQuery("x".repeat(MAX_QUERY_LENGTH + 25))
+        assertEquals(
+            "x".repeat(MAX_QUERY_LENGTH),
+            savedState.get<String>(SAVED_SEARCH_QUERY_KEY),
+        )
+
+        viewModel.clearQuery()
+        assertEquals("", savedState.get<String>(SAVED_SEARCH_QUERY_KEY))
     }
 
     private class FakeCatalogRepository(initial: CatalogSnapshot) : CatalogRepository {

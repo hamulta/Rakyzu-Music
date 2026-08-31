@@ -2,7 +2,10 @@ package my.id.rakyzumusic.feature.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import java.text.Normalizer
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,8 +60,12 @@ data class SearchUiState(
 
 class SearchViewModel internal constructor(
     private val repository: CatalogRepository,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
-    private val mutableUiState = MutableStateFlow(SearchUiState())
+    private val restoredQuery = savedStateHandle.get<String>(SAVED_SEARCH_QUERY_KEY)
+        .orEmpty()
+        .take(MAX_QUERY_LENGTH)
+    private val mutableUiState = MutableStateFlow(SearchUiState(query = restoredQuery))
     val uiState: StateFlow<SearchUiState> = mutableUiState.asStateFlow()
 
     init {
@@ -77,6 +84,7 @@ class SearchViewModel internal constructor(
 
     fun updateQuery(value: String) {
         val boundedQuery = value.take(MAX_QUERY_LENGTH)
+        savedStateHandle[SAVED_SEARCH_QUERY_KEY] = boundedQuery
         mutableUiState.update { state ->
             state.copy(
                 query = boundedQuery,
@@ -94,6 +102,15 @@ class SearchViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(SearchViewModel::class.java))
                     return SearchViewModel(repository) as T
+                }
+
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(
+                    modelClass: Class<T>,
+                    extras: CreationExtras,
+                ): T {
+                    require(modelClass.isAssignableFrom(SearchViewModel::class.java))
+                    return SearchViewModel(repository, extras.createSavedStateHandle()) as T
                 }
             }
     }
@@ -182,6 +199,7 @@ private val COMBINING_MARKS = Regex("\\p{M}+")
 
 internal const val MAX_QUERY_LENGTH = 100
 internal const val MAX_RESULTS_PER_TYPE = 50
+internal const val SAVED_SEARCH_QUERY_KEY = "search_query"
 private const val ASSOCIATED_MATCH_OFFSET = 4
 
 private val EMPTY_CATALOG = CatalogSnapshot(

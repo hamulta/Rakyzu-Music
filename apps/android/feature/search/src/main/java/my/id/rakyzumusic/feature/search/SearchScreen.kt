@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Clear
@@ -34,13 +36,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -49,12 +57,12 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
@@ -67,25 +75,18 @@ import my.id.rakyzumusic.core.model.Track
 
 @Composable
 fun SearchRoute(
-    userId: String,
-    repository: CatalogRepository,
+    viewModel: SearchViewModel,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
 ) {
-    val searchViewModel: SearchViewModel = viewModel(
-        key = "search-$userId",
-        factory = SearchViewModel.factory(repository),
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    SearchScreen(
+        state = state,
+        onQueryChange = viewModel::updateQuery,
+        onClearQuery = viewModel::clearQuery,
+        onTrackPlay = onTrackPlay,
+        modifier = modifier,
     )
-    val state by searchViewModel.uiState.collectAsStateWithLifecycle()
-    key(userId) {
-        SearchScreen(
-            state = state,
-            onQueryChange = searchViewModel::updateQuery,
-            onClearQuery = searchViewModel::clearQuery,
-            onTrackPlay = onTrackPlay,
-            modifier = modifier,
-        )
-    }
 }
 
 @Composable
@@ -96,7 +97,16 @@ fun SearchScreen(
     onTrackPlay: (List<Track>, Int) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
+    onSearchSubmit: () -> Unit = {},
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -130,9 +140,22 @@ fun SearchScreen(
                 onValueChange = onQueryChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 20.dp)
+                    .focusRequester(focusRequester)
+                    .testTag(SEARCH_FIELD_TAG),
                 singleLine = true,
                 label = { Text("Artists, albums, or tracks") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Search,
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                        onSearchSubmit()
+                    },
+                ),
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Rounded.Search,
@@ -142,7 +165,11 @@ fun SearchScreen(
                 trailingIcon = if (state.query.isNotEmpty()) {
                     {
                         IconButton(
-                            onClick = onClearQuery,
+                            onClick = {
+                                onClearQuery()
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            },
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
@@ -231,6 +258,8 @@ fun SearchScreen(
         }
     }
 }
+
+internal const val SEARCH_FIELD_TAG = "search_field"
 
 @Composable
 private fun BrowseCatalogSummary(catalog: CatalogSnapshot) {

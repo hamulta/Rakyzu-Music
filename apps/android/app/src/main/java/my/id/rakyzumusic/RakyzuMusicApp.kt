@@ -86,6 +86,7 @@ import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
 import my.id.rakyzumusic.feature.search.SearchRoute
+import my.id.rakyzumusic.feature.search.SearchViewModel
 import my.id.rakyzumusic.navigation.RakyzuRoute
 import my.id.rakyzumusic.navigation.dismissNowPlaying
 import my.id.rakyzumusic.navigation.openNowPlaying
@@ -233,6 +234,10 @@ private fun AuthenticatedRakyzuMusicApp(
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
     val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
+    val searchViewModel: SearchViewModel = viewModel(
+        key = "search-$userId",
+        factory = SearchViewModel.factory(catalogRepository),
+    )
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
     var isSigningOut by remember { mutableStateOf(false) }
@@ -321,8 +326,7 @@ private fun AuthenticatedRakyzuMusicApp(
                     }
                     entry<RakyzuRoute.Search> {
                         SearchRoute(
-                            userId = userId,
-                            repository = catalogRepository,
+                            viewModel = searchViewModel,
                             onTrackPlay = playbackController::playQueue,
                         )
                     }
