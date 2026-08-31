@@ -85,6 +85,7 @@ import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
+import my.id.rakyzumusic.feature.search.SearchRoute
 import my.id.rakyzumusic.navigation.RakyzuRoute
 import my.id.rakyzumusic.navigation.dismissNowPlaying
 import my.id.rakyzumusic.navigation.openNowPlaying
@@ -319,10 +320,10 @@ private fun AuthenticatedRakyzuMusicApp(
                         )
                     }
                     entry<RakyzuRoute.Search> {
-                        FoundationDestination(
-                            title = "Search",
-                            message = "Search foundations arrive in the 0.2.x release line.",
-                            icon = Icons.Rounded.Search,
+                        SearchRoute(
+                            userId = userId,
+                            repository = catalogRepository,
+                            onTrackPlay = playbackController::playQueue,
                         )
                     }
                     entry<RakyzuRoute.Library> {

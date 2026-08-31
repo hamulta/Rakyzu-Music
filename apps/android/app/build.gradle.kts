@@ -89,6 +89,7 @@ dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:player"))
     implementation(project(":feature:profile"))
+    implementation(project(":feature:search"))
 
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.19.0")

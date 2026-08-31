@@ -55,6 +55,11 @@ jobs:
           ./gradlew :feature:home:testDebugUnitTest :feature:home:lintDebug
           :feature:home:assembleDebugAndroidTest --stacktrace
 
+      - name: Validate Search milestone
+        run: >-
+          ./gradlew :feature:search:testDebugUnitTest :feature:search:lintDebug
+          :feature:search:assembleDebugAndroidTest --stacktrace
+
       - name: Validate Android project
         run: >-
           ./gradlew testDebugUnitTest lintDebug assembleDebug
