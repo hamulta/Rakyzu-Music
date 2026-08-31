@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.1.6`.
+Status: baseline for `0.1.7`.
 
 ## Goals
 
@@ -45,9 +45,11 @@ The authenticated shell loads the current user's `profiles` row through Postgres
 
 Published catalog and editorial tables expose only metadata to the authenticated role and allow no client mutations. Editorial entry policies require both their shelf and referenced track to remain published. Android fetches bounded columns, validates identifiers, parent relationships, durations, album positions, shelf limits/order, and track membership, then replaces the Room snapshot in one transaction. Room emits the canonical Home graph as a Flow; failed or invalid refreshes never delete the previous verified snapshot. Media locations remain outside catalog rows.
 
-`services/rakyzu-api` is the Cloudflare Worker delivery boundary. `GET /v1/health` is public; `GET` and `HEAD /v1/tracks/{uuid}/stream` require a Supabase bearer JWT. The Worker verifies ES256 signatures against the project's remote JWKS with a fixed issuer, `authenticated` audience and role, and a UUID subject. It then queries the track through PostgREST using that same session, so the database's published-only RLS policy is re-evaluated before any R2 access.
+`services/rakyzu-api` is the Cloudflare Worker delivery boundary. `GET /v1/health` is public; `GET` and `HEAD` requests to `/v1/tracks/{uuid}/stream` and `/v1/albums/{uuid}/artwork` require a Supabase bearer JWT. The Worker verifies ES256 signatures against the project's remote JWKS with a fixed issuer, `authenticated` audience and role, and a UUID subject. It then queries the requested catalog resource through PostgREST using that same session, so the database's published-only RLS policy is re-evaluated before any R2 access.
 
 The client supplies only a validated track UUID. The Worker derives `media/tracks/{uuid}/source.mp3`, reads the private `MEDIA` R2 binding, and streams the object body without buffering it. Full responses, `HEAD`, open-ended ranges, bounded ranges, suffix ranges, and `416` responses share strict private/no-store, CORS, request-ID, and security-header behavior. R2 S3 credentials and Supabase privileged keys never enter the Worker bundle or APK.
+
+Album artwork uses the deterministic private key `media/albums/{uuid}/artwork.webp` after the same JWT and RLS checks. The Worker accepts only AVIF, JPEG, PNG, or WebP metadata, returns an ETag, honors exact `If-None-Match` requests with `304`, and applies `private, max-age=86400`; missing or unauthorized albums remain non-disclosing `404` responses. Android builds each Coil request from the authenticated media boundary, holds the bearer value only in request headers, and redacts it from object diagnostics. A process-wide Coil loader uses a bounded 25% memory cache, a 128 MiB disk cache under the application cache directory, HTTP cache-control semantics, and crossfades. Cache keys use normalized album UUIDs rather than credential-bearing URLs or headers.
 
 Media3 owns playback inside `RakyzuPlaybackService`, independently of Compose and activity lifecycles. Catalog selections become internal `rakyzu://tracks/{uuid}` media items containing only public display metadata. A resolving data source validates that URI, asks the application data boundary for the current in-memory bearer session at request-open time, and accepts only an authenticated HTTPS response contract. Tokens are not embedded in the MediaItem, notification, queue metadata, or persisted state. Untrusted external media controllers are rejected; system-trusted controllers retain lock-screen, headset, Bluetooth, and notification interoperability.
 
@@ -68,6 +70,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Home canonicalizes structurally equal catalog and listening-history snapshots at the state-holder boundary. Featured playback and new-release ordering are cached derived sections rebuilt only for a real catalog change; scalar status inputs, stable callbacks, and remembered card labels keep unrelated refresh recompositions outside shelf content.
 - Catalog refresh coalesces concurrent triggers and applies two bounded transient retries after 1 second and 3 seconds. Invalid payloads fail immediately; loss of validated Android connectivity cancels further backoff, exposes an accessible waiting state, and causes one immediate recovery refresh when the default network is validated again. The process-scoped monitor registers callbacks only while collected and never polls.
 - Each Home shelf is an accessibility traversal group. Track controls preserve the Media3 queue order through explicit traversal indices, expose a track-specific `Play` action with button semantics, and forward the same list/index pair used by visual taps. Profile, filters, retry/refresh, featured playback, and track cards enforce a minimum 48dp interactive height; Compose instrumentation coverage guards those contracts.
+- Home artwork has explicit placeholder, loading, loaded, and failure states. Decorative cover images add no duplicate TalkBack description; their enclosing track controls remain the semantic owner, while loading and failure visuals preserve the established card geometry and touch targets.
 
 ## Release topology
 

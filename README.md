@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.1.6**
+Current version: **0.1.7**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.6-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.7-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -51,6 +51,8 @@ Password recovery uses the exact callback `my.id.rakyzumusic://auth/recovery`, a
 Published artist, album, track, and editorial-shelf metadata is read through authenticated Supabase RLS and synchronized into Room 3. The local database is the Home screen's observable source of truth, so the last verified feed remains available when refresh fails. Home presents ordered editorial shelves, recently played tracks isolated by listener account, new releases, and the complete catalog. It exposes relative feed freshness from persisted sync metadata and clearly warns when a failed refresh leaves a saved catalog at least 24 hours old. Screens narrower than 360dp or using font scale 1.3x and above switch to an adaptive shelf layout with a stacked hero, wider cards, and additional text lines. Structurally equal Room snapshots retain their canonical references, while featured and new-release sections are derived only when catalog content changes; status and listening-history updates therefore avoid rebuilding unrelated shelf content. Catalog refresh retries transient failures twice with bounded 1-second and 3-second backoffs, never retries an invalid payload, and waits for validated Android connectivity before an immediate recovery attempt. An empty successful refresh renders an explicit accessible state with a refresh action instead of inactive playback controls; loading and degraded status changes are announced as polite accessibility live regions. Shelf playback exposes track-specific TalkBack action labels and deterministic queue-order traversal, while every Home interaction maintains an explicit minimum 48dp target.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
+
+Album artwork follows the same authenticated boundary through `GET /v1/albums/{uuid}/artwork`; the Android client never receives an R2 credential or direct object URL. Coil keeps a bounded 25% memory cache and 128 MiB disk cache, honors the Worker's private 24-hour cache contract and ETags, and shows distinct loading, placeholder, and failure visuals. Authorization remains request-only and is redacted from media-request diagnostics.
 
 Playback runs in a Media3 `MediaSessionService` with automatic MediaStyle notification controls, audio-focus handling, and noisy-output protection. The player receives only internal track UUID URIs; the current bearer session is resolved into an HTTPS Worker request just before each data-source open and is never placed in media metadata, logs, or a persisted queue. Home selections populate a Media3 playlist, while the compact player and branded Now Playing surface expose synchronized progress, seeking, previous/next actions, and queue navigation. Actual Media3 item transitions update the active listener's bounded local recently-played history. Progress sampling is suspended whenever playback is inactive, and queue metadata is rebuilt only when the Media3 timeline changes. Playback clears when the listener session is no longer signed in.
 
