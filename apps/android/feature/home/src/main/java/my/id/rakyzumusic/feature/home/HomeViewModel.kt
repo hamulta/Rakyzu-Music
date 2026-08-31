@@ -75,12 +75,16 @@ data class CatalogFreshness(
     }
 }
 
-class HomeViewModel(
+class HomeViewModel internal constructor(
     private val userId: String,
     private val repository: CatalogRepository,
     private val connectivityMonitor: ConnectivityMonitor,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis,
     private val retryDelaysMillis: List<Long> = DEFAULT_RETRY_DELAYS_MILLIS,
+    private val diagnostics: HomeFeedDiagnosticSink = NoOpHomeFeedDiagnosticSink,
+    private val elapsedRealtimeMillis: () -> Long = {
+        System.nanoTime() / NANOS_PER_MILLISECOND
+    },
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = mutableUiState.asStateFlow()
@@ -93,6 +97,9 @@ class HomeViewModel(
         require(retryDelaysMillis.all { it >= 0L })
         viewModelScope.launch {
             repository.observeHomeFeed(userId).collect { feed ->
+                recordDiagnostic(
+                    HomeFeedDiagnosticEvent.FeedObserved(HomeFeedShape.from(feed)),
+                )
                 mutableUiState.update {
                     it.withHomeFeed(
                         feed = feed,
@@ -103,6 +110,13 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             connectivityMonitor.isOnline.collect { connectivityAvailable ->
+                val triggersRecovery = connectivityAvailable && waitingForConnectivity
+                recordDiagnostic(
+                    HomeFeedDiagnosticEvent.ConnectivityObserved(
+                        isOnline = connectivityAvailable,
+                        triggersRecovery = triggersRecovery,
+                    ),
+                )
                 isOnline = connectivityAvailable
                 if (
                     !connectivityAvailable &&
@@ -119,21 +133,31 @@ class HomeViewModel(
                         )
                     }
                 }
-                if (connectivityAvailable && waitingForConnectivity) {
-                    startRefresh()
+                if (triggersRecovery) {
+                    startRefresh(HomeRefreshTrigger.ConnectivityRecovery)
                 }
             }
         }
-        refresh()
+        startRefresh(HomeRefreshTrigger.Initial)
     }
 
-    fun refresh() = startRefresh()
+    fun refresh() = startRefresh(HomeRefreshTrigger.Manual)
 
-    private fun startRefresh() {
-        if (refreshInProgress) return
+    private fun startRefresh(trigger: HomeRefreshTrigger) {
+        if (refreshInProgress) {
+            recordDiagnostic(HomeFeedDiagnosticEvent.RefreshCoalesced(trigger))
+            return
+        }
         refreshInProgress = true
         waitingForConnectivity = false
         lastRefreshFailure = null
+        val refreshStartedAtMillis = elapsedRealtimeMillis()
+        recordDiagnostic(
+            HomeFeedDiagnosticEvent.RefreshStarted(
+                trigger = trigger,
+                isOnline = isOnline,
+            ),
+        )
         mutableUiState.update {
             it.copy(
                 isRefreshing = true,
@@ -144,22 +168,44 @@ class HomeViewModel(
         viewModelScope.launch {
             var recoverAfterCompletion = false
             try {
-                when (val result = refreshWithRetry()) {
-                    is CatalogRefreshResult.Success -> mutableUiState.update {
-                        it.copy(
-                            catalogFreshness = result.syncedAtEpochMillis.toCatalogFreshness(
-                                currentTimeMillis = currentTimeMillis(),
+                val execution = refreshWithRetry(trigger)
+                val duration = HomeRefreshDuration.from(
+                    elapsedRealtimeMillis() - refreshStartedAtMillis,
+                )
+                when (val result = execution.result) {
+                    is CatalogRefreshResult.Success -> {
+                        recordDiagnostic(
+                            HomeFeedDiagnosticEvent.RefreshSucceeded(
+                                trigger = trigger,
+                                attempts = HomeRefreshAttempt.from(execution.attemptCount),
+                                duration = duration,
                             ),
-                            isRefreshing = false,
-                            isWaitingForConnection = false,
-                            refreshMessage = null,
                         )
+                        mutableUiState.update {
+                            it.copy(
+                                catalogFreshness = result.syncedAtEpochMillis.toCatalogFreshness(
+                                    currentTimeMillis = currentTimeMillis(),
+                                ),
+                                isRefreshing = false,
+                                isWaitingForConnection = false,
+                                refreshMessage = null,
+                            )
+                        }
                     }
                     is CatalogRefreshResult.Failure -> {
                         lastRefreshFailure = result.reason
                         waitingForConnectivity =
                             result.reason == CatalogRefreshFailure.NetworkUnavailable && !isOnline
                         recoverAfterCompletion = waitingForConnectivity
+                        recordDiagnostic(
+                            HomeFeedDiagnosticEvent.RefreshFailed(
+                                trigger = trigger,
+                                attempts = HomeRefreshAttempt.from(execution.attemptCount),
+                                duration = duration,
+                                failure = result.reason,
+                                waitingForConnection = waitingForConnectivity,
+                            ),
+                        )
                         mutableUiState.update {
                             it.copy(
                                 catalogFreshness = it.catalog.lastSyncedAtEpochMillis.toCatalogFreshness(
@@ -178,16 +224,22 @@ class HomeViewModel(
                 refreshInProgress = false
             }
             if (recoverAfterCompletion && isOnline) {
-                startRefresh()
+                startRefresh(HomeRefreshTrigger.ConnectivityRecovery)
             }
         }
     }
 
-    private suspend fun refreshWithRetry(): CatalogRefreshResult {
+    private suspend fun refreshWithRetry(
+        trigger: HomeRefreshTrigger,
+    ): HomeRefreshExecution {
         var retryIndex = 0
+        var attemptCount = 0
         while (true) {
+            attemptCount += 1
             val result = repository.refresh()
-            if (result is CatalogRefreshResult.Success) return result
+            if (result is CatalogRefreshResult.Success) {
+                return HomeRefreshExecution(result, attemptCount)
+            }
             val failure = result as CatalogRefreshResult.Failure
             val retryDelayMillis = if (
                 isOnline && failure.reason != CatalogRefreshFailure.InvalidPayload
@@ -195,13 +247,34 @@ class HomeViewModel(
                 retryDelaysMillis.getOrNull(retryIndex)
             } else {
                 null
-            } ?: return failure
+            } ?: return HomeRefreshExecution(failure, attemptCount)
 
+            recordDiagnostic(
+                HomeFeedDiagnosticEvent.RetryScheduled(
+                    trigger = trigger,
+                    nextAttempt = HomeRefreshAttempt.from(attemptCount + 1),
+                    delay = HomeRetryDelay.from(retryDelayMillis),
+                    failure = failure.reason,
+                ),
+            )
             delay(retryDelayMillis)
             if (!isOnline) {
-                return CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable)
+                return HomeRefreshExecution(
+                    result = CatalogRefreshResult.Failure(
+                        CatalogRefreshFailure.NetworkUnavailable,
+                    ),
+                    attemptCount = attemptCount,
+                )
             }
             retryIndex += 1
+        }
+    }
+
+    private fun recordDiagnostic(event: HomeFeedDiagnosticEvent) {
+        try {
+            diagnostics.record(event)
+        } catch (_: RuntimeException) {
+            // Diagnostics must never alter Home feed behavior.
         }
     }
 
@@ -215,7 +288,12 @@ class HomeViewModel(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(HomeViewModel::class.java))
-                    return HomeViewModel(userId, repository, connectivityMonitor) as T
+                    return HomeViewModel(
+                        userId = userId,
+                        repository = repository,
+                        connectivityMonitor = connectivityMonitor,
+                        diagnostics = AndroidHomeFeedDiagnostics.sink,
+                    ) as T
                 }
             }
     }
@@ -294,3 +372,10 @@ private const val MILLIS_PER_MINUTE = 60_000L
 private val DEFAULT_RETRY_DELAYS_MILLIS = listOf(1_000L, 3_000L)
 
 private val NEW_RELEASE_ALBUM_ORDER = compareByDescending<Album> { it.releaseDate }
+
+private data class HomeRefreshExecution(
+    val result: CatalogRefreshResult,
+    val attemptCount: Int,
+)
+
+private const val NANOS_PER_MILLISECOND = 1_000_000L

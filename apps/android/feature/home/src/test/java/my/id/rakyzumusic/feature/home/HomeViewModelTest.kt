@@ -119,12 +119,24 @@ class HomeViewModelTest {
     @Test
     fun refreshWhileRequestIsRunningIsIgnored() = runTest(dispatcher) {
         val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
+        val diagnostics = RecordingHomeFeedDiagnostics()
 
-        val viewModel = HomeViewModel("listener-1", repository, FakeConnectivityMonitor(true))
+        val viewModel = HomeViewModel(
+            "listener-1",
+            repository,
+            FakeConnectivityMonitor(true),
+            diagnostics = diagnostics,
+        )
         viewModel.refresh()
         testScheduler.advanceUntilIdle()
 
         assertEquals(1, repository.refreshCalls)
+        assertEquals(
+            listOf(HomeRefreshTrigger.Manual),
+            diagnostics.events
+                .filterIsInstance<HomeFeedDiagnosticEvent.RefreshCoalesced>()
+                .map { it.trigger },
+        )
     }
 
     @Test
@@ -170,6 +182,69 @@ class HomeViewModelTest {
         assertEquals(3, repository.refreshCalls)
         assertFalse(viewModel.uiState.value.isRefreshing)
         assertEquals(null, viewModel.uiState.value.refreshMessage)
+    }
+
+    @Test
+    fun transientRetryPublishesBoundedAttemptDelayAndDurationDiagnostics() =
+        runTest(dispatcher) {
+            val repository = FakeCatalogRepository(
+                refreshResult = CatalogRefreshResult.Failure(
+                    CatalogRefreshFailure.ServiceUnavailable,
+                ),
+                additionalRefreshResults = listOf(
+                    CatalogRefreshResult.Failure(CatalogRefreshFailure.ServiceUnavailable),
+                    CatalogRefreshResult.Success(NOW),
+                ),
+            )
+            val diagnostics = RecordingHomeFeedDiagnostics()
+            val elapsedTimes = ArrayDeque(listOf(1_000L, 5_300L))
+            HomeViewModel(
+                userId = "listener-1",
+                repository = repository,
+                connectivityMonitor = FakeConnectivityMonitor(true),
+                currentTimeMillis = { NOW },
+                diagnostics = diagnostics,
+                elapsedRealtimeMillis = elapsedTimes::removeFirst,
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            val retries = diagnostics.events
+                .filterIsInstance<HomeFeedDiagnosticEvent.RetryScheduled>()
+            assertEquals(
+                listOf(HomeRefreshAttempt.RetryOne, HomeRefreshAttempt.RetryTwo),
+                retries.map { it.nextAttempt },
+            )
+            assertEquals(
+                listOf(HomeRetryDelay.OneSecond, HomeRetryDelay.TwoToFourSeconds),
+                retries.map { it.delay },
+            )
+            val success = diagnostics.events
+                .filterIsInstance<HomeFeedDiagnosticEvent.RefreshSucceeded>()
+                .single()
+            assertEquals(HomeRefreshTrigger.Initial, success.trigger)
+            assertEquals(HomeRefreshAttempt.RetryTwo, success.attempts)
+            assertEquals(HomeRefreshDuration.UnderFiveSeconds, success.duration)
+        }
+
+    @Test
+    fun diagnosticSinkFailureCannotBreakHomeRefresh() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(
+            initial = CATALOG,
+            refreshResult = CatalogRefreshResult.Success(NOW),
+        )
+        val viewModel = HomeViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = FakeConnectivityMonitor(true),
+            diagnostics = HomeFeedDiagnosticSink { error("diagnostics unavailable") },
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertEquals(CATALOG, viewModel.uiState.value.catalog)
     }
 
     @Test
@@ -239,6 +314,7 @@ class HomeViewModelTest {
     @Test
     fun offlineFailureRecoversImmediatelyWhenConnectivityReturns() = runTest(dispatcher) {
         val connectivityMonitor = FakeConnectivityMonitor(false)
+        val diagnostics = RecordingHomeFeedDiagnostics()
         val repository = FakeCatalogRepository(
             refreshResult = CatalogRefreshResult.Failure(CatalogRefreshFailure.NetworkUnavailable),
             additionalRefreshResults = listOf(CatalogRefreshResult.Success(NOW)),
@@ -248,6 +324,7 @@ class HomeViewModelTest {
             repository,
             connectivityMonitor,
             currentTimeMillis = { NOW },
+            diagnostics = diagnostics,
         )
         testScheduler.advanceUntilIdle()
 
@@ -261,6 +338,16 @@ class HomeViewModelTest {
         assertEquals(2, repository.refreshCalls)
         assertFalse(viewModel.uiState.value.isWaitingForConnection)
         assertEquals(null, viewModel.uiState.value.refreshMessage)
+        assertTrue(
+            diagnostics.events
+                .filterIsInstance<HomeFeedDiagnosticEvent.ConnectivityObserved>()
+                .any { it.isOnline && it.triggersRecovery },
+        )
+        assertTrue(
+            diagnostics.events
+                .filterIsInstance<HomeFeedDiagnosticEvent.RefreshStarted>()
+                .any { it.trigger == HomeRefreshTrigger.ConnectivityRecovery },
+        )
     }
 
     @Test
@@ -395,6 +482,14 @@ class HomeViewModelTest {
         override val isOnline: Flow<Boolean> = online
 
         override fun isCurrentlyOnline(): Boolean = online.value
+    }
+
+    private class RecordingHomeFeedDiagnostics : HomeFeedDiagnosticSink {
+        val events = mutableListOf<HomeFeedDiagnosticEvent>()
+
+        override fun record(event: HomeFeedDiagnosticEvent) {
+            events += event
+        }
     }
 
     private companion object {
