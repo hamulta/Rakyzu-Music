@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,15 +44,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -84,7 +88,22 @@ private val catalogGradients = listOf(
     listOf(Color(0xFF123C5A), Color(0xFF59C7F1)),
 )
 
-private val homeFilters = listOf("Music", "New releases")
+internal enum class HomeFilter(
+    val storageKey: String,
+    val label: String,
+) {
+    Music(storageKey = "music", label = "Music"),
+    NewReleases(storageKey = "new-releases", label = "New releases"),
+    ;
+
+    companion object {
+        fun restore(storageKey: String?): HomeFilter = entries
+            .firstOrNull { it.storageKey == storageKey }
+            ?: Music
+    }
+}
+
+private val homeFilters = HomeFilter.entries
 
 internal data class HomeLayoutSpec(
     val horizontalPadding: Dp,
@@ -140,16 +159,18 @@ fun HomeRoute(
     val artworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository) {
         mediaDeliveryRepository::artworkRequest
     }
-    HomeScreen(
-        versionName = versionName,
-        displayName = displayName,
-        state = state,
-        artworkRequestProvider = artworkRequestProvider,
-        modifier = modifier,
-        onRetryCatalog = homeViewModel::refresh,
-        onTrackPlay = onTrackPlay,
-        onProfileClick = onProfileClick,
-    )
+    key(userId) {
+        HomeScreen(
+            versionName = versionName,
+            displayName = displayName,
+            state = state,
+            artworkRequestProvider = artworkRequestProvider,
+            modifier = modifier,
+            onRetryCatalog = homeViewModel::refresh,
+            onTrackPlay = onTrackPlay,
+            onProfileClick = onProfileClick,
+        )
+    }
 }
 
 @Composable
@@ -164,7 +185,11 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
 ) {
-    var selectedFilter by remember { mutableStateOf("Music") }
+    var selectedFilterKey by rememberSaveable {
+        mutableStateOf(HomeFilter.Music.storageKey)
+    }
+    val selectedFilter = HomeFilter.restore(selectedFilterKey)
+    val homeListState = rememberLazyListState()
     val featuredQueue = state.derivedSections.featuredQueue
     val onFeaturedTrackPlay = remember(featuredQueue, onTrackPlay) {
         { onTrackPlay(featuredQueue, 0) }
@@ -179,6 +204,7 @@ fun HomeScreen(
             )
         }
         LazyColumn(
+            state = homeListState,
             modifier = Modifier
                 .fillMaxSize()
                 .background(
@@ -189,10 +215,11 @@ fun HomeScreen(
                             1f to RakyzuBlack,
                         ),
                     ),
-                ),
+                )
+                .testTag("home-list"),
             contentPadding = contentPadding,
         ) {
-            item {
+            item(key = "home-header") {
                 HomeHeader(
                     versionName = versionName,
                     displayName = displayName,
@@ -201,20 +228,20 @@ fun HomeScreen(
                 )
             }
             if (state.hasPlayableContent) {
-                item {
+                item(key = "home-filters") {
                     FilterRow(
                         selectedFilter = selectedFilter,
                         horizontalPadding = layoutSpec.horizontalPadding,
-                        onFilterSelected = { selectedFilter = it },
+                        onFilterSelected = { selectedFilterKey = it.storageKey },
                     )
                 }
-                item {
+                item(key = "catalog-freshness") {
                     CatalogFreshnessMetadata(
                         freshness = state.catalogFreshness,
                         horizontalPadding = layoutSpec.horizontalPadding,
                     )
                 }
-                item {
+                item(key = "featured-track") {
                     FeaturedCard(
                         track = state.derivedSections.featuredTrack,
                         layoutSpec = layoutSpec,
@@ -224,7 +251,7 @@ fun HomeScreen(
                 }
             }
             if (state.isRefreshing || state.refreshMessage != null) {
-                item {
+                item(key = "catalog-status") {
                     CatalogStatus(
                         isRefreshing = state.isRefreshing,
                         isWaitingForConnection = state.isWaitingForConnection,
@@ -238,15 +265,15 @@ fun HomeScreen(
                 }
             }
             if (state.isEmptyAfterRefresh) {
-                item {
+                item(key = "empty-home") {
                     EmptyHomeState(
                         horizontalPadding = layoutSpec.horizontalPadding,
                         onRefresh = onRetryCatalog,
                     )
                 }
             }
-            if (selectedFilter == "Music" && state.recentlyPlayed.isNotEmpty()) {
-                item {
+            if (selectedFilter == HomeFilter.Music && state.recentlyPlayed.isNotEmpty()) {
+                item(key = "recently-played") {
                     TrackShelf(
                         title = "Recently played",
                         subtitle = "Continue from your latest listening on this device.",
@@ -257,7 +284,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (selectedFilter == "Music") {
+            if (selectedFilter == HomeFilter.Music) {
                 items(
                     items = state.catalog.editorialShelves,
                     key = { "editorial-${it.id}" },
@@ -273,7 +300,7 @@ fun HomeScreen(
                 }
             }
             if (state.derivedSections.newReleaseTracks.isNotEmpty()) {
-                item {
+                item(key = "new-releases") {
                     TrackShelf(
                         title = "New releases",
                         subtitle = "The latest published sounds on Rakyzu Music.",
@@ -284,8 +311,8 @@ fun HomeScreen(
                     )
                 }
             }
-            if (selectedFilter == "Music" && state.catalog.tracks.isNotEmpty()) {
-                item {
+            if (selectedFilter == HomeFilter.Music && state.catalog.tracks.isNotEmpty()) {
+                item(key = "all-tracks") {
                     TrackShelf(
                         title = "All tracks",
                         subtitle = "Explore the complete verified catalog.",
@@ -522,21 +549,26 @@ private fun HomeHeader(
 
 @Composable
 private fun FilterRow(
-    selectedFilter: String,
+    selectedFilter: HomeFilter,
     horizontalPadding: Dp,
-    onFilterSelected: (String) -> Unit,
+    onFilterSelected: (HomeFilter) -> Unit,
 ) {
+    val filterListState = rememberLazyListState()
     LazyRow(
+        state = filterListState,
         contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(homeFilters) { filter ->
+        items(
+            items = homeFilters,
+            key = HomeFilter::storageKey,
+        ) { filter ->
             val selected = filter == selectedFilter
             FilterChip(
                 selected = selected,
                 onClick = { onFilterSelected(filter) },
                 modifier = Modifier.heightIn(min = 48.dp),
-                label = { Text(filter) },
+                label = { Text(filter.label) },
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = RakyzuSurfaceRaised.copy(alpha = 0.82f),
                     labelColor = MaterialTheme.colorScheme.onSurface,
@@ -671,6 +703,7 @@ internal fun TrackShelf(
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     onTrackPlay: (List<Track>, Int) -> Unit,
 ) {
+    val shelfListState = rememberLazyListState()
     Column(
         modifier = Modifier
             .padding(bottom = 28.dp)
@@ -695,7 +728,10 @@ internal fun TrackShelf(
             )
         }
         LazyRow(
-            modifier = Modifier.semantics { isTraversalGroup = true },
+            state = shelfListState,
+            modifier = Modifier
+                .semantics { isTraversalGroup = true }
+                .testTag("track-shelf-list-$title"),
             contentPadding = PaddingValues(horizontal = layoutSpec.horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
