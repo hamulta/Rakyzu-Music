@@ -27,7 +27,7 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.1.7` — artwork loading, cache policy, placeholders, and failure states.
 - [x] `0.1.8` — Home filter and scroll state restoration across recreation.
 - [x] `0.1.9` — Home feed observability and bounded diagnostics.
-- [ ] `0.1.10` — final Home regression, accessibility, resilience, and performance gate before Search.
+- [x] `0.1.10` — final Home regression, accessibility, resilience, and performance gate before Search.
 - `0.2.x`: Search, browse, artists, albums, and tracks.
 - `0.3.x`: Library, liked songs, saved albums, follows.
 - `0.4.x`: Playlist create/edit/order/share and concurrency handling.

@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.1.9`.
+Status: baseline for `0.1.10`.
 
 ## Goals
 
@@ -73,6 +73,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Home artwork has explicit placeholder, loading, loaded, and failure states. Decorative cover images add no duplicate TalkBack description; their enclosing track controls remain the semantic owner, while loading and failure visuals preserve the established card geometry and touch targets.
 - Home persists its filter as a version-tolerant stable key and restores unknown values to Music. Compose `LazyListState` savers retain the vertical feed, filter row, and every horizontal shelf position across saved-instance recreation. Explicit section, shelf, and track keys preserve identity when refresh status or catalog rows change, and the complete saveable subtree is keyed by listener ID so one account never inherits another account's navigation position.
 - Home records process-local structured diagnostics for feed-shape emissions, connectivity transitions, refresh triggers, coalesced requests, scheduled retries, outcomes, bounded attempt ordinals, and monotonic duration buckets. Content quantities are reduced to fixed buckets; listener/catalog identifiers, titles, URLs, tokens, payloads, and raw exceptions are absent by construction. The FIFO keeps 32 events with a hard ceiling of 64, rendered lines are capped at 240 characters, and sink failures are isolated from product state.
+- Home's final milestone gate centralizes shelf visibility as a testable contract, compiles Compose accessibility regressions for loading, empty, and cached-refresh states, verifies that connectivity loss during retry backoff waits and recovers exactly once, and bounds stable unique derivation for a 5,000-track catalog. GitHub Actions runs this focused Home gate before the global Android validation and APK upload.
 
 ## Release topology
 

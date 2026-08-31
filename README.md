@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.1.9**
+Current version: **0.1.10**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.9-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.1.10-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -53,6 +53,8 @@ Published artist, album, track, and editorial-shelf metadata is read through aut
 Home restores the selected feed filter, vertical feed position, filter-row position, and each horizontal shelf position through Compose saved-instance state. Section and track keys remain stable across refresh/status changes, while the restoration scope is reset when the authenticated listener changes. Only bounded UI selection and scroll coordinates are saved; catalog content and credentials remain in their existing data and session boundaries.
 
 Home feed observability emits structured Logcat events for feed shape, connectivity, refresh triggers, coalescing, retries, duration buckets, and outcomes. Diagnostics use only fixed enums, booleans, and bucketed counts; they never include listener IDs, catalog IDs or titles, URLs, tokens, raw exceptions, or backend payloads. A process-local FIFO retains at most 32 events, log lines are capped at 240 characters, and diagnostic transport failure cannot alter Home state or refresh behavior.
+
+The completed Home milestone has an explicit CI gate for its unit tests, lint, and Compose instrumentation APK. Regression contracts cover shelf visibility for every filter and empty feed, polite loading/refresh announcements, one accessible 48dp empty-state action, connectivity loss during retry backoff, and stable unique derivation for a 5,000-track catalog before the Search milestone begins.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 
