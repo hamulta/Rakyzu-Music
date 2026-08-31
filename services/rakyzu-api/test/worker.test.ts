@@ -4,14 +4,16 @@ import { createWorker } from "../src/worker";
 import type { RakyzuApiEnv, RequestDependencies } from "../src/types";
 
 const TRACK_ID = "a3000000-0000-4000-8000-000000000001";
+const ALBUM_ID = "a2000000-0000-4000-8000-000000000001";
 const AUDIO = new TextEncoder().encode("rakyzu-audio");
+const ARTWORK = new Uint8Array([0x52, 0x41, 0x4b, 0x59, 0x5a, 0x55]);
 
 describe("Rakyzu Music API", () => {
   it("serves a public health response with security headers", async () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.0.7" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.0.8" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -79,6 +81,47 @@ describe("Rakyzu Music API", () => {
     expect(await response.text()).toBe("");
   });
 
+  it("requires a bearer session for album artwork", async () => {
+    const response = await execute(`/v1/albums/${ALBUM_ID}/artwork`);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toContain("Bearer");
+  });
+
+  it("does not disclose artwork for an unpublished album", async () => {
+    const response = await execute(`/v1/albums/${ALBUM_ID}/artwork`, {
+      headers: { authorization: "Bearer listener-token" },
+      published: false,
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "artwork_not_found" } });
+  });
+
+  it("serves authorized album artwork with bounded private caching", async () => {
+    const response = await execute(`/v1/albums/${ALBUM_ID}/artwork`, {
+      headers: { authorization: "Bearer listener-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=86400");
+    expect(response.headers.get("etag")).toBe('"artwork-etag"');
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(ARTWORK);
+  });
+
+  it("revalidates cached album artwork with its entity tag", async () => {
+    const response = await execute(`/v1/albums/${ALBUM_ID}/artwork`, {
+      headers: {
+        authorization: "Bearer listener-token",
+        "if-none-match": '"artwork-etag"',
+      },
+    });
+
+    expect(response.status).toBe(304);
+    expect(await response.text()).toBe("");
+  });
+
   it("uses a bounded JSON error for unexpected failures", async () => {
     const response = await execute(`/v1/tracks/${TRACK_ID}/stream`, {
       headers: { authorization: "Bearer listener-token" },
@@ -116,6 +159,10 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
       if (options.catalogError) throw options.catalogError;
       return options.published ?? true;
     },
+    async canAccessAlbumArtwork() {
+      if (options.catalogError) throw options.catalogError;
+      return options.published ?? true;
+    },
   };
   const worker = createWorker(dependencies);
   const env = {
@@ -135,19 +182,20 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
 }
 
 class FakeR2Bucket {
-  constructor(private readonly bytes: Uint8Array) {}
+  constructor(private readonly audioBytes: Uint8Array) {}
 
-  async head(): Promise<R2Object> {
-    return this.metadata() as R2Object;
+  async head(key: string): Promise<R2Object> {
+    return this.metadata(key) as R2Object;
   }
 
-  async get(_key: string, options?: R2GetOptions): Promise<R2ObjectBody> {
+  async get(key: string, options?: R2GetOptions): Promise<R2ObjectBody> {
+    const bytes = this.bytes(key);
     const range = options?.range as { offset?: number; length?: number } | undefined;
     const offset = range?.offset ?? 0;
-    const length = range?.length ?? this.bytes.length;
-    const body = this.bytes.slice(offset, offset + length);
+    const length = range?.length ?? bytes.length;
+    const body = bytes.slice(offset, offset + length);
     return {
-      ...this.metadata(),
+      ...this.metadata(key),
       body: new Blob([body]).stream(),
       bodyUsed: false,
       arrayBuffer: async () => body.buffer,
@@ -157,20 +205,26 @@ class FakeR2Bucket {
     } as R2ObjectBody;
   }
 
-  private metadata() {
+  private bytes(key: string): Uint8Array {
+    return key.endsWith("/artwork.webp") ? ARTWORK : this.audioBytes;
+  }
+
+  private metadata(key: string) {
+    const isArtwork = key.endsWith("/artwork.webp");
+    const bytes = this.bytes(key);
     return {
-      key: "media",
+      key,
       version: "1",
-      size: this.bytes.length,
-      etag: "etag",
-      httpEtag: '"etag"',
+      size: bytes.length,
+      etag: isArtwork ? "artwork-etag" : "audio-etag",
+      httpEtag: isArtwork ? '"artwork-etag"' : '"audio-etag"',
       uploaded: new Date(0),
-      httpMetadata: { contentType: "audio/mpeg" },
+      httpMetadata: { contentType: isArtwork ? "image/webp" : "audio/mpeg" },
       customMetadata: {},
       checksums: {},
       storageClass: "Standard",
       writeHttpMetadata(headers: Headers) {
-        headers.set("content-type", "audio/mpeg");
+        headers.set("content-type", isArtwork ? "image/webp" : "audio/mpeg");
       },
     };
   }

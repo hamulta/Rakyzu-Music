@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
@@ -123,6 +124,7 @@ internal fun resolveHomeLayoutSpec(
 fun HomeRoute(
     userId: String,
     repository: CatalogRepository,
+    mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     versionName: String,
     displayName: String,
@@ -135,10 +137,14 @@ fun HomeRoute(
         factory = HomeViewModel.factory(userId, repository, connectivityMonitor),
     )
     val state by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val artworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository) {
+        mediaDeliveryRepository::artworkRequest
+    }
     HomeScreen(
         versionName = versionName,
         displayName = displayName,
         state = state,
+        artworkRequestProvider = artworkRequestProvider,
         modifier = modifier,
         onRetryCatalog = homeViewModel::refresh,
         onTrackPlay = onTrackPlay,
@@ -156,6 +162,7 @@ fun HomeScreen(
     onRetryCatalog: () -> Unit = {},
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
+    artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
 ) {
     var selectedFilter by remember { mutableStateOf("Music") }
     val featuredQueue = state.derivedSections.featuredQueue
@@ -211,6 +218,7 @@ fun HomeScreen(
                     FeaturedCard(
                         track = state.derivedSections.featuredTrack,
                         layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onFeaturedTrackPlay,
                     )
                 }
@@ -244,6 +252,7 @@ fun HomeScreen(
                         subtitle = "Continue from your latest listening on this device.",
                         tracks = state.recentlyPlayed,
                         layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
                     )
                 }
@@ -258,6 +267,7 @@ fun HomeScreen(
                         subtitle = shelf.subtitle,
                         tracks = shelf.tracks,
                         layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
                     )
                 }
@@ -269,6 +279,7 @@ fun HomeScreen(
                         subtitle = "The latest published sounds on Rakyzu Music.",
                         tracks = state.derivedSections.newReleaseTracks,
                         layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
                     )
                 }
@@ -280,6 +291,7 @@ fun HomeScreen(
                         subtitle = "Explore the complete verified catalog.",
                         tracks = state.catalog.tracks,
                         layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
                     )
                 }
@@ -541,6 +553,7 @@ private fun FilterRow(
 private fun FeaturedCard(
     track: Track?,
     layoutSpec: HomeLayoutSpec,
+    artworkRequestProvider: ArtworkRequestProvider,
     onTrackPlay: () -> Unit,
 ) {
     Card(
@@ -559,8 +572,10 @@ private fun FeaturedCard(
             .padding(18.dp)
         if (layoutSpec.useStackedFeaturedCard) {
             Column(modifier = contentModifier) {
-                AlbumCover(
+                AlbumArtwork(
+                    albumId = track?.albumId.orEmpty(),
                     colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
+                    artworkRequestProvider = artworkRequestProvider,
                     modifier = Modifier.size(128.dp),
                 )
                 Spacer(Modifier.height(16.dp))
@@ -574,8 +589,10 @@ private fun FeaturedCard(
                 modifier = contentModifier,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AlbumCover(
+                AlbumArtwork(
+                    albumId = track?.albumId.orEmpty(),
                     colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
+                    artworkRequestProvider = artworkRequestProvider,
                     modifier = Modifier.size(112.dp),
                 )
                 Spacer(Modifier.width(18.dp))
@@ -651,6 +668,7 @@ internal fun TrackShelf(
     subtitle: String?,
     tracks: List<Track>,
     layoutSpec: HomeLayoutSpec = HomeLayoutSpec.Standard,
+    artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     onTrackPlay: (List<Track>, Int) -> Unit,
 ) {
     Column(
@@ -704,8 +722,10 @@ internal fun TrackShelf(
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {
                     Column {
-                        AlbumCover(
+                        AlbumArtwork(
+                            albumId = track.albumId,
                             colors = catalogGradients[index % catalogGradients.size],
+                            artworkRequestProvider = artworkRequestProvider,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f),
@@ -741,34 +761,6 @@ internal fun Track.homeSubtitle(): String {
         artistLabel.isEmpty() -> albumLabel
         albumLabel.isEmpty() -> artistLabel
         else -> "$artistLabel · $albumLabel"
-    }
-}
-
-@Composable
-private fun AlbumCover(
-    colors: List<Color>,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(colors)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(RakyzuBlack.copy(alpha = 0.72f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.MusicNote,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(34.dp),
-            )
-        }
     }
 }
 

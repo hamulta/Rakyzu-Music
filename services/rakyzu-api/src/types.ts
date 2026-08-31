@@ -12,4 +12,5 @@ export interface ListenerIdentity {
 export interface RequestDependencies {
   verifyListener(token: string, env: RakyzuApiEnv): Promise<ListenerIdentity>;
   canStreamTrack(trackId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
+  canAccessAlbumArtwork(albumId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
 }

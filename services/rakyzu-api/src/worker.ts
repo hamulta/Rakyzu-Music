@@ -1,12 +1,14 @@
-import { canStreamTrack, CatalogUnavailable } from "./catalog";
+import { canAccessAlbumArtwork, canStreamTrack, CatalogUnavailable } from "./catalog";
 import { readBearerToken, UnauthorizedRequest, verifyListener } from "./auth";
 import { parseRange } from "./range";
 import { errorResponse, jsonResponse, responseHeaders } from "./responses";
 import type { RakyzuApiEnv, RequestDependencies } from "./types";
 
-const API_VERSION = "0.0.7";
+const API_VERSION = "0.0.8";
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
-const dependencies: RequestDependencies = { verifyListener, canStreamTrack };
+const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
+const ARTWORK_CACHE_CONTROL = "private, max-age=86400";
+const dependencies: RequestDependencies = { verifyListener, canStreamTrack, canAccessAlbumArtwork };
 
 export function createWorker(
   requestDependencies: RequestDependencies = dependencies,
@@ -18,71 +20,94 @@ export function createWorker(
       try {
         const url = new URL(request.url);
         origin = allowedOrigin(request, env);
-      if (request.headers.has("origin") && origin === null) {
-        return errorResponse("origin_denied", "Origin is not allowed.", 403, requestId, null);
-      }
-
-      if (request.method === "OPTIONS") {
-        return preflightResponse(requestId, origin);
-      }
-      if (url.pathname === "/v1/health" && request.method === "GET") {
-        return jsonResponse(
-          { service: "rakyzu-music-api", status: "ok", version: API_VERSION },
-          200,
-          requestId,
-          origin,
-        );
-      }
-
-      const route = url.pathname.match(TRACK_ROUTE);
-      if (!route?.[1]) {
-        return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
-      }
-      if (request.method !== "GET" && request.method !== "HEAD") {
-        return errorResponse(
-          "method_not_allowed",
-          "Method not allowed.",
-          405,
-          requestId,
-          origin,
-          { allow: "GET, HEAD, OPTIONS" },
-        );
-      }
-
-      let token: string;
-      try {
-        token = readBearerToken(request);
-        await requestDependencies.verifyListener(token, env);
-      } catch (error) {
-        if (!(error instanceof UnauthorizedRequest)) throw error;
-        return errorResponse(
-          "unauthorized",
-          "A valid Rakyzu Music session is required.",
-          401,
-          requestId,
-          origin,
-          { "www-authenticate": 'Bearer realm="Rakyzu Music"' },
-        );
-      }
-
-      const trackId = route[1].toLowerCase();
-      try {
-        if (!(await requestDependencies.canStreamTrack(trackId, token, env))) {
-          return errorResponse("track_not_found", "Track not found.", 404, requestId, origin);
+        if (request.headers.has("origin") && origin === null) {
+          return errorResponse("origin_denied", "Origin is not allowed.", 403, requestId, null);
         }
-      } catch (error) {
-        if (!(error instanceof CatalogUnavailable)) throw error;
-        return errorResponse(
-          "catalog_unavailable",
-          "Catalog authorization is temporarily unavailable.",
-          503,
-          requestId,
-          origin,
-          { "retry-after": "30" },
-        );
-      }
 
-        return await streamTrack(request, env, trackId, requestId, origin);
+        if (request.method === "OPTIONS") {
+          return preflightResponse(requestId, origin);
+        }
+        if (url.pathname === "/v1/health" && request.method === "GET") {
+          return jsonResponse(
+            { service: "rakyzu-music-api", status: "ok", version: API_VERSION },
+            200,
+            requestId,
+            origin,
+          );
+        }
+
+        const trackRoute = url.pathname.match(TRACK_ROUTE);
+        const artworkRoute = url.pathname.match(ALBUM_ARTWORK_ROUTE);
+        if (!trackRoute?.[1] && !artworkRoute?.[1]) {
+          return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
+        }
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          return errorResponse(
+            "method_not_allowed",
+            "Method not allowed.",
+            405,
+            requestId,
+            origin,
+            { allow: "GET, HEAD, OPTIONS" },
+          );
+        }
+
+        let token: string;
+        try {
+          token = readBearerToken(request);
+          await requestDependencies.verifyListener(token, env);
+        } catch (error) {
+          if (!(error instanceof UnauthorizedRequest)) throw error;
+          return errorResponse(
+            "unauthorized",
+            "A valid Rakyzu Music session is required.",
+            401,
+            requestId,
+            origin,
+            { "www-authenticate": 'Bearer realm="Rakyzu Music"' },
+          );
+        }
+
+        if (trackRoute?.[1]) {
+          const trackId = trackRoute[1].toLowerCase();
+          try {
+            if (!(await requestDependencies.canStreamTrack(trackId, token, env))) {
+              return errorResponse("track_not_found", "Track not found.", 404, requestId, origin);
+            }
+          } catch (error) {
+            if (!(error instanceof CatalogUnavailable)) throw error;
+            return errorResponse(
+              "catalog_unavailable",
+              "Catalog authorization is temporarily unavailable.",
+              503,
+              requestId,
+              origin,
+              { "retry-after": "30" },
+            );
+          }
+          return await streamTrack(request, env, trackId, requestId, origin);
+        }
+
+        const albumId = artworkRoute?.[1]?.toLowerCase();
+        if (!albumId) {
+          return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
+        }
+        try {
+          if (!(await requestDependencies.canAccessAlbumArtwork(albumId, token, env))) {
+            return errorResponse("artwork_not_found", "Artwork not found.", 404, requestId, origin);
+          }
+        } catch (error) {
+          if (!(error instanceof CatalogUnavailable)) throw error;
+          return errorResponse(
+            "catalog_unavailable",
+            "Catalog authorization is temporarily unavailable.",
+            503,
+            requestId,
+            origin,
+            { "retry-after": "30" },
+          );
+        }
+        return await serveAlbumArtwork(request, env, albumId, requestId, origin);
       } catch {
         return errorResponse(
           "internal_error",
@@ -94,6 +119,48 @@ export function createWorker(
       }
     },
   };
+}
+
+async function serveAlbumArtwork(
+  request: Request,
+  env: RakyzuApiEnv,
+  albumId: string,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  const objectKey = `media/albums/${albumId}/artwork.webp`;
+  const metadata = await env.MEDIA.head(objectKey);
+  const contentType = metadata?.httpMetadata?.contentType;
+  if (metadata === null || !isSupportedArtworkContentType(contentType)) {
+    return errorResponse("artwork_not_found", "Artwork is unavailable.", 404, requestId, origin);
+  }
+
+  const headers = responseHeaders(requestId, origin);
+  metadata.writeHttpMetadata(headers);
+  headers.set("cache-control", ARTWORK_CACHE_CONTROL);
+  headers.set("etag", metadata.httpEtag);
+  headers.set("access-control-expose-headers", "Content-Length, ETag, X-Request-ID");
+
+  if (request.headers.get("if-none-match") === metadata.httpEtag) {
+    return new Response(null, { status: 304, headers });
+  }
+  headers.set("content-length", metadata.size.toString());
+  if (request.method === "HEAD") {
+    return new Response(null, { status: 200, headers });
+  }
+
+  const object = await env.MEDIA.get(objectKey);
+  if (object === null) {
+    return errorResponse("artwork_not_found", "Artwork is unavailable.", 404, requestId, origin);
+  }
+  return new Response(object.body, { status: 200, headers });
+}
+
+function isSupportedArtworkContentType(contentType: string | undefined): boolean {
+  return contentType === "image/avif" ||
+    contentType === "image/jpeg" ||
+    contentType === "image/png" ||
+    contentType === "image/webp";
 }
 
 async function streamTrack(

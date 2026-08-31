@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
                     authRepository = rakyzuApplication.authRepository,
                     profileRepository = rakyzuApplication.profileRepository,
                     catalogRepository = rakyzuApplication.catalogRepository,
+                    mediaDeliveryRepository = rakyzuApplication.mediaDeliveryRepository,
                     connectivityMonitor = rakyzuApplication.connectivityMonitor,
                     playbackController = rakyzuApplication.playbackController,
                 )

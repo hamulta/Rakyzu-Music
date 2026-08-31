@@ -1,6 +1,15 @@
 package my.id.rakyzumusic
 
 import android.app.Application
+import android.content.Context
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.annotation.ExperimentalCoilApi
+import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
+import coil3.network.cachecontrol.CacheControlCacheStrategy
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.crossfade
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
@@ -23,8 +32,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okio.Path.Companion.toOkioPath
 
-class RakyzuMusicApplication : Application(), PlaybackDependencies {
+class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonImageLoader.Factory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val repositories: RakyzuRepositories by lazy {
@@ -69,6 +79,35 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies {
                 }
             }
         }
+    }
+
+    @OptIn(ExperimentalCoilApi::class)
+    override fun newImageLoader(context: Context): ImageLoader = ImageLoader.Builder(context)
+        .memoryCache {
+            MemoryCache.Builder()
+                .maxSizePercent(context, ARTWORK_MEMORY_CACHE_PERCENT)
+                .build()
+        }
+        .diskCache {
+            DiskCache.Builder()
+                .directory(context.cacheDir.resolve(ARTWORK_CACHE_DIRECTORY).toOkioPath())
+                .maxSizeBytes(ARTWORK_DISK_CACHE_BYTES)
+                .build()
+        }
+        .components {
+            add(
+                OkHttpNetworkFetcherFactory(
+                    cacheStrategy = { CacheControlCacheStrategy() },
+                ),
+            )
+        }
+        .crossfade(true)
+        .build()
+
+    private companion object {
+        const val ARTWORK_MEMORY_CACHE_PERCENT = 0.25
+        const val ARTWORK_DISK_CACHE_BYTES = 128L * 1024L * 1024L
+        const val ARTWORK_CACHE_DIRECTORY = "rakyzu_music_artwork"
     }
 }
 

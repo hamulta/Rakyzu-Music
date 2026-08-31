@@ -31,6 +31,51 @@ class MediaDeliveryRepositoryTest {
     }
 
     @Test
+    fun authenticatedArtworkRequestUsesAlbumApiPathAndAuthorizationHeader() {
+        val result = repository(accessToken = "listener-token")
+            .artworkRequest(ALBUM_ID.uppercase())
+
+        assertTrue(result is ArtworkRequestResult.Ready)
+        val request = (result as ArtworkRequestResult.Ready).request
+        assertEquals(
+            "https://api.rakyzu.my.id/v1/albums/$ALBUM_ID/artwork",
+            request.url,
+        )
+        assertEquals(ALBUM_ID, request.albumId)
+        assertEquals("Bearer listener-token", request.requestHeaders()["Authorization"])
+    }
+
+    @Test
+    fun artworkAccessTokenIsRedactedFromStringRepresentation() {
+        val result = repository(accessToken = "listener-token").artworkRequest(ALBUM_ID)
+        val request = (result as ArtworkRequestResult.Ready).request
+
+        assertFalse(request.toString().contains("listener-token"))
+        assertTrue(request.toString().contains("REDACTED"))
+    }
+
+    @Test
+    fun artworkRequestFailsClosedWithoutSession() {
+        val result = repository(accessToken = null).artworkRequest(ALBUM_ID)
+
+        assertEquals(
+            ArtworkRequestResult.Failure(ArtworkRequestFailure.NotAuthenticated),
+            result,
+        )
+    }
+
+    @Test
+    fun malformedAlbumIdCannotChangeArtworkApiPath() {
+        val result = repository(accessToken = "listener-token")
+            .artworkRequest("../../private-object")
+
+        assertEquals(
+            ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidAlbumId),
+            result,
+        )
+    }
+
+    @Test
     fun missingSessionFailsClosed() {
         val result = repository(accessToken = null).streamRequest(TRACK_ID)
 
@@ -81,5 +126,6 @@ class MediaDeliveryRepositoryTest {
 
     private companion object {
         const val TRACK_ID = "a3000000-0000-4000-8000-000000000001"
+        const val ALBUM_ID = "a2000000-0000-4000-8000-000000000001"
     }
 }

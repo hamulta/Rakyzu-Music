@@ -97,6 +97,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.navigation3:navigation3-runtime:1.1.7")
     implementation("androidx.navigation3:navigation3-ui:1.1.7")
+    implementation("io.coil-kt.coil3:coil:3.6.0")
+    implementation("io.coil-kt.coil3:coil-network-cache-control:3.6.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
 
     val composeBom = platform("androidx.compose:compose-bom:2026.08.00")

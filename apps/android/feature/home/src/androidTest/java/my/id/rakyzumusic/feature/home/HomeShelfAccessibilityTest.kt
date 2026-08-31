@@ -8,11 +8,17 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
+import my.id.rakyzumusic.core.data.media.ArtworkRequestFailure
+import my.id.rakyzumusic.core.data.media.ArtworkRequestResult
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
@@ -169,6 +175,46 @@ class HomeShelfAccessibilityTest {
         composeRule.onNode(hasPlayAction(track.homePlayActionLabel()))
             .assertWidthIsAtLeast(220.dp)
             .assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun missingArtworkUsesPlaceholderWithoutCallingDelivery() {
+        var deliveryCalls = 0
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                AlbumArtwork(
+                    albumId = "",
+                    colors = listOf(Color.Black, Color.DarkGray),
+                    artworkRequestProvider = {
+                        deliveryCalls += 1
+                        ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidAlbumId)
+                    },
+                    modifier = Modifier.size(128.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("album-artwork-placeholder-").assertExists()
+        composeRule.runOnIdle { assertEquals(0, deliveryCalls) }
+    }
+
+    @Test
+    fun unavailableArtworkUsesExplicitFailureVisual() {
+        val albumId = "a2000000-0000-4000-8000-000000000001"
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                AlbumArtwork(
+                    albumId = albumId,
+                    colors = listOf(Color.Black, Color.DarkGray),
+                    artworkRequestProvider = {
+                        ArtworkRequestResult.Failure(ArtworkRequestFailure.NotAuthenticated)
+                    },
+                    modifier = Modifier.size(128.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("album-artwork-failed-$albumId").assertExists()
     }
 
     private fun hasPlayAction(expectedLabel: String? = null): SemanticsMatcher =

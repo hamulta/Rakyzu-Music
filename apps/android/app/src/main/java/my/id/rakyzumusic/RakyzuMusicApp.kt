@@ -68,6 +68,7 @@ import my.id.rakyzumusic.core.data.auth.AuthFailure
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
@@ -108,6 +109,7 @@ fun RakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
@@ -143,6 +145,7 @@ fun RakyzuMusicApp(
             authRepository = authRepository,
             profileRepository = profileRepository,
             catalogRepository = catalogRepository,
+            mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             playbackController = playbackController,
             modifier = modifier,
@@ -158,6 +161,7 @@ private fun ProfileGatedRakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
@@ -196,6 +200,7 @@ private fun ProfileGatedRakyzuMusicApp(
             onResetProfileDraft = profileViewModel::resetDraft,
             authRepository = authRepository,
             catalogRepository = catalogRepository,
+            mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             playbackController = playbackController,
             modifier = modifier,
@@ -219,6 +224,7 @@ private fun AuthenticatedRakyzuMusicApp(
     onResetProfileDraft: () -> Unit,
     authRepository: AuthRepository,
     catalogRepository: CatalogRepository,
+    mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
@@ -301,6 +307,7 @@ private fun AuthenticatedRakyzuMusicApp(
                         HomeRoute(
                             userId = userId,
                             repository = catalogRepository,
+                            mediaDeliveryRepository = mediaDeliveryRepository,
                             connectivityMonitor = connectivityMonitor,
                             versionName = versionName,
                             displayName = displayName,
