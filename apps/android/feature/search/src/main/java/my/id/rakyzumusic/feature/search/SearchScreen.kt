@@ -78,6 +78,7 @@ fun SearchRoute(
     viewModel: SearchViewModel,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
+    onArtistClick: ((Artist) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SearchScreen(
@@ -85,6 +86,7 @@ fun SearchRoute(
         onQueryChange = viewModel::updateQuery,
         onClearQuery = viewModel::clearQuery,
         onTrackPlay = onTrackPlay,
+        onArtistClick = onArtistClick,
         modifier = modifier,
     )
 }
@@ -98,6 +100,7 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
     onSearchSubmit: () -> Unit = {},
+    onArtistClick: ((Artist) -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -222,6 +225,12 @@ fun SearchScreen(
                             icon = Icons.Rounded.Person,
                             title = artist.name,
                             subtitle = "Artist",
+                            onClickLabel = onArtistClick?.let {
+                                "Open ${artist.name.trim()} artist"
+                            },
+                            onClick = onArtistClick?.let { callback ->
+                                { callback(artist) }
+                            },
                         )
                     }
                 }
@@ -350,9 +359,20 @@ private fun MetadataResultRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    onClickLabel: String? = null,
+    onClick: (() -> Unit)? = null,
 ) {
+    val interactionModifier = if (onClick == null) {
+        Modifier
+    } else {
+        Modifier.clickable(
+            onClickLabel = onClickLabel,
+            role = Role.Button,
+            onClick = onClick,
+        )
+    }
     Row(
-        modifier = Modifier
+        modifier = interactionModifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .padding(horizontal = 20.dp, vertical = 8.dp),

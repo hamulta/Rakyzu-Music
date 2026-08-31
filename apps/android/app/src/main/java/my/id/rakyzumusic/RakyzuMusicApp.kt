@@ -85,10 +85,14 @@ import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
+import my.id.rakyzumusic.feature.search.ArtistDetailRoute
+import my.id.rakyzumusic.feature.search.ArtistDetailViewModel
 import my.id.rakyzumusic.feature.search.SearchRoute
 import my.id.rakyzumusic.feature.search.SearchViewModel
 import my.id.rakyzumusic.navigation.RakyzuRoute
+import my.id.rakyzumusic.navigation.dismissArtistDetail
 import my.id.rakyzumusic.navigation.dismissNowPlaying
+import my.id.rakyzumusic.navigation.openArtistDetail
 import my.id.rakyzumusic.navigation.openNowPlaying
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
 import kotlinx.coroutines.launch
@@ -285,7 +289,9 @@ private fun AuthenticatedRakyzuMusicApp(
         navigationSuiteItems = {
             topLevelDestinations.forEach { destination ->
                 item(
-                    selected = currentRoute == destination.route,
+                    selected = currentRoute == destination.route ||
+                        currentRoute is RakyzuRoute.ArtistDetail &&
+                        destination.route == RakyzuRoute.Search,
                     onClick = { selectTopLevelRoute(backStack, destination.route) },
                     icon = {
                         Icon(
@@ -327,6 +333,23 @@ private fun AuthenticatedRakyzuMusicApp(
                     entry<RakyzuRoute.Search> {
                         SearchRoute(
                             viewModel = searchViewModel,
+                            onTrackPlay = playbackController::playQueue,
+                            onArtistClick = { artist ->
+                                openArtistDetail(backStack, artist.id)
+                            },
+                        )
+                    }
+                    entry<RakyzuRoute.ArtistDetail> { route ->
+                        val artistViewModel: ArtistDetailViewModel = viewModel(
+                            key = "artist-$userId-${route.artistId}",
+                            factory = ArtistDetailViewModel.factory(
+                                artistId = route.artistId,
+                                repository = catalogRepository,
+                            ),
+                        )
+                        ArtistDetailRoute(
+                            viewModel = artistViewModel,
+                            onBack = { dismissArtistDetail(backStack) },
                             onTrackPlay = playbackController::playQueue,
                         )
                     }

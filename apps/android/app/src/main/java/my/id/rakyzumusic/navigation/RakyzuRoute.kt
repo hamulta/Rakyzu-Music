@@ -12,6 +12,9 @@ sealed interface RakyzuRoute : NavKey {
     data object Search : RakyzuRoute
 
     @Serializable
+    data class ArtistDetail(val artistId: String) : RakyzuRoute
+
+    @Serializable
     data object Library : RakyzuRoute
 
     @Serializable
@@ -31,6 +34,22 @@ internal fun selectTopLevelRoute(
 internal fun openNowPlaying(backStack: MutableList<NavKey>) {
     if (backStack.lastOrNull() != RakyzuRoute.NowPlaying) {
         backStack.add(RakyzuRoute.NowPlaying)
+    }
+}
+
+internal fun openArtistDetail(
+    backStack: MutableList<NavKey>,
+    artistId: String,
+) {
+    val route = RakyzuRoute.ArtistDetail(artistId)
+    if (artistId.isNotBlank() && backStack.lastOrNull() != route) {
+        backStack.add(route)
+    }
+}
+
+internal fun dismissArtistDetail(backStack: MutableList<NavKey>) {
+    if (backStack.size > 1 && backStack.lastOrNull() is RakyzuRoute.ArtistDetail) {
+        backStack.removeAt(backStack.lastIndex)
     }
 }
 

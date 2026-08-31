@@ -21,6 +21,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
+import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
@@ -104,6 +105,37 @@ class SearchAccessibilityTest {
             .assertHeightIsAtLeast(64.dp)
             .performClick()
         composeRule.runOnIdle { assertEquals(1, playedIndex) }
+    }
+
+    @Test
+    fun artistResultExposesNamedNavigationActionAndMinimumTarget() {
+        val artist = Artist("artist-1", "Rakyzu Sessions")
+        var selectedArtist: Artist? = null
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                SearchScreen(
+                    state = SearchUiState(
+                        query = "rakyzu",
+                        catalog = CATALOG.copy(artists = listOf(artist)),
+                        results = SearchResults(
+                            artists = listOf(artist),
+                            totalArtistMatches = 1,
+                        ),
+                        hasObservedCatalog = true,
+                    ),
+                    onQueryChange = {},
+                    onClearQuery = {},
+                    onTrackPlay = { _, _ -> },
+                    onArtistClick = { selectedArtist = it },
+                )
+            }
+        }
+
+        composeRule.onNode(hasPlayAction("Open Rakyzu Sessions artist"))
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(64.dp)
+            .performClick()
+        composeRule.runOnIdle { assertEquals(artist, selectedArtist) }
     }
 
     @Test

@@ -45,4 +45,30 @@ class RakyzuRouteTest {
 
         assertEquals(listOf(RakyzuRoute.NowPlaying), backStack)
     }
+
+    @Test
+    fun artistDetailIsAddedOnceAndDismissedBackToSearch() {
+        val backStack = mutableListOf<NavKey>(RakyzuRoute.Search)
+
+        openArtistDetail(backStack, "artist-1")
+        openArtistDetail(backStack, "artist-1")
+
+        assertEquals(
+            listOf(RakyzuRoute.Search, RakyzuRoute.ArtistDetail("artist-1")),
+            backStack,
+        )
+
+        dismissArtistDetail(backStack)
+
+        assertEquals(listOf(RakyzuRoute.Search), backStack)
+    }
+
+    @Test
+    fun blankArtistIdIsRejectedWithoutChangingNavigation() {
+        val backStack = mutableListOf<NavKey>(RakyzuRoute.Search)
+
+        openArtistDetail(backStack, "  ")
+
+        assertEquals(listOf(RakyzuRoute.Search), backStack)
+    }
 }
