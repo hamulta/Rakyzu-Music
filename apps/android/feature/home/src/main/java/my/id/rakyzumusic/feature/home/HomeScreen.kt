@@ -105,6 +105,25 @@ internal enum class HomeFilter(
 
 private val homeFilters = HomeFilter.entries
 
+internal data class HomeSectionVisibility(
+    val recentlyPlayed: Boolean,
+    val editorialShelves: Boolean,
+    val newReleases: Boolean,
+    val allTracks: Boolean,
+)
+
+internal fun HomeUiState.toHomeSectionVisibility(
+    filter: HomeFilter,
+): HomeSectionVisibility {
+    val showsMusicSections = filter == HomeFilter.Music
+    return HomeSectionVisibility(
+        recentlyPlayed = showsMusicSections && recentlyPlayed.isNotEmpty(),
+        editorialShelves = showsMusicSections && catalog.editorialShelves.isNotEmpty(),
+        newReleases = derivedSections.newReleaseTracks.isNotEmpty(),
+        allTracks = showsMusicSections && catalog.tracks.isNotEmpty(),
+    )
+}
+
 internal data class HomeLayoutSpec(
     val horizontalPadding: Dp,
     val trackCardWidth: Dp,
@@ -189,6 +208,7 @@ fun HomeScreen(
         mutableStateOf(HomeFilter.Music.storageKey)
     }
     val selectedFilter = HomeFilter.restore(selectedFilterKey)
+    val sectionVisibility = state.toHomeSectionVisibility(selectedFilter)
     val homeListState = rememberLazyListState()
     val featuredQueue = state.derivedSections.featuredQueue
     val onFeaturedTrackPlay = remember(featuredQueue, onTrackPlay) {
@@ -272,7 +292,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (selectedFilter == HomeFilter.Music && state.recentlyPlayed.isNotEmpty()) {
+            if (sectionVisibility.recentlyPlayed) {
                 item(key = "recently-played") {
                     TrackShelf(
                         title = "Recently played",
@@ -284,7 +304,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (selectedFilter == HomeFilter.Music) {
+            if (sectionVisibility.editorialShelves) {
                 items(
                     items = state.catalog.editorialShelves,
                     key = { "editorial-${it.id}" },
@@ -299,7 +319,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (state.derivedSections.newReleaseTracks.isNotEmpty()) {
+            if (sectionVisibility.newReleases) {
                 item(key = "new-releases") {
                     TrackShelf(
                         title = "New releases",
@@ -311,7 +331,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (selectedFilter == HomeFilter.Music && state.catalog.tracks.isNotEmpty()) {
+            if (sectionVisibility.allTracks) {
                 item(key = "all-tracks") {
                     TrackShelf(
                         title = "All tracks",

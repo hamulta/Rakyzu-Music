@@ -351,6 +351,43 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun connectivityLossDuringBackoffWaitsThenRecoversOnceOnline() = runTest(dispatcher) {
+        val connectivityMonitor = FakeConnectivityMonitor(true)
+        val repository = FakeCatalogRepository(
+            initial = CATALOG,
+            refreshResult = CatalogRefreshResult.Failure(
+                CatalogRefreshFailure.ServiceUnavailable,
+            ),
+            additionalRefreshResults = listOf(CatalogRefreshResult.Success(NOW)),
+        )
+        val viewModel = HomeViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = connectivityMonitor,
+            currentTimeMillis = { NOW },
+            retryDelaysMillis = listOf(1_000L),
+        )
+
+        runCurrent()
+        assertEquals(1, repository.refreshCalls)
+
+        connectivityMonitor.online.value = false
+        runCurrent()
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        assertEquals(1, repository.refreshCalls)
+        assertTrue(viewModel.uiState.value.isWaitingForConnection)
+
+        connectivityMonitor.online.value = true
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isWaitingForConnection)
+        assertEquals(null, viewModel.uiState.value.refreshMessage)
+    }
+
+    @Test
     fun equivalentFeedReusesCatalogAndDerivedSectionReferences() {
         val recent = CATALOG.tracks.single().copy(title = "Played most recently")
         val state = HomeUiState(
