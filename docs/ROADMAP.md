@@ -37,8 +37,8 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.2.6` — authenticated paginated full-catalog search boundary.
 - [x] `0.2.7` — recent searches with explicit listener privacy controls.
 - [x] `0.2.8` — search resilience and offline/online transition hardening.
-- [ ] `0.2.9` — privacy-safe Search observability and performance hardening.
-- [ ] `0.2.10` — final Search regression, accessibility, resilience, and performance gate before Library.
+- [x] `0.2.9` — privacy-safe Search observability and performance hardening.
+- [x] `0.2.10` — final Search regression, accessibility, resilience, and performance gate before Library.
 - `0.3.x`: Library, liked songs, saved albums, follows.
 - `0.4.x`: Playlist create/edit/order/share and concurrency handling.
 - `0.5.x`: Queue, playback recovery, devices, audio quality controls.

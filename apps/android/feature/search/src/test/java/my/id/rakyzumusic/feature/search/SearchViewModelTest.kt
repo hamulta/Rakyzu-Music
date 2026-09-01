@@ -1,6 +1,7 @@
 package my.id.rakyzumusic.feature.search
 
 import androidx.lifecycle.SavedStateHandle
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -251,11 +252,101 @@ class SearchViewModelTest {
         assertEquals("midnight", viewModel.uiState.value.query)
     }
 
+    @Test
+    fun editingQueryInvalidatesAStaleRemoteResponse() = runTest(dispatcher) {
+        val delayedResponse = CompletableDeferred<CatalogSearchResult>()
+        val repository = FakeCatalogRepository(CATALOG).apply {
+            searchResponse = { delayedResponse.await() }
+        }
+        val viewModel = SearchViewModel(repository)
+        testScheduler.advanceUntilIdle()
+        viewModel.updateQuery("midnight")
+        viewModel.submitSearch()
+        testScheduler.runCurrent()
+
+        viewModel.updateQuery("afterglow")
+        delayedResponse.complete(
+            CatalogSearchResult.Success(
+                CatalogSearchPage(
+                    artists = emptyList(),
+                    albums = emptyList(),
+                    tracks = listOf(track("stale", "Midnight Remote")),
+                    totalCount = 1,
+                    nextOffset = null,
+                ),
+            ),
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("afterglow", viewModel.uiState.value.query)
+        assertEquals(RemoteSearchStatus.Idle, viewModel.uiState.value.remoteSearchStatus)
+        assertFalse(viewModel.uiState.value.results.tracks.any { it.id == "stale" })
+    }
+
+    @Test
+    fun diagnosticsMeasureBoundedOutcomesWithoutRecordingQueryContent() = runTest(dispatcher) {
+        val diagnostics = RecordingSearchDiagnostics()
+        val elapsedTimes = ArrayDeque(listOf(0L, 12L, 100L, 140L))
+        val viewModel = SearchViewModel(
+            repository = FakeCatalogRepository(CATALOG).apply {
+                searchResponse = {
+                    CatalogSearchResult.Success(
+                        CatalogSearchPage(
+                            artists = emptyList(),
+                            albums = emptyList(),
+                            tracks = listOf(track("remote-1", "Private Midnight Signal")),
+                            totalCount = 1,
+                            nextOffset = null,
+                        ),
+                    )
+                }
+            },
+            diagnostics = diagnostics,
+            elapsedRealtimeMillis = elapsedTimes::removeFirst,
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.updateQuery("private midnight signal")
+        viewModel.submitSearch()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            SearchDuration.Under16Millis,
+            diagnostics.events.filterIsInstance<SearchDiagnosticEvent.LocalSearchCompleted>()
+                .single().duration,
+        )
+        val remote = diagnostics.events
+            .filterIsInstance<SearchDiagnosticEvent.RemoteSearchSucceeded>()
+            .single()
+        assertEquals(RemoteSearchTrigger.Submit, remote.trigger)
+        assertEquals(SearchDuration.Under50Millis, remote.duration)
+        diagnostics.events.map(SearchDiagnosticEvent::toBoundedLogLine).forEach { line ->
+            assertFalse(line.contains("private", ignoreCase = true))
+            assertFalse(line.contains("midnight", ignoreCase = true))
+            assertFalse(line.contains("signal", ignoreCase = true))
+        }
+    }
+
+    @Test
+    fun diagnosticSinkFailureCannotBreakSearch() = runTest(dispatcher) {
+        val viewModel = SearchViewModel(
+            repository = FakeCatalogRepository(CATALOG),
+            diagnostics = SearchDiagnosticSink { error("diagnostics unavailable") },
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.updateQuery("midnight")
+        viewModel.submitSearch()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(RemoteSearchStatus.Loaded, viewModel.uiState.value.remoteSearchStatus)
+    }
+
     private class FakeCatalogRepository(initial: CatalogSnapshot) : CatalogRepository {
         val catalog = MutableStateFlow(initial)
         var refreshCalls = 0
         val searchOffsets = mutableListOf<Int>()
-        var searchResponse: (Int) -> CatalogSearchResult = {
+        var searchResponse: suspend (Int) -> CatalogSearchResult = {
             CatalogSearchResult.Success(
                 CatalogSearchPage(emptyList(), emptyList(), emptyList(), 0, null),
             )
@@ -318,6 +409,14 @@ class SearchViewModelTest {
         val online = MutableStateFlow(initial)
         override val isOnline = online
         override fun isCurrentlyOnline() = online.value
+    }
+
+    private class RecordingSearchDiagnostics : SearchDiagnosticSink {
+        val events = mutableListOf<SearchDiagnosticEvent>()
+
+        override fun record(event: SearchDiagnosticEvent) {
+            events += event
+        }
     }
 
     private companion object {

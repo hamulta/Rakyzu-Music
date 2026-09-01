@@ -111,6 +111,10 @@ class SearchViewModel internal constructor(
     private val userId: String = TEST_USER_ID,
     private val recentSearchRepository: RecentSearchRepository = DisabledRecentSearchRepository,
     private val connectivityMonitor: ConnectivityMonitor = AlwaysOnlineConnectivityMonitor,
+    private val diagnostics: SearchDiagnosticSink = NoOpSearchDiagnosticSink,
+    private val elapsedRealtimeMillis: () -> Long = {
+        System.nanoTime() / NANOS_PER_MILLISECOND
+    },
 ) : ViewModel() {
     private val restoredQuery = savedStateHandle.get<String>(SAVED_SEARCH_QUERY_KEY)
         .orEmpty()
@@ -129,6 +133,7 @@ class SearchViewModel internal constructor(
     private var remoteSearchJob: Job? = null
     private var requestGeneration = 0
     private var submittedQuery: String? = null
+    private var searchIndex = SearchCatalogIndex.from(EMPTY_CATALOG)
 
     init {
         observeCatalog()
@@ -138,6 +143,7 @@ class SearchViewModel internal constructor(
 
     fun updateQuery(value: String) {
         val boundedQuery = value.take(MAX_QUERY_LENGTH)
+        val localResults = searchLocally(boundedQuery)
         cancelRemoteSearch()
         submittedQuery = null
         savedStateHandle[SAVED_SEARCH_QUERY_KEY] = boundedQuery
@@ -150,7 +156,7 @@ class SearchViewModel internal constructor(
                 } else {
                     null
                 },
-                results = state.catalog.search(boundedQuery),
+                results = localResults,
                 remoteSearchStatus = RemoteSearchStatus.Idle,
                 remoteSearchFailure = null,
                 nextRemoteOffset = null,
@@ -187,10 +193,11 @@ class SearchViewModel internal constructor(
 
     fun closeBrowseCategory() {
         savedStateHandle[SAVED_BROWSE_CATEGORY_KEY] = null
+        val localResults = searchLocally(mutableUiState.value.query)
         mutableUiState.update { state ->
             state.copy(
                 selectedBrowseCategoryId = null,
-                results = state.catalog.search(state.query),
+                results = localResults,
             )
         }
     }
@@ -200,17 +207,24 @@ class SearchViewModel internal constructor(
         if (query.length < MIN_REMOTE_QUERY_LENGTH) return
         submittedQuery = query
         viewModelScope.launch { recentSearchRepository.record(userId, query) }
-        requestRemotePage(query = query, offset = 0, append = false)
+        requestRemotePage(
+            query = query,
+            offset = 0,
+            append = false,
+            trigger = RemoteSearchTrigger.Submit,
+        )
     }
 
-    fun retrySearch() {
+    fun retrySearch() = retrySearch(RemoteSearchTrigger.ManualRetry)
+
+    private fun retrySearch(trigger: RemoteSearchTrigger) {
         val query = submittedQuery ?: mutableUiState.value.query
             .trim()
             .replace(WHITESPACE, " ")
             .takeIf { it.length >= MIN_REMOTE_QUERY_LENGTH }
             ?: return
         submittedQuery = query
-        requestRemotePage(query = query, offset = 0, append = false)
+        requestRemotePage(query = query, offset = 0, append = false, trigger = trigger)
     }
 
     fun loadNextPage() {
@@ -218,7 +232,12 @@ class SearchViewModel internal constructor(
         val query = submittedQuery ?: return
         val offset = state.nextRemoteOffset ?: return
         if (!state.canLoadMore) return
-        requestRemotePage(query = query, offset = offset, append = true)
+        requestRemotePage(
+            query = query,
+            offset = offset,
+            append = true,
+            trigger = RemoteSearchTrigger.LoadMore,
+        )
     }
 
     fun selectRecentSearch(query: String) {
@@ -237,8 +256,14 @@ class SearchViewModel internal constructor(
     private fun observeCatalog() {
         viewModelScope.launch {
             repository.observeCatalog().collect { catalog ->
+                val categories = catalog.browseCategories()
+                searchIndex = SearchCatalogIndex.from(catalog)
+                recordDiagnostic(
+                    SearchDiagnosticEvent.CatalogObserved(
+                        SearchCatalogShape.from(catalog, categories.size),
+                    ),
+                )
                 mutableUiState.update { state ->
-                    val categories = catalog.browseCategories()
                     val selectedId = state.selectedBrowseCategoryId
                         ?.takeIf { id -> categories.any { it.id == id } }
                     val keepRemoteResults = submittedQuery != null &&
@@ -251,7 +276,7 @@ class SearchViewModel internal constructor(
                         )
                     val results = when {
                         keepRemoteResults -> state.results
-                        state.query.isNotBlank() -> catalog.search(state.query)
+                        state.query.isNotBlank() -> searchLocally(state.query)
                         selectedId != null -> categories.first { it.id == selectedId }.toSearchResults()
                         else -> SearchResults()
                     }
@@ -287,6 +312,12 @@ class SearchViewModel internal constructor(
                 val shouldRetry = previousOnline == false && isOnline &&
                     submittedQuery != null &&
                     mutableUiState.value.remoteSearchStatus == RemoteSearchStatus.Offline
+                recordDiagnostic(
+                    SearchDiagnosticEvent.ConnectivityObserved(
+                        isOnline = isOnline,
+                        triggersRecovery = shouldRetry,
+                    ),
+                )
                 if (!isOnline) {
                     cancelRemoteSearch()
                 }
@@ -302,13 +333,20 @@ class SearchViewModel internal constructor(
                     )
                 }
                 previousOnline = isOnline
-                if (shouldRetry) retrySearch()
+                if (shouldRetry) retrySearch(RemoteSearchTrigger.ConnectivityRecovery)
             }
         }
     }
 
-    private fun requestRemotePage(query: String, offset: Int, append: Boolean) {
+    private fun requestRemotePage(
+        query: String,
+        offset: Int,
+        append: Boolean,
+        trigger: RemoteSearchTrigger,
+    ) {
+        val page = if (append) RemoteSearchPage.Additional else RemoteSearchPage.Initial
         if (!mutableUiState.value.isOnline) {
+            recordDiagnostic(SearchDiagnosticEvent.RemoteSearchSkippedOffline(trigger, page))
             mutableUiState.update {
                 it.copy(
                     remoteSearchStatus = RemoteSearchStatus.Offline,
@@ -321,6 +359,8 @@ class SearchViewModel internal constructor(
 
         remoteSearchJob?.cancel()
         val generation = ++requestGeneration
+        val startedAtMillis = elapsedRealtimeMillis()
+        recordDiagnostic(SearchDiagnosticEvent.RemoteSearchStarted(trigger, page))
         mutableUiState.update {
             it.copy(
                 remoteSearchStatus = if (append) it.remoteSearchStatus else RemoteSearchStatus.Loading,
@@ -332,8 +372,19 @@ class SearchViewModel internal constructor(
             when (val result = repository.searchCatalog(query, offset, REMOTE_PAGE_SIZE)) {
                 is CatalogSearchResult.Success -> {
                     if (generation != requestGeneration || submittedQuery != query) return@launch
+                    val pageResults = result.page.toSearchResults()
+                    recordDiagnostic(
+                        SearchDiagnosticEvent.RemoteSearchSucceeded(
+                            trigger = trigger,
+                            page = page,
+                            duration = SearchDuration.from(
+                                elapsedRealtimeMillis() - startedAtMillis,
+                            ),
+                            results = SearchResultShape.from(pageResults),
+                            hasNextPage = result.page.nextOffset != null,
+                        ),
+                    )
                     mutableUiState.update { state ->
-                        val pageResults = result.page.toSearchResults()
                         state.copy(
                             results = if (append) state.results.append(pageResults) else pageResults,
                             remoteSearchStatus = RemoteSearchStatus.Loaded,
@@ -345,6 +396,16 @@ class SearchViewModel internal constructor(
                 }
                 is CatalogSearchResult.Failure -> {
                     if (generation != requestGeneration || submittedQuery != query) return@launch
+                    recordDiagnostic(
+                        SearchDiagnosticEvent.RemoteSearchFailed(
+                            trigger = trigger,
+                            page = page,
+                            duration = SearchDuration.from(
+                                elapsedRealtimeMillis() - startedAtMillis,
+                            ),
+                            failure = result.reason,
+                        ),
+                    )
                     mutableUiState.update { state ->
                         state.copy(
                             remoteSearchStatus = if (
@@ -371,6 +432,27 @@ class SearchViewModel internal constructor(
         remoteSearchJob = null
     }
 
+    private fun searchLocally(rawQuery: String): SearchResults {
+        if (rawQuery.isBlank()) return SearchResults()
+        val startedAtMillis = elapsedRealtimeMillis()
+        val results = searchIndex.search(rawQuery)
+        recordDiagnostic(
+            SearchDiagnosticEvent.LocalSearchCompleted(
+                duration = SearchDuration.from(elapsedRealtimeMillis() - startedAtMillis),
+                results = SearchResultShape.from(results),
+            ),
+        )
+        return results
+    }
+
+    private fun recordDiagnostic(event: SearchDiagnosticEvent) {
+        try {
+            diagnostics.record(event)
+        } catch (_: RuntimeException) {
+            // Diagnostics must never alter Search behavior.
+        }
+    }
+
     companion object {
         fun factory(
             userId: String,
@@ -386,6 +468,7 @@ class SearchViewModel internal constructor(
                     userId = userId,
                     recentSearchRepository = recentSearchRepository,
                     connectivityMonitor = connectivityMonitor,
+                    diagnostics = AndroidSearchDiagnostics.sink,
                 ) as T
             }
 
@@ -401,50 +484,11 @@ class SearchViewModel internal constructor(
                     recentSearchRepository = recentSearchRepository,
                     connectivityMonitor = connectivityMonitor,
                     savedStateHandle = extras.createSavedStateHandle(),
+                    diagnostics = AndroidSearchDiagnostics.sink,
                 ) as T
             }
         }
     }
-}
-
-internal fun CatalogSnapshot.search(rawQuery: String): SearchResults {
-    val query = rawQuery.normalizedSearchText()
-    if (query.isBlank()) return SearchResults()
-
-    val artistsById = artists.associateBy(Artist::id)
-    val artistMatches = artists.mapNotNull { artist ->
-        artist.name.searchScore(query)?.let { score -> Ranked(score, artist.name, artist.id, artist) }
-    }.sortedWith(RANKED_ORDER)
-
-    val albumMatches = albums.mapNotNull { album ->
-        val artistName = artistsById[album.artistId]?.name.orEmpty()
-        primaryOrAssociatedSearchScore(query, album.title, artistName)?.let { score ->
-            Ranked(
-                score = score,
-                label = album.title,
-                id = album.id,
-                value = SearchAlbumResult(album, artistName),
-            )
-        }
-    }.sortedWith(RANKED_ORDER)
-
-    val trackMatches = tracks.mapNotNull { track ->
-        primaryOrAssociatedSearchScore(
-            query,
-            track.title,
-            track.artist,
-            track.albumTitle,
-        )?.let { score -> Ranked(score, track.title, track.id, track) }
-    }.sortedWith(RANKED_ORDER)
-
-    return SearchResults(
-        artists = artistMatches.take(MAX_RESULTS_PER_TYPE).map(Ranked<Artist>::value),
-        albums = albumMatches.take(MAX_RESULTS_PER_TYPE).map(Ranked<SearchAlbumResult>::value),
-        tracks = trackMatches.take(MAX_RESULTS_PER_TYPE).map(Ranked<Track>::value),
-        totalArtistMatches = artistMatches.size,
-        totalAlbumMatches = albumMatches.size,
-        totalTrackMatches = trackMatches.size,
-    )
 }
 
 internal fun CatalogSnapshot.browseCategories(): List<BrowseCategory> {
@@ -494,37 +538,6 @@ private fun SearchResults.append(page: SearchResults) = copy(
     remoteTotalMatches = page.remoteTotalMatches ?: remoteTotalMatches,
 )
 
-private fun primaryOrAssociatedSearchScore(
-    query: String,
-    primary: String,
-    vararg associated: String,
-): Int? = primary.searchScore(query) ?: associated
-    .mapNotNull { it.searchScore(query) }
-    .minOrNull()
-    ?.plus(ASSOCIATED_MATCH_OFFSET)
-
-private fun String.searchScore(query: String): Int? {
-    val candidate = normalizedSearchText()
-    return when {
-        candidate == query -> 0
-        candidate.startsWith(query) -> 1
-        candidate.split(' ').any { it.startsWith(query) } -> 2
-        candidate.contains(query) -> 3
-        else -> null
-    }
-}
-
-private data class Ranked<T>(
-    val score: Int,
-    val label: String,
-    val id: String,
-    val value: T,
-)
-
-private val RANKED_ORDER = compareBy<Ranked<*>> { it.score }
-    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
-    .thenBy { it.id }
-
 private data object DisabledRecentSearchRepository : RecentSearchRepository {
     override fun observe(userId: String): Flow<RecentSearchState> = flowOf(RecentSearchState())
     override suspend fun setEnabled(userId: String, enabled: Boolean) = Unit
@@ -547,8 +560,8 @@ internal const val SAVED_BROWSE_CATEGORY_KEY = "search_browse_category"
 internal const val REMOTE_PAGE_SIZE = 30
 private const val MIN_REMOTE_QUERY_LENGTH = 2
 private const val MAX_BROWSE_CATEGORIES = 12
-private const val ASSOCIATED_MATCH_OFFSET = 4
 private const val TEST_USER_ID = "test-listener"
+private const val NANOS_PER_MILLISECOND = 1_000_000L
 
 private val EMPTY_CATALOG = CatalogSnapshot(
     artists = emptyList(),

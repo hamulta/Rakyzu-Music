@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.2.8**
+Current version: **0.2.10**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.2.8-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.2.10-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -56,9 +56,11 @@ Home feed observability emits structured Logcat events for feed shape, connectiv
 
 The completed Home milestone has an explicit CI gate for its unit tests, lint, and Compose instrumentation APK. Regression contracts cover shelf visibility for every filter and empty feed, polite loading/refresh announcements, one accessible 48dp empty-state action, connectivity loss during retry backoff, and stable unique derivation for a 5,000-track catalog before the Search milestone begins.
 
-Search observes the verified Room catalog and returns immediate case-, whitespace-, and accent-insensitive local matches while the listener types. Curated editorial shelves become ordered offline discovery categories with deterministic playable queues. An explicit IME submission may send only the bounded query, offset, and page size through the authenticated Supabase PostgREST session to a `security invoker` RPC; RLS, publication gates, strict input bounds, deterministic ranking, and a 50-row server ceiling protect the full-catalog boundary. Results paginate without replacing saved matches during loading or failure, and validated connectivity recovery retries one submitted offline request automatically. Query values are never logged, added to telemetry, copied into playback metadata, or sent to R2/Cloudflare.
+Search observes the verified Room catalog and returns immediate case-, whitespace-, and accent-insensitive local matches while the listener types. A snapshot-scoped index normalizes catalog fields once, then uses a bounded top-50 heap per result type instead of sorting every match on every keystroke. Curated editorial shelves become ordered offline discovery categories with deterministic playable queues. An explicit IME submission may send only the bounded query, offset, and page size through the authenticated Supabase PostgREST session to a `security invoker` RPC; RLS, publication gates, strict input bounds, deterministic ranking, and a 50-row server ceiling protect the full-catalog boundary. Results paginate without replacing saved matches during loading or failure, and validated connectivity recovery retries one submitted offline request automatically. Query values are never logged, added to telemetry, copied into playback metadata, or sent to R2/Cloudflare.
 
 Recent searches are disabled by default. When a listener explicitly enables them, at most ten bounded queries are encrypted with a dedicated Android Keystore AES-GCM key and stored under a one-way listener-specific key. Disabling the feature deletes its stored queries; the listener can also clear them independently without changing the active query. Search history never crosses the Supabase, Worker, playback, analytics, or logging boundaries.
+
+Search observability emits only fixed event names, enums, booleans, coarse count buckets, and monotonic duration buckets for catalog shape, local completion, connectivity, and remote outcomes. Query text, listener/catalog identifiers, titles, offsets, URLs, tokens, raw exceptions, and payloads are absent by construction. The process-local FIFO keeps 32 events with a hard ceiling of 64, log lines stop at 240 characters, and diagnostic failure cannot affect Search state. The completed Search milestone also compiles dedicated accessibility regressions for loading, offline/failure, retry, and pagination states and runs bounded repeated-query performance contracts before Library work begins.
 
 Artist results open an offline-first detail destination while preserving the Search back stack and query. Exact catalog IDs derive the artist's releases and playable track queue without a network request; releases use deterministic newest-first ordering and tracks follow release, disc, track, title, and ID order. Loading, unavailable, and no-release states are explicit, the Search destination remains selected, and Play all or an individual track starts the complete artist queue at the expected position.
 

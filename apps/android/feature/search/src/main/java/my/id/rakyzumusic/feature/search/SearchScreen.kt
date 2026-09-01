@@ -879,7 +879,8 @@ private fun LoadMoreSearchResults(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 16.dp)
-            .heightIn(min = 48.dp),
+            .heightIn(min = 48.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         if (isLoading) {
             CircularProgressIndicator(
