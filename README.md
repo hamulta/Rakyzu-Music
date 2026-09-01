@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.2.2**
+Current version: **0.2.3**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.2.2-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.2.3-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -59,6 +59,8 @@ The completed Home milestone has an explicit CI gate for its unit tests, lint, a
 Search observes that same verified Room catalog without issuing a query-time network request. It finds artists, albums, and tracks with case-, whitespace-, and accent-insensitive matching, deterministic exact/prefix/token/contains relevance, and lower-priority association matches through artist and album metadata. Results are capped at 50 per type while exact totals remain visible; browse, loading, empty-catalog, and no-result states remain explicit and accessible. Track results start the displayed queue at the selected position. The listener's bounded query is retained only in Android saved UI state for tab, Activity, and process restoration; it is never sent to a backend, logged, or used for telemetry. Search requests focus on entry, exposes the IME Search action, dismisses the keyboard on submission, and returns focus after Clear.
 
 Artist results open an offline-first detail destination while preserving the Search back stack and query. Exact catalog IDs derive the artist's releases and playable track queue without a network request; releases use deterministic newest-first ordering and tracks follow release, disc, track, title, and ID order. Loading, unavailable, and no-release states are explicit, the Search destination remains selected, and Play all or an individual track starts the complete artist queue at the expected position.
+
+Album results and artist releases open a typed offline-first album destination using the exact catalog album ID. The album screen derives its artist and complete track queue from Room, orders tracks by disc and track position with stable title/ID ties, exposes disc headings for multi-disc releases, and provides Play album plus accessible per-track playback. Loading, unavailable, and empty-album states remain explicit while Back restores the prior Search or artist-detail destination.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

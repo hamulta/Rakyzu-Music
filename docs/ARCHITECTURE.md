@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.2.2`.
+Status: baseline for `0.2.3`.
 
 ## Goals
 
@@ -78,6 +78,7 @@ Media3 item transitions are the listening-history event source, so manual select
 - Search observes the canonical Room-backed catalog and never refreshes or transmits text while the listener types. Normalization is locale-stable and accent-insensitive; exact, prefix, token-prefix, and contains matches have deterministic ordering, while artist/album association matches rank below primary-name matches. Each result type is capped at 50 after ranking with exact totals retained, and a 5,000-track unit guard bounds the local operation. Loading, browse, empty-catalog, no-results, grouped headings, polite result announcements, clear actions, and track playback targets have explicit accessibility contracts. GitHub Actions runs a focused Search unit/lint/instrumentation-APK gate before global Android validation.
 - The Search state holder is scoped to the authenticated listener shell rather than a disposable top-level navigation entry. A bounded query is mirrored into `SavedStateHandle`, preserving results across tab changes and Android Activity/process recreation without storing catalog output, transmitting text, or adding telemetry. The field requests focus when Search enters composition, submits through the IME Search action, dismisses focus/keyboard on submission, and restores focus after Clear; Compose instrumentation guards these interaction contracts.
 - Artist detail is a typed nested Navigation 3 destination under Search. It resolves an exact artist ID from the observed Room catalog, derives only ID-associated albums and tracks, sorts releases newest-first with stable title/ID ties, and builds a stable release/disc/track/title/ID playback queue. Back navigation restores the shell-scoped Search query, and the Search top-level destination remains selected. Loading, unavailable, empty-discography, release, Play all, and per-track actions have explicit UI and accessibility contracts; no artist-detail request, cache, schema, or telemetry path is added.
+- Album detail is a typed nested Navigation 3 destination reachable from Search results and artist releases. It resolves one exact album ID from the observed Room catalog, derives the canonical artist and only ID-associated tracks, and orders the complete playback queue by disc, track number, title, and ID. Multi-disc headings, Back restoration, Play album, per-track playback, loading, unavailable, and empty-album states have explicit UI and accessibility contracts; no album-detail network, cache, schema, or telemetry path is added.
 
 ## Release topology
 
