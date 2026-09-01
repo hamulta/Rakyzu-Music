@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
@@ -33,6 +34,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -63,6 +67,8 @@ fun ArtistDetailRoute(
     onBack: () -> Unit,
     onTrackPlay: (List<Track>, Int) -> Unit,
     onAlbumClick: ((Album) -> Unit)? = null,
+    onTrackArtistClick: ((Track) -> Unit)? = null,
+    onTrackAlbumClick: ((Track) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -71,6 +77,8 @@ fun ArtistDetailRoute(
         onBack = onBack,
         onTrackPlay = onTrackPlay,
         onAlbumClick = onAlbumClick,
+        onTrackArtistClick = onTrackArtistClick,
+        onTrackAlbumClick = onTrackAlbumClick,
         modifier = modifier,
     )
 }
@@ -81,9 +89,41 @@ fun ArtistDetailScreen(
     onBack: () -> Unit,
     onTrackPlay: (List<Track>, Int) -> Unit,
     onAlbumClick: ((Album) -> Unit)? = null,
+    onTrackArtistClick: ((Track) -> Unit)? = null,
+    onTrackAlbumClick: ((Track) -> Unit)? = null,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
+    var contextualTrack by remember { mutableStateOf<Track?>(null) }
+
+    contextualTrack?.let { track ->
+        val queueIndex = state.tracks.indexOfFirst { it.id == track.id }
+        TrackContextSheet(
+            track = track,
+            onDismiss = { contextualTrack = null },
+            onPlay = if (queueIndex >= 0) {
+                {
+                    contextualTrack = null
+                    onTrackPlay(state.tracks, queueIndex)
+                }
+            } else {
+                null
+            },
+            onViewArtist = onTrackArtistClick?.let { callback ->
+                {
+                    contextualTrack = null
+                    callback(track)
+                }
+            },
+            onViewAlbum = onTrackAlbumClick?.let { callback ->
+                {
+                    contextualTrack = null
+                    callback(track)
+                }
+            },
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -166,6 +206,7 @@ fun ArtistDetailScreen(
                         ArtistTrackRow(
                             track = track,
                             onPlay = { onTrackPlay(state.tracks, index) },
+                            onMoreClick = { contextualTrack = track },
                         )
                     }
                 }
@@ -307,7 +348,11 @@ private fun ArtistReleaseRow(
 }
 
 @Composable
-private fun ArtistTrackRow(track: Track, onPlay: () -> Unit) {
+private fun ArtistTrackRow(
+    track: Track,
+    onPlay: () -> Unit,
+    onMoreClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -343,6 +388,15 @@ private fun ArtistTrackRow(track: Track, onPlay: () -> Unit) {
             )
         }
         Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = RakyzuAqua)
+        IconButton(
+            onClick = onMoreClick,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.MoreVert,
+                contentDescription = "More options for ${track.title.trim()}",
+            )
+        }
     }
 }
 

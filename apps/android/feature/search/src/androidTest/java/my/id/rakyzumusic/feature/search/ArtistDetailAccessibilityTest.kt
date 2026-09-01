@@ -116,6 +116,19 @@ class ArtistDetailAccessibilityTest {
         composeRule.runOnIdle { assertEquals(ALBUM, selectedAlbum) }
     }
 
+    @Test
+    fun trackMoreActionOpensTrackDetails() {
+        setArtistContent()
+
+        composeRule.onNodeWithContentDescription("More options for Midnight Signal")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+
+        composeRule.onNodeWithText("Track details")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+    }
+
     private fun setArtistContent(
         onBack: () -> Unit = {},
         onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },

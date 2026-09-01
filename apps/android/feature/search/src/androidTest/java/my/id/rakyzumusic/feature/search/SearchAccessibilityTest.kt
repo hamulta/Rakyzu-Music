@@ -175,6 +175,34 @@ class SearchAccessibilityTest {
     }
 
     @Test
+    fun trackMoreActionOpensTrackDetails() {
+        val result = track("track-1", "Midnight Signal").copy(
+            artistId = "artist-1",
+            albumId = "album-1",
+            albumTitle = "Signal Zero",
+        )
+        setSearchContent(
+            SearchUiState(
+                query = "signal",
+                catalog = CATALOG.copy(tracks = listOf(result)),
+                results = SearchResults(
+                    tracks = listOf(result),
+                    totalTrackMatches = 1,
+                ),
+                hasObservedCatalog = true,
+            ),
+        )
+
+        composeRule.onNodeWithContentDescription("More options for Midnight Signal")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+
+        composeRule.onNodeWithText("Track details")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+    }
+
+    @Test
     fun searchFieldAutofocusesAndImeSearchClearsFocus() {
         var submitCalls = 0
         composeRule.setContent {
@@ -245,7 +273,9 @@ class SearchAccessibilityTest {
     private fun hasPlayAction(label: String? = null): SemanticsMatcher =
         SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick).let { hasClick ->
             if (label == null) {
-                hasClick
+                hasClick and SemanticsMatcher("OnClick action label starts with Play") { node ->
+                    node.config[SemanticsActions.OnClick].label?.startsWith("Play ") == true
+                }
             } else {
                 hasClick and SemanticsMatcher("OnClick action label is $label") { node ->
                     node.config[SemanticsActions.OnClick].label == label

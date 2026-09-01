@@ -98,6 +98,19 @@ class AlbumDetailAccessibilityTest {
         composeRule.onNodeWithContentDescription("Back").assertHasClickAction()
     }
 
+    @Test
+    fun trackMoreActionOpensTrackDetails() {
+        setAlbumContent()
+
+        composeRule.onNodeWithContentDescription("More options for Midnight Signal")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+
+        composeRule.onNodeWithText("Track details")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+    }
+
     private fun setAlbumContent(
         onBack: () -> Unit = {},
         onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },

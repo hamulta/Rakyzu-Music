@@ -345,6 +345,12 @@ private fun AuthenticatedRakyzuMusicApp(
                             onAlbumClick = { album ->
                                 openAlbumDetail(backStack, album.id)
                             },
+                            onTrackArtistClick = { track ->
+                                openArtistDetail(backStack, track.artistId)
+                            },
+                            onTrackAlbumClick = { track ->
+                                openAlbumDetail(backStack, track.albumId)
+                            },
                         )
                     }
                     entry<RakyzuRoute.ArtistDetail> { route ->
@@ -362,6 +368,9 @@ private fun AuthenticatedRakyzuMusicApp(
                             onAlbumClick = { album ->
                                 openAlbumDetail(backStack, album.id)
                             },
+                            onTrackAlbumClick = { track ->
+                                openAlbumDetail(backStack, track.albumId)
+                            },
                         )
                     }
                     entry<RakyzuRoute.AlbumDetail> { route ->
@@ -376,6 +385,9 @@ private fun AuthenticatedRakyzuMusicApp(
                             viewModel = albumViewModel,
                             onBack = { dismissAlbumDetail(backStack) },
                             onTrackPlay = playbackController::playQueue,
+                            onTrackArtistClick = { track ->
+                                openArtistDetail(backStack, track.artistId)
+                            },
                         )
                     }
                     entry<RakyzuRoute.Library> {

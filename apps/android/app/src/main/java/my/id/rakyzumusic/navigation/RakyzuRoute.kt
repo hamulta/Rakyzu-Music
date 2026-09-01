@@ -45,9 +45,9 @@ internal fun openArtistDetail(
     artistId: String,
 ) {
     val route = RakyzuRoute.ArtistDetail(artistId)
-    if (artistId.isNotBlank() && backStack.lastOrNull() != route) {
-        backStack.add(route)
-    }
+    if (artistId.isBlank() || backStack.lastOrNull() == route) return
+
+    backStack.navigateToExistingOrAdd(route)
 }
 
 internal fun dismissArtistDetail(backStack: MutableList<NavKey>) {
@@ -61,9 +61,9 @@ internal fun openAlbumDetail(
     albumId: String,
 ) {
     val route = RakyzuRoute.AlbumDetail(albumId)
-    if (albumId.isNotBlank() && backStack.lastOrNull() != route) {
-        backStack.add(route)
-    }
+    if (albumId.isBlank() || backStack.lastOrNull() == route) return
+
+    backStack.navigateToExistingOrAdd(route)
 }
 
 internal fun dismissAlbumDetail(backStack: MutableList<NavKey>) {
@@ -75,5 +75,14 @@ internal fun dismissAlbumDetail(backStack: MutableList<NavKey>) {
 internal fun dismissNowPlaying(backStack: MutableList<NavKey>) {
     if (backStack.size > 1 && backStack.lastOrNull() == RakyzuRoute.NowPlaying) {
         backStack.removeAt(backStack.lastIndex)
+    }
+}
+
+private fun MutableList<NavKey>.navigateToExistingOrAdd(route: RakyzuRoute) {
+    val existingIndex = indexOfLast { it == route }
+    if (existingIndex < 0) {
+        add(route)
+    } else {
+        subList(existingIndex + 1, size).clear()
     }
 }
