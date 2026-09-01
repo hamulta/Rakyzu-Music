@@ -3,6 +3,7 @@ package my.id.rakyzumusic.feature.search
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -94,6 +95,24 @@ class SearchCatalogTest {
         assertEquals(MAX_RESULTS_PER_TYPE, results.tracks.size)
         assertEquals("track-0", results.tracks.first().id)
         assertTrue(results.totalMatches > results.displayedCount)
+    }
+
+    @Test
+    fun browseCategoriesFollowEditorialOrderAndRejectUnknownTracks() {
+        val first = track("track-1", "Midnight Signal")
+        val second = track("track-2", "Afterglow Circuit")
+        val snapshot = catalog(tracks = listOf(first, second)).copy(
+            editorialShelves = listOf(
+                EditorialShelf("later", "Late Night", null, 2, listOf(second)),
+                EditorialShelf("first", "Fresh Signals", "Made for discovery", 0, listOf(first, first)),
+                EditorialShelf("invalid", "Missing", null, 1, listOf(track("missing", "Hidden"))),
+            ),
+        )
+
+        val categories = snapshot.browseCategories()
+
+        assertEquals(listOf("first", "later"), categories.map(BrowseCategory::id))
+        assertEquals(listOf("track-1"), categories.first().tracks.map(Track::id))
     }
 
     private fun catalog(

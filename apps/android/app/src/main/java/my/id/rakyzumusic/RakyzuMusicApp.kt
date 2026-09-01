@@ -71,6 +71,7 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
+import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
@@ -121,6 +122,7 @@ fun RakyzuMusicApp(
     catalogRepository: CatalogRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
+    recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
 ) {
@@ -157,6 +159,7 @@ fun RakyzuMusicApp(
             catalogRepository = catalogRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
+            recentSearchRepository = recentSearchRepository,
             playbackController = playbackController,
             modifier = modifier,
         )
@@ -173,6 +176,7 @@ private fun ProfileGatedRakyzuMusicApp(
     catalogRepository: CatalogRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
+    recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
 ) {
@@ -212,6 +216,7 @@ private fun ProfileGatedRakyzuMusicApp(
             catalogRepository = catalogRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
+            recentSearchRepository = recentSearchRepository,
             playbackController = playbackController,
             modifier = modifier,
         )
@@ -236,6 +241,7 @@ private fun AuthenticatedRakyzuMusicApp(
     catalogRepository: CatalogRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
+    recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
     modifier: Modifier = Modifier,
 ) {
@@ -244,7 +250,12 @@ private fun AuthenticatedRakyzuMusicApp(
     val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
     val searchViewModel: SearchViewModel = viewModel(
         key = "search-$userId",
-        factory = SearchViewModel.factory(catalogRepository),
+        factory = SearchViewModel.factory(
+            userId = userId,
+            repository = catalogRepository,
+            recentSearchRepository = recentSearchRepository,
+            connectivityMonitor = connectivityMonitor,
+        ),
     )
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }

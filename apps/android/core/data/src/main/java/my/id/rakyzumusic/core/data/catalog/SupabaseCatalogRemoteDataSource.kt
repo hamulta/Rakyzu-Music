@@ -4,6 +4,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
@@ -82,12 +84,72 @@ internal class SupabaseCatalogRemoteDataSource(
         )
     }
 
+    override suspend fun searchCatalog(
+        query: String,
+        offset: Int,
+        limit: Int,
+    ): CatalogSearchPage {
+        val rows = postgrest.rpc(
+            function = SEARCH_CATALOG_FUNCTION,
+            parameters = buildJsonObject {
+                put("search_query", query)
+                put("page_offset", offset)
+                put("page_limit", limit)
+            },
+        ).decodeList<CatalogSearchRow>()
+
+        val artists = rows.filter { it.kind == SEARCH_KIND_ARTIST }.map { row ->
+            Artist(id = row.id, name = row.title)
+        }
+        val albums = rows.filter { it.kind == SEARCH_KIND_ALBUM }.map { row ->
+            CatalogSearchAlbum(
+                album = Album(
+                    id = row.id,
+                    artistId = row.artistId ?: throw InvalidCatalogPayloadException(),
+                    title = row.title,
+                    releaseDate = row.releaseDate,
+                ),
+                artistName = row.artistName.orEmpty(),
+            )
+        }
+        val tracks = rows.filter { it.kind == SEARCH_KIND_TRACK }.map { row ->
+            Track(
+                id = row.id,
+                title = row.title,
+                artist = row.artistName ?: throw InvalidCatalogPayloadException(),
+                durationMs = row.durationMs ?: throw InvalidCatalogPayloadException(),
+                artistId = row.artistId ?: throw InvalidCatalogPayloadException(),
+                albumId = row.albumId ?: throw InvalidCatalogPayloadException(),
+                albumTitle = row.albumTitle ?: throw InvalidCatalogPayloadException(),
+                discNumber = row.discNumber ?: throw InvalidCatalogPayloadException(),
+                trackNumber = row.trackNumber ?: throw InvalidCatalogPayloadException(),
+                isExplicit = row.isExplicit ?: false,
+            )
+        }
+        if (artists.size + albums.size + tracks.size != rows.size) {
+            throw InvalidCatalogPayloadException()
+        }
+        val totalCount = rows.firstOrNull()?.totalCount ?: 0
+        val displayedCount = rows.size
+        return CatalogSearchPage(
+            artists = artists,
+            albums = albums,
+            tracks = tracks,
+            totalCount = totalCount,
+            nextOffset = (offset + displayedCount).takeIf { displayedCount > 0 && it < totalCount },
+        )
+    }
+
     private companion object {
         const val ARTISTS_TABLE = "artists"
         const val ALBUMS_TABLE = "albums"
         const val TRACKS_TABLE = "tracks"
         const val EDITORIAL_SHELVES_TABLE = "editorial_shelves"
         const val EDITORIAL_SHELF_TRACKS_TABLE = "editorial_shelf_tracks"
+        const val SEARCH_CATALOG_FUNCTION = "search_catalog"
+        const val SEARCH_KIND_ARTIST = "artist"
+        const val SEARCH_KIND_ALBUM = "album"
+        const val SEARCH_KIND_TRACK = "track"
         val ARTIST_COLUMNS = Columns.list("id", "name")
         val ALBUM_COLUMNS = Columns.list("id", "artist_id", "title", "release_date")
         val TRACK_COLUMNS = Columns.list(
@@ -103,6 +165,23 @@ internal class SupabaseCatalogRemoteDataSource(
         val EDITORIAL_SHELF_TRACK_COLUMNS = Columns.list("shelf_id", "track_id", "position")
     }
 }
+
+@Serializable
+private data class CatalogSearchRow(
+    val kind: String,
+    val id: String,
+    val title: String,
+    @SerialName("artist_id") val artistId: String? = null,
+    @SerialName("artist_name") val artistName: String? = null,
+    @SerialName("album_id") val albumId: String? = null,
+    @SerialName("album_title") val albumTitle: String? = null,
+    @SerialName("release_date") val releaseDate: String? = null,
+    @SerialName("duration_ms") val durationMs: Long? = null,
+    @SerialName("disc_number") val discNumber: Int? = null,
+    @SerialName("track_number") val trackNumber: Int? = null,
+    @SerialName("is_explicit") val isExplicit: Boolean? = null,
+    @SerialName("total_count") val totalCount: Int,
+)
 
 @Serializable
 private data class ArtistRow(

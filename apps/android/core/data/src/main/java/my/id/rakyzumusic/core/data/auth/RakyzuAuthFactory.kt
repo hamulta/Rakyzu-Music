@@ -29,6 +29,8 @@ import my.id.rakyzumusic.core.data.profile.ProfileFailure
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
 import my.id.rakyzumusic.core.data.profile.SupabaseProfileRepository
+import my.id.rakyzumusic.core.data.search.RecentSearchRepository
+import my.id.rakyzumusic.core.data.search.createRecentSearchRepository
 import my.id.rakyzumusic.core.database.catalog.createCatalogLocalDataSource
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
@@ -61,12 +63,14 @@ object RakyzuAuthFactory {
         apiConfiguration: RakyzuApiConfiguration = RakyzuApiConfiguration(""),
     ): RakyzuRepositories {
         val connectivityMonitor = createConnectivityMonitor(context)
+        val recentSearchRepository = createRecentSearchRepository(context)
         if (!configuration.isValid()) return RakyzuRepositories(
             authRepository = UnavailableAuthRepository,
             profileRepository = UnavailableProfileRepository,
             catalogRepository = UnavailableCatalogRepository,
             mediaDeliveryRepository = UnavailableMediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
+            recentSearchRepository = recentSearchRepository,
         )
 
         val encryptedStore = EncryptedAuthStore(context)
@@ -112,6 +116,7 @@ object RakyzuAuthFactory {
                 )
             },
             connectivityMonitor = connectivityMonitor,
+            recentSearchRepository = recentSearchRepository,
         )
     }
 }
@@ -122,6 +127,7 @@ data class RakyzuRepositories(
     val catalogRepository: CatalogRepository,
     val mediaDeliveryRepository: MediaDeliveryRepository,
     val connectivityMonitor: ConnectivityMonitor,
+    val recentSearchRepository: RecentSearchRepository,
 )
 
 private data object UnavailableAuthRepository : AuthRepository {

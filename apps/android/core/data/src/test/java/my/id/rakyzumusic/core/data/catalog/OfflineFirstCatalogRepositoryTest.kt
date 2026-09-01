@@ -109,6 +109,62 @@ class OfflineFirstCatalogRepositoryTest {
         assertEquals(Triple("listener-1", "track-1", 73L), local.lastRecorded)
     }
 
+    @Test
+    fun authenticatedSearchReturnsValidatedBoundedPage() = runTest {
+        val expected = CatalogSearchPage(
+            artists = VALID_CATALOG.artists,
+            albums = emptyList(),
+            tracks = emptyList(),
+            totalCount = 2,
+            nextOffset = 1,
+        )
+        val remote = SearchRemoteDataSource(expected)
+        val repository = OfflineFirstCatalogRepository(
+            localDataSource = FakeLocalDataSource(VALID_CATALOG),
+            remoteDataSource = remote,
+        )
+
+        assertEquals(CatalogSearchResult.Success(expected), repository.searchCatalog("signal", 0, 1))
+        assertEquals(Triple("signal", 0, 1), remote.lastRequest)
+    }
+
+    @Test
+    fun invalidSearchRequestFailsBeforeRemoteBoundary() = runTest {
+        val remote = SearchRemoteDataSource(
+            CatalogSearchPage(emptyList(), emptyList(), emptyList(), 0, null),
+        )
+        val repository = OfflineFirstCatalogRepository(
+            localDataSource = FakeLocalDataSource(VALID_CATALOG),
+            remoteDataSource = remote,
+        )
+
+        assertEquals(
+            CatalogSearchResult.Failure(CatalogSearchFailure.InvalidRequest),
+            repository.searchCatalog("x", 0, 30),
+        )
+        assertEquals(null, remote.lastRequest)
+    }
+
+    @Test
+    fun malformedSearchPageFailsClosed() = runTest {
+        val malformed = CatalogSearchPage(
+            artists = VALID_CATALOG.artists,
+            albums = emptyList(),
+            tracks = emptyList(),
+            totalCount = 1,
+            nextOffset = 99,
+        )
+        val repository = OfflineFirstCatalogRepository(
+            localDataSource = FakeLocalDataSource(VALID_CATALOG),
+            remoteDataSource = SearchRemoteDataSource(malformed),
+        )
+
+        assertEquals(
+            CatalogSearchResult.Failure(CatalogSearchFailure.InvalidPayload),
+            repository.searchCatalog("signal", 0, 1),
+        )
+    }
+
     private class FakeLocalDataSource(initial: CatalogSnapshot) : CatalogLocalDataSource {
         private val catalog = MutableStateFlow(initial)
         var lastRecorded: Triple<String, String, Long>? = null
@@ -136,6 +192,23 @@ class OfflineFirstCatalogRepositoryTest {
 
     private fun interface FakeRemoteDataSource : CatalogRemoteDataSource {
         override suspend fun fetchCatalog(): CatalogSnapshot
+    }
+
+    private class SearchRemoteDataSource(
+        private val page: CatalogSearchPage,
+    ) : CatalogRemoteDataSource {
+        var lastRequest: Triple<String, Int, Int>? = null
+
+        override suspend fun fetchCatalog() = VALID_CATALOG
+
+        override suspend fun searchCatalog(
+            query: String,
+            offset: Int,
+            limit: Int,
+        ): CatalogSearchPage {
+            lastRequest = Triple(query, offset, limit)
+            return page
+        }
     }
 
     private companion object {

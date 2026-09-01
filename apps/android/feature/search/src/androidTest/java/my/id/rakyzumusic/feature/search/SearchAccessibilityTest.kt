@@ -24,6 +24,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -247,6 +248,133 @@ class SearchAccessibilityTest {
 
         composeRule.onNodeWithTag(SEARCH_FIELD_TAG).assertIsFocused()
         composeRule.runOnIdle { assertEquals(1, clearCalls) }
+    }
+
+    @Test
+    fun curatedCategoryHasNamedLargeEntryPoint() {
+        val track = track("track-1", "Midnight Signal")
+        val category = BrowseCategory(
+            id = "shelf-1",
+            title = "Fresh Signals",
+            subtitle = "New discoveries",
+            tracks = listOf(track),
+        )
+        var selectedId: String? = null
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                SearchScreen(
+                    state = SearchUiState(
+                        catalog = CATALOG.copy(
+                            editorialShelves = listOf(
+                                EditorialShelf("shelf-1", "Fresh Signals", "New discoveries", 0, listOf(track)),
+                            ),
+                        ),
+                        browseCategories = listOf(category),
+                        hasObservedCatalog = true,
+                    ),
+                    onQueryChange = {},
+                    onClearQuery = {},
+                    onTrackPlay = { _, _ -> },
+                    onBrowseCategoryClick = { selectedId = it },
+                )
+            }
+        }
+
+        composeRule.onNode(hasPlayAction("Open Fresh Signals category"))
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(72.dp)
+            .performClick()
+        composeRule.runOnIdle { assertEquals("shelf-1", selectedId) }
+    }
+
+    @Test
+    fun recentSearchPrivacyAndClearControlsAreExplicit() {
+        var enabledValue: Boolean? = null
+        var clearCalls = 0
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                SearchScreen(
+                    state = SearchUiState(
+                        catalog = CATALOG,
+                        recentSearchesEnabled = true,
+                        recentSearches = listOf("midnight signal"),
+                        hasObservedCatalog = true,
+                    ),
+                    onQueryChange = {},
+                    onClearQuery = {},
+                    onTrackPlay = { _, _ -> },
+                    onRecentSearchesEnabledChange = { enabledValue = it },
+                    onClearRecentSearches = { clearCalls += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Save recent searches")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.onNodeWithText("Clear recent searches")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(false, enabledValue)
+            assertEquals(1, clearCalls)
+        }
+    }
+
+    @Test
+    fun offlineStatusIsPoliteAndKeepsSavedResultVisible() {
+        setSearchContent(
+            SearchUiState(
+                query = "signal",
+                catalog = CATALOG,
+                results = SearchResults(
+                    tracks = CATALOG.tracks,
+                    totalTrackMatches = 1,
+                ),
+                hasObservedCatalog = true,
+                isOnline = false,
+                remoteSearchStatus = RemoteSearchStatus.Offline,
+            ),
+        )
+
+        composeRule.onNode(hasPoliteLiveRegion()).assertExists()
+        composeRule.onNodeWithText("Offline results").assertExists()
+        composeRule.onNode(hasPlayAction("Play Midnight Signal")).assertExists()
+    }
+
+    @Test
+    fun paginationActionHasMinimumTarget() {
+        var loadCalls = 0
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                SearchScreen(
+                    state = SearchUiState(
+                        query = "signal",
+                        catalog = CATALOG,
+                        results = SearchResults(
+                            tracks = CATALOG.tracks,
+                            totalTrackMatches = 1,
+                            remoteTotalMatches = 2,
+                        ),
+                        hasObservedCatalog = true,
+                        remoteSearchStatus = RemoteSearchStatus.Loaded,
+                        nextRemoteOffset = 1,
+                    ),
+                    onQueryChange = {},
+                    onClearQuery = {},
+                    onTrackPlay = { _, _ -> },
+                    onLoadMore = { loadCalls += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Load more results")
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, loadCalls) }
     }
 
     private fun setSearchContent(

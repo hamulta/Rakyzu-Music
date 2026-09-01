@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
                     catalogRepository = rakyzuApplication.catalogRepository,
                     mediaDeliveryRepository = rakyzuApplication.mediaDeliveryRepository,
                     connectivityMonitor = rakyzuApplication.connectivityMonitor,
+                    recentSearchRepository = rakyzuApplication.recentSearchRepository,
                     playbackController = rakyzuApplication.playbackController,
                 )
             }

@@ -22,20 +22,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +62,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
@@ -91,6 +100,14 @@ fun SearchRoute(
         state = state,
         onQueryChange = viewModel::updateQuery,
         onClearQuery = viewModel::clearQuery,
+        onSearchSubmit = viewModel::submitSearch,
+        onBrowseCategoryClick = viewModel::openBrowseCategory,
+        onCloseBrowseCategory = viewModel::closeBrowseCategory,
+        onLoadMore = viewModel::loadNextPage,
+        onRetrySearch = viewModel::retrySearch,
+        onRecentSearchClick = viewModel::selectRecentSearch,
+        onRecentSearchesEnabledChange = viewModel::setRecentSearchesEnabled,
+        onClearRecentSearches = viewModel::clearRecentSearches,
         onTrackPlay = onTrackPlay,
         onArtistClick = onArtistClick,
         onAlbumClick = onAlbumClick,
@@ -109,6 +126,13 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
     onSearchSubmit: () -> Unit = {},
+    onBrowseCategoryClick: (String) -> Unit = {},
+    onCloseBrowseCategory: () -> Unit = {},
+    onLoadMore: () -> Unit = {},
+    onRetrySearch: () -> Unit = {},
+    onRecentSearchClick: (String) -> Unit = {},
+    onRecentSearchesEnabledChange: (Boolean) -> Unit = {},
+    onClearRecentSearches: () -> Unit = {},
     onArtistClick: ((Artist) -> Unit)? = null,
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
@@ -229,6 +253,38 @@ fun SearchScreen(
             Spacer(Modifier.height(22.dp))
         }
 
+        if (state.query.isNotBlank()) {
+            when (state.remoteSearchStatus) {
+                RemoteSearchStatus.Loading -> item(key = "remote-search-loading") {
+                    SearchRemoteStatus(
+                        icon = Icons.Rounded.Search,
+                        title = "Searching the full catalog",
+                        message = "Saved results stay visible while the authenticated search completes.",
+                        showProgress = true,
+                    )
+                }
+                RemoteSearchStatus.Offline -> item(key = "remote-search-offline") {
+                    SearchRemoteStatus(
+                        icon = Icons.Rounded.CloudOff,
+                        title = "Offline results",
+                        message = "Showing saved catalog matches. Full search resumes automatically when validated internet returns.",
+                    )
+                }
+                RemoteSearchStatus.Failed -> item(key = "remote-search-failed") {
+                    SearchRemoteStatus(
+                        icon = Icons.Rounded.Refresh,
+                        title = "Full search is temporarily unavailable",
+                        message = "Saved catalog matches are still available.",
+                        actionLabel = "Retry full search",
+                        onAction = onRetrySearch,
+                    )
+                }
+                RemoteSearchStatus.Idle,
+                RemoteSearchStatus.Loaded,
+                -> Unit
+            }
+        }
+
         when {
             !state.hasObservedCatalog -> item(key = "search-loading") {
                 SearchStatus(
@@ -244,7 +300,33 @@ fun SearchScreen(
                 )
             }
             state.isReadyToBrowse -> item(key = "search-browse") {
-                BrowseCatalogSummary(state.catalog)
+                BrowseCatalogSummary(
+                    catalog = state.catalog,
+                    categories = state.browseCategories,
+                    recentSearchesEnabled = state.recentSearchesEnabled,
+                    recentSearches = state.recentSearches,
+                    onCategoryClick = onBrowseCategoryClick,
+                    onRecentSearchClick = onRecentSearchClick,
+                    onRecentSearchesEnabledChange = onRecentSearchesEnabledChange,
+                    onClearRecentSearches = onClearRecentSearches,
+                )
+            }
+            state.isBrowsingCategory -> {
+                val category = requireNotNull(state.selectedBrowseCategory)
+                item(key = "browse-category-header") {
+                    BrowseCategoryHeader(category, onCloseBrowseCategory)
+                }
+                itemsIndexed(
+                    items = category.tracks,
+                    key = { _, track -> "browse-track-${track.id}" },
+                ) { index, track ->
+                    TrackSearchResultRow(
+                        track = track,
+                        traversalOrder = index.toFloat(),
+                        onPlay = { onTrackPlay(category.tracks, index) },
+                        onMoreClick = { contextualTrack = track },
+                    )
+                }
             }
             state.hasNoResults -> item(key = "search-no-results") {
                 SearchStatus(
@@ -311,6 +393,15 @@ fun SearchScreen(
                         )
                     }
                 }
+                if (state.nextRemoteOffset != null || state.isLoadingMore) {
+                    item(key = "search-load-more") {
+                        LoadMoreSearchResults(
+                            isLoading = state.isLoadingMore,
+                            enabled = state.canLoadMore,
+                            onClick = onLoadMore,
+                        )
+                    }
+                }
             }
         }
     }
@@ -319,7 +410,16 @@ fun SearchScreen(
 internal const val SEARCH_FIELD_TAG = "search_field"
 
 @Composable
-private fun BrowseCatalogSummary(catalog: CatalogSnapshot) {
+private fun BrowseCatalogSummary(
+    catalog: CatalogSnapshot,
+    categories: List<BrowseCategory>,
+    recentSearchesEnabled: Boolean,
+    recentSearches: List<String>,
+    onCategoryClick: (String) -> Unit,
+    onRecentSearchClick: (String) -> Unit,
+    onRecentSearchesEnabledChange: (Boolean) -> Unit,
+    onClearRecentSearches: () -> Unit,
+) {
     Column(
         modifier = Modifier.padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -331,13 +431,208 @@ private fun BrowseCatalogSummary(catalog: CatalogSnapshot) {
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = "Search your saved offline catalog. Your query stays on this device.",
+            text = "Explore curated collections offline, or submit a query for the authenticated full catalog.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
         BrowseMetric(Icons.Rounded.Person, "Artists", catalog.artists.size)
         BrowseMetric(Icons.Rounded.Album, "Albums", catalog.albums.size)
         BrowseMetric(Icons.Rounded.MusicNote, "Tracks", catalog.tracks.size)
+
+        if (categories.isNotEmpty()) {
+            Text(
+                text = "Explore categories",
+                color = MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .semantics { heading() },
+            )
+            categories.forEach { category ->
+                BrowseCategoryRow(category, onCategoryClick)
+            }
+        }
+
+        RecentSearchControls(
+            enabled = recentSearchesEnabled,
+            queries = recentSearches,
+            onQueryClick = onRecentSearchClick,
+            onEnabledChange = onRecentSearchesEnabledChange,
+            onClear = onClearRecentSearches,
+        )
+    }
+}
+
+@Composable
+private fun BrowseCategoryRow(
+    category: BrowseCategory,
+    onClick: (String) -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = RakyzuSurfaceRaised,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 72.dp)
+            .clickable(
+                onClickLabel = "Open ${category.title} category",
+                role = Role.Button,
+                onClick = { onClick(category.id) },
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Explore, contentDescription = null, tint = RakyzuAqua)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 14.dp),
+            ) {
+                Text(
+                    text = category.title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = category.subtitle ?: "${category.tracks.size} curated tracks",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = category.tracks.size.toString(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrowseCategoryHeader(
+    category: BrowseCategory,
+    onBack: () -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back to browse",
+                )
+            }
+            Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text(
+                    text = category.title,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() },
+                )
+                category.subtitle?.let { subtitle ->
+                    Text(
+                        text = subtitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+        Text(
+            text = "${category.tracks.size} curated tracks · available from your saved catalog",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+        )
+    }
+}
+
+@Composable
+private fun RecentSearchControls(
+    enabled: Boolean,
+    queries: List<String>,
+    onQueryClick: (String) -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onClear: () -> Unit,
+) {
+    Text(
+        text = "Recent searches",
+        color = MaterialTheme.colorScheme.onBackground,
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier
+            .padding(top = 12.dp)
+            .semantics { heading() },
+    )
+    Surface(shape = RoundedCornerShape(18.dp), color = RakyzuSurfaceRaised) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.History, contentDescription = null, tint = RakyzuAqua)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 14.dp),
+                ) {
+                    Text("Save recent searches", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Off by default · encrypted and isolated to this listener",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = "Save recent searches" },
+                )
+            }
+            if (enabled && queries.isEmpty()) {
+                Text(
+                    text = "No saved searches yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+            queries.forEach { query ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .clickable(
+                            onClickLabel = "Search again for $query",
+                            role = Role.Button,
+                            onClick = { onQueryClick(query) },
+                        )
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Search, contentDescription = null, tint = RakyzuAqua)
+                    Text(
+                        text = query,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (queries.isNotEmpty()) {
+                TextButton(onClick = onClear, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("Clear recent searches")
+                }
+            }
+        }
     }
 }
 
@@ -515,6 +810,85 @@ private fun ResultText(title: String, subtitle: String, modifier: Modifier = Mod
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+@Composable
+private fun SearchRemoteStatus(
+    icon: ImageVector,
+    title: String,
+    message: String,
+    showProgress: Boolean = false,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = RakyzuSurfaceRaised,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showProgress) {
+                CircularProgressIndicator(
+                    color = RakyzuAqua,
+                    modifier = Modifier.size(24.dp),
+                )
+            } else {
+                Icon(icon, contentDescription = null, tint = RakyzuAqua)
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 14.dp),
+            ) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            actionLabel?.let { label ->
+                TextButton(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(label)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadMoreSearchResults(
+    isLoading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .heightIn(min = 48.dp),
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.size(10.dp))
+        }
+        Text(if (isLoading) "Loading more results" else "Load more results")
     }
 }
 

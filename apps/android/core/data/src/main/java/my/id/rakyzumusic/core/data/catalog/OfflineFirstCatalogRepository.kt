@@ -12,6 +12,9 @@ import my.id.rakyzumusic.core.model.Track
 
 internal interface CatalogRemoteDataSource {
     suspend fun fetchCatalog(): CatalogSnapshot
+
+    suspend fun searchCatalog(query: String, offset: Int, limit: Int): CatalogSearchPage =
+        throw UnsupportedOperationException("Remote catalog search is unavailable")
 }
 
 internal class OfflineFirstCatalogRepository(
@@ -45,6 +48,44 @@ internal class OfflineFirstCatalogRepository(
     } catch (error: Throwable) {
         CatalogRefreshResult.Failure(error.toCatalogRefreshFailure())
     }
+
+    override suspend fun searchCatalog(
+        query: String,
+        offset: Int,
+        limit: Int,
+    ): CatalogSearchResult {
+        val boundedQuery = query.trim().replace(WHITESPACE, " ")
+        if (boundedQuery.length !in MIN_SEARCH_QUERY_LENGTH..MAX_SEARCH_QUERY_LENGTH ||
+            offset !in 0..MAX_SEARCH_OFFSET ||
+            limit !in 1..MAX_SEARCH_PAGE_SIZE
+        ) {
+            return CatalogSearchResult.Failure(CatalogSearchFailure.InvalidRequest)
+        }
+
+        return try {
+            val page = remoteDataSource.searchCatalog(boundedQuery, offset, limit)
+            if (page.isValid(offset, limit)) {
+                CatalogSearchResult.Success(page)
+            } else {
+                CatalogSearchResult.Failure(CatalogSearchFailure.InvalidPayload)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            CatalogSearchResult.Failure(error.toCatalogSearchFailure())
+        }
+    }
+}
+
+private fun CatalogSearchPage.isValid(requestOffset: Int, requestLimit: Int): Boolean {
+    val displayedCount = artists.size + albums.size + tracks.size
+    if (displayedCount > requestLimit || totalCount < requestOffset + displayedCount) return false
+    if (nextOffset != null && (nextOffset <= requestOffset || nextOffset > totalCount)) return false
+
+    val ids = artists.map { "artist:${it.id}" } +
+        albums.map { "album:${it.album.id}" } +
+        tracks.map { "track:${it.id}" }
+    return ids.none { it.substringAfter(':').isBlank() } && ids.size == ids.toSet().size
 }
 
 private fun CatalogSnapshot.isValidCatalog(): Boolean {
@@ -108,4 +149,19 @@ private fun Throwable.toCatalogRefreshFailure(): CatalogRefreshFailure = when (t
     else -> CatalogRefreshFailure.ServiceUnavailable
 }
 
+private fun Throwable.toCatalogSearchFailure(): CatalogSearchFailure = when (this) {
+    is InvalidCatalogPayloadException -> CatalogSearchFailure.InvalidPayload
+    is HttpRequestTimeoutException,
+    is HttpRequestException,
+    -> CatalogSearchFailure.NetworkUnavailable
+    is PostgrestRestException -> CatalogSearchFailure.ServiceUnavailable
+    else -> CatalogSearchFailure.ServiceUnavailable
+}
+
 internal class InvalidCatalogPayloadException : IllegalStateException("Invalid catalog relationship")
+
+private val WHITESPACE = Regex("\\s+")
+private const val MIN_SEARCH_QUERY_LENGTH = 2
+private const val MAX_SEARCH_QUERY_LENGTH = 100
+private const val MAX_SEARCH_PAGE_SIZE = 50
+private const val MAX_SEARCH_OFFSET = 10_000
