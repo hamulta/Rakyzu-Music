@@ -13,15 +13,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,7 +26,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,36 +47,32 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.formattedDuration
 
 @Composable
-fun ArtistDetailRoute(
-    viewModel: ArtistDetailViewModel,
+fun AlbumDetailRoute(
+    viewModel: AlbumDetailViewModel,
     onBack: () -> Unit,
     onTrackPlay: (List<Track>, Int) -> Unit,
-    onAlbumClick: ((Album) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ArtistDetailScreen(
+    AlbumDetailScreen(
         state = state,
         onBack = onBack,
         onTrackPlay = onTrackPlay,
-        onAlbumClick = onAlbumClick,
         modifier = modifier,
     )
 }
 
 @Composable
-fun ArtistDetailScreen(
-    state: ArtistDetailUiState,
+fun AlbumDetailScreen(
+    state: AlbumDetailUiState,
     onBack: () -> Unit,
     onTrackPlay: (List<Track>, Int) -> Unit,
-    onAlbumClick: ((Album) -> Unit)? = null,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -90,7 +82,7 @@ fun ArtistDetailScreen(
             .background(
                 Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0f to Color(0xFF321C4F),
+                        0f to Color(0xFF19384C),
                         0.34f to RakyzuBlack,
                         1f to RakyzuBlack,
                     ),
@@ -98,7 +90,7 @@ fun ArtistDetailScreen(
             ),
         contentPadding = contentPadding,
     ) {
-        item(key = "artist-back") {
+        item(key = "album-back") {
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
@@ -107,75 +99,69 @@ fun ArtistDetailScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back to search",
+                    contentDescription = "Back",
                     tint = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }
 
         when {
-            !state.hasObservedCatalog -> item(key = "artist-loading") {
-                ArtistDetailStatus(
-                    title = "Loading artist",
+            !state.hasObservedCatalog -> item(key = "album-loading") {
+                AlbumDetailStatus(
+                    title = "Loading album",
                     message = "Reading the latest verified offline catalog.",
                     showProgress = true,
                 )
             }
-            state.isUnavailable -> item(key = "artist-unavailable") {
-                ArtistDetailStatus(
-                    title = "Artist unavailable",
-                    message = "This artist is no longer available in your verified catalog.",
+            state.isUnavailable -> item(key = "album-unavailable") {
+                AlbumDetailStatus(
+                    title = "Album unavailable",
+                    message = "This album is no longer available in your verified catalog.",
                 )
             }
             else -> {
-                val artist = requireNotNull(state.artist)
-                item(key = "artist-header") {
-                    ArtistHeader(
-                        artist = artist,
-                        releaseCount = state.releases.size,
+                val album = requireNotNull(state.album)
+                val artistName = state.artist?.name
+                    ?: state.tracks.firstOrNull()?.artist
+                    ?: "Unknown artist"
+                item(key = "album-header") {
+                    AlbumHeader(
+                        album = album,
+                        artistName = artistName,
                         trackCount = state.tracks.size,
+                        discCount = state.discCount,
                         onPlayAll = { onTrackPlay(state.tracks, 0) },
                     )
                 }
 
-                if (state.releases.isNotEmpty()) {
-                    item(key = "artist-releases-heading") {
-                        ArtistSectionHeading("Releases")
-                    }
-                    items(
-                        items = state.releases,
-                        key = { "artist-release-${it.album.id}" },
-                    ) { release ->
-                        ArtistReleaseRow(
-                            release = release,
-                            onClick = onAlbumClick?.let { callback ->
-                                { callback(release.album) }
-                            },
+                if (state.tracks.isEmpty()) {
+                    item(key = "album-empty") {
+                        AlbumDetailStatus(
+                            title = "No tracks yet",
+                            message = "This album has no published tracks in your catalog.",
                         )
                     }
-                }
-
-                if (state.tracks.isNotEmpty()) {
-                    item(key = "artist-tracks-heading") {
-                        ArtistSectionHeading("Tracks")
+                } else {
+                    item(key = "album-tracks-heading") {
+                        AlbumSectionHeading("Tracks")
                     }
                     itemsIndexed(
                         items = state.tracks,
-                        key = { _, track -> "artist-track-${track.id}" },
+                        key = { _, track -> "album-track-${track.id}" },
                     ) { index, track ->
-                        ArtistTrackRow(
-                            track = track,
-                            onPlay = { onTrackPlay(state.tracks, index) },
-                        )
-                    }
-                }
-
-                if (state.releases.isEmpty() && state.tracks.isEmpty()) {
-                    item(key = "artist-empty") {
-                        ArtistDetailStatus(
-                            title = "No releases yet",
-                            message = "This artist has no published music in your catalog.",
-                        )
+                        val discNumber = track.discNumber.coerceAtLeast(1)
+                        val previousDisc = state.tracks.getOrNull(index - 1)
+                            ?.discNumber
+                            ?.coerceAtLeast(1)
+                        Column {
+                            if (state.discCount > 1 && discNumber != previousDisc) {
+                                AlbumDiscHeading(discNumber)
+                            }
+                            AlbumTrackRow(
+                                track = track,
+                                onPlay = { onTrackPlay(state.tracks, index) },
+                            )
+                        }
                     }
                 }
             }
@@ -184,10 +170,11 @@ fun ArtistDetailScreen(
 }
 
 @Composable
-private fun ArtistHeader(
-    artist: Artist,
-    releaseCount: Int,
+private fun AlbumHeader(
+    album: Album,
+    artistName: String,
     trackCount: Int,
+    discCount: Int,
     onPlayAll: () -> Unit,
 ) {
     Column(
@@ -199,22 +186,22 @@ private fun ArtistHeader(
     ) {
         Box(
             modifier = Modifier
-                .size(120.dp)
+                .size(180.dp)
                 .background(
                     Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)),
-                    CircleShape,
+                    RoundedCornerShape(24.dp),
                 ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Person,
+                imageVector = Icons.Rounded.Album,
                 contentDescription = null,
                 tint = RakyzuBlack,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(88.dp),
             )
         }
         Text(
-            text = artist.name,
+            text = album.title,
             color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Black,
@@ -223,8 +210,16 @@ private fun ArtistHeader(
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = "$releaseCount ${releaseCount.unit("release")} · " +
-                "$trackCount ${trackCount.unit("track")}",
+            text = artistName,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = buildList {
+                album.releaseDate?.take(4)?.takeIf(String::isNotBlank)?.let(::add)
+                add("$trackCount ${trackCount.albumUnit("track")}")
+                if (discCount > 1) add("$discCount discs")
+            }.joinToString(" · "),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -238,14 +233,14 @@ private fun ArtistHeader(
                 ),
             ) {
                 Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                Text("Play all", modifier = Modifier.padding(start = 8.dp))
+                Text("Play album", modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ArtistSectionHeading(title: String) {
+private fun AlbumSectionHeading(title: String) {
     Text(
         text = title,
         color = MaterialTheme.colorScheme.onBackground,
@@ -258,74 +253,39 @@ private fun ArtistSectionHeading(title: String) {
 }
 
 @Composable
-private fun ArtistReleaseRow(
-    release: ArtistRelease,
-    onClick: (() -> Unit)?,
-) {
-    val interactionModifier = if (onClick == null) {
-        Modifier
-    } else {
-        Modifier.clickable(
-            onClickLabel = "Open ${release.album.title.trim()} album",
-            role = Role.Button,
-            onClick = onClick,
-        )
-    }
-    Surface(
-        color = RakyzuSurfaceRaised,
-        shape = RoundedCornerShape(16.dp),
-        modifier = interactionModifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 64.dp)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Rounded.Album, contentDescription = null, tint = RakyzuAqua)
-            Column(modifier = Modifier.padding(start = 14.dp)) {
-                Text(
-                    text = release.album.title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = listOfNotNull(
-                        release.album.releaseDate?.take(4)?.takeIf(String::isNotBlank),
-                        "${release.trackCount} ${release.trackCount.unit("track")}",
-                    ).joinToString(" · "),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-    }
+private fun AlbumDiscHeading(discNumber: Int) {
+    Text(
+        text = "Disc $discNumber",
+        color = RakyzuAqua,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .padding(top = 12.dp, bottom = 4.dp)
+            .semantics { heading() },
+    )
 }
 
 @Composable
-private fun ArtistTrackRow(track: Track, onPlay: () -> Unit) {
+private fun AlbumTrackRow(track: Track, onPlay: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .clickable(
-                onClickLabel = "Play ${track.title.trim()} by ${track.artist.trim()}",
+                onClickLabel = "Play ${track.title.trim()}",
                 role = Role.Button,
                 onClick = onPlay,
             )
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = RakyzuAqua)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 14.dp),
-        ) {
+        Text(
+            text = track.trackNumber.coerceAtLeast(1).toString(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(end = 16.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -334,20 +294,20 @@ private fun ArtistTrackRow(track: Track, onPlay: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = listOf(track.albumTitle, track.formattedDuration())
-                    .map(String::trim)
-                    .filter(String::isNotEmpty)
-                    .joinToString(" · "),
+                text = listOfNotNull(
+                    "Explicit".takeIf { track.isExplicit },
+                    track.formattedDuration(),
+                ).joinToString(" · "),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = RakyzuAqua)
+        Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = RakyzuAqua)
     }
 }
 
 @Composable
-private fun ArtistDetailStatus(
+private fun AlbumDetailStatus(
     title: String,
     message: String,
     showProgress: Boolean = false,
@@ -375,30 +335,32 @@ private fun ArtistDetailStatus(
     }
 }
 
-private fun Int.unit(singular: String): String = if (this == 1) singular else "${singular}s"
+private fun Int.albumUnit(singular: String): String = if (this == 1) singular else "${singular}s"
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun ArtistDetailScreenPreview() {
+private fun AlbumDetailScreenPreview() {
     val artist = Artist("artist-1", "Rakyzu Sessions")
     val album = Album("album-1", artist.id, "Signal Zero", "2026-08-31")
-    val track = Track(
-        id = "track-1",
-        title = "Midnight Signal",
-        artist = artist.name,
-        durationMs = 180_000L,
-        artistId = artist.id,
-        albumId = album.id,
-        albumTitle = album.title,
+    val tracks = listOf(
+        Track(
+            id = "track-1",
+            title = "Midnight Signal",
+            artist = artist.name,
+            durationMs = 180_000L,
+            artistId = artist.id,
+            albumId = album.id,
+            albumTitle = album.title,
+        ),
     )
     RakyzuMusicTheme(darkTheme = true) {
-        ArtistDetailScreen(
-            state = ArtistDetailUiState(
-                artistId = artist.id,
+        AlbumDetailScreen(
+            state = AlbumDetailUiState(
+                albumId = album.id,
                 hasObservedCatalog = true,
+                album = album,
                 artist = artist,
-                releases = listOf(ArtistRelease(album, 1)),
-                tracks = listOf(track),
+                tracks = tracks,
             ),
             onBack = {},
             onTrackPlay = { _, _ -> },

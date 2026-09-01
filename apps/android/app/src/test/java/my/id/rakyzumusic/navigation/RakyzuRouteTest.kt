@@ -71,4 +71,31 @@ class RakyzuRouteTest {
 
         assertEquals(listOf(RakyzuRoute.Search), backStack)
     }
+
+    @Test
+    fun albumDetailIsAddedOnceAndDismissedToPreviousDestination() {
+        val artist = RakyzuRoute.ArtistDetail("artist-1")
+        val backStack = mutableListOf<NavKey>(RakyzuRoute.Search, artist)
+
+        openAlbumDetail(backStack, "album-1")
+        openAlbumDetail(backStack, "album-1")
+
+        assertEquals(
+            listOf(RakyzuRoute.Search, artist, RakyzuRoute.AlbumDetail("album-1")),
+            backStack,
+        )
+
+        dismissAlbumDetail(backStack)
+
+        assertEquals(listOf(RakyzuRoute.Search, artist), backStack)
+    }
+
+    @Test
+    fun blankAlbumIdIsRejectedWithoutChangingNavigation() {
+        val backStack = mutableListOf<NavKey>(RakyzuRoute.Search)
+
+        openAlbumDetail(backStack, "")
+
+        assertEquals(listOf(RakyzuRoute.Search), backStack)
+    }
 }

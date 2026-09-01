@@ -79,6 +79,7 @@ fun SearchRoute(
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onArtistClick: ((Artist) -> Unit)? = null,
+    onAlbumClick: ((Album) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SearchScreen(
@@ -87,6 +88,7 @@ fun SearchRoute(
         onClearQuery = viewModel::clearQuery,
         onTrackPlay = onTrackPlay,
         onArtistClick = onArtistClick,
+        onAlbumClick = onAlbumClick,
         modifier = modifier,
     )
 }
@@ -101,6 +103,7 @@ fun SearchScreen(
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
     onSearchSubmit: () -> Unit = {},
     onArtistClick: ((Artist) -> Unit)? = null,
+    onAlbumClick: ((Album) -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -247,6 +250,12 @@ fun SearchScreen(
                                 "Album",
                                 result.artistName.takeIf(String::isNotBlank),
                             ).joinToString(" · "),
+                            onClickLabel = onAlbumClick?.let {
+                                "Open ${result.album.title.trim()} album"
+                            },
+                            onClick = onAlbumClick?.let { callback ->
+                                { callback(result.album) }
+                            },
                         )
                     }
                 }

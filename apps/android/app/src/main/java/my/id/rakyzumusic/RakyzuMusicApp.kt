@@ -85,13 +85,17 @@ import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
+import my.id.rakyzumusic.feature.search.AlbumDetailRoute
+import my.id.rakyzumusic.feature.search.AlbumDetailViewModel
 import my.id.rakyzumusic.feature.search.ArtistDetailRoute
 import my.id.rakyzumusic.feature.search.ArtistDetailViewModel
 import my.id.rakyzumusic.feature.search.SearchRoute
 import my.id.rakyzumusic.feature.search.SearchViewModel
 import my.id.rakyzumusic.navigation.RakyzuRoute
+import my.id.rakyzumusic.navigation.dismissAlbumDetail
 import my.id.rakyzumusic.navigation.dismissArtistDetail
 import my.id.rakyzumusic.navigation.dismissNowPlaying
+import my.id.rakyzumusic.navigation.openAlbumDetail
 import my.id.rakyzumusic.navigation.openArtistDetail
 import my.id.rakyzumusic.navigation.openNowPlaying
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
@@ -290,7 +294,8 @@ private fun AuthenticatedRakyzuMusicApp(
             topLevelDestinations.forEach { destination ->
                 item(
                     selected = currentRoute == destination.route ||
-                        currentRoute is RakyzuRoute.ArtistDetail &&
+                        (currentRoute is RakyzuRoute.ArtistDetail ||
+                            currentRoute is RakyzuRoute.AlbumDetail) &&
                         destination.route == RakyzuRoute.Search,
                     onClick = { selectTopLevelRoute(backStack, destination.route) },
                     icon = {
@@ -337,6 +342,9 @@ private fun AuthenticatedRakyzuMusicApp(
                             onArtistClick = { artist ->
                                 openArtistDetail(backStack, artist.id)
                             },
+                            onAlbumClick = { album ->
+                                openAlbumDetail(backStack, album.id)
+                            },
                         )
                     }
                     entry<RakyzuRoute.ArtistDetail> { route ->
@@ -350,6 +358,23 @@ private fun AuthenticatedRakyzuMusicApp(
                         ArtistDetailRoute(
                             viewModel = artistViewModel,
                             onBack = { dismissArtistDetail(backStack) },
+                            onTrackPlay = playbackController::playQueue,
+                            onAlbumClick = { album ->
+                                openAlbumDetail(backStack, album.id)
+                            },
+                        )
+                    }
+                    entry<RakyzuRoute.AlbumDetail> { route ->
+                        val albumViewModel: AlbumDetailViewModel = viewModel(
+                            key = "album-$userId-${route.albumId}",
+                            factory = AlbumDetailViewModel.factory(
+                                albumId = route.albumId,
+                                repository = catalogRepository,
+                            ),
+                        )
+                        AlbumDetailRoute(
+                            viewModel = albumViewModel,
+                            onBack = { dismissAlbumDetail(backStack) },
                             onTrackPlay = playbackController::playQueue,
                         )
                     }

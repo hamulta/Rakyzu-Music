@@ -23,18 +23,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class ArtistDetailAccessibilityTest {
+class AlbumDetailAccessibilityTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     @Test
-    fun readyArtistHasHeadingAndAccessibleBackAction() {
+    fun readyAlbumHasHeadingAndAccessibleBackAction() {
         var backCalls = 0
-        setArtistContent(onBack = { backCalls += 1 })
+        setAlbumContent(onBack = { backCalls += 1 })
 
-        composeRule.onNodeWithText(ARTIST.name)
+        composeRule.onNodeWithText(ALBUM.title)
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
-        composeRule.onNodeWithContentDescription("Back to search")
+        composeRule.onNodeWithContentDescription("Back")
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
             .performClick()
@@ -42,15 +42,15 @@ class ArtistDetailAccessibilityTest {
     }
 
     @Test
-    fun playAllStartsTheCompleteArtistQueueAtTheBeginning() {
+    fun playAlbumStartsCompleteOrderedQueueAtBeginning() {
         var playedIds = emptyList<String>()
         var playedIndex: Int? = null
-        setArtistContent { tracks, index ->
+        setAlbumContent { tracks, index ->
             playedIds = tracks.map(Track::id)
             playedIndex = index
         }
 
-        composeRule.onNodeWithText("Play all")
+        composeRule.onNodeWithText("Play album")
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
             .performClick()
@@ -62,25 +62,28 @@ class ArtistDetailAccessibilityTest {
     }
 
     @Test
-    fun trackRowsExposeNamedPlayActionsAndMinimumTargets() {
+    fun multiDiscHeadingsAndTrackActionsAreAccessible() {
         var playedIndex: Int? = null
-        setArtistContent { _, index -> playedIndex = index }
+        setAlbumContent { _, index -> playedIndex = index }
 
-        composeRule.onNode(hasPlayAction("Play Signal Bloom by ${ARTIST.name}"))
+        composeRule.onNodeWithText("Disc 1")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        composeRule.onNodeWithText("Disc 2")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        composeRule.onNode(hasClickAction("Play Second Disc Signal"))
             .assertHasClickAction()
             .assertHeightIsAtLeast(64.dp)
             .performClick()
-
-        composeRule.runOnIdle { assertEquals(1, playedIndex) }
+        composeRule.runOnIdle { assertEquals(2, playedIndex) }
     }
 
     @Test
-    fun unavailableArtistUsesPoliteStatusAndKeepsBackAction() {
+    fun unavailableAlbumUsesPoliteStatusAndKeepsBackAction() {
         composeRule.setContent {
             RakyzuMusicTheme(darkTheme = true) {
-                ArtistDetailScreen(
-                    state = ArtistDetailUiState(
-                        artistId = "missing",
+                AlbumDetailScreen(
+                    state = AlbumDetailUiState(
+                        albumId = "missing",
                         hasObservedCatalog = true,
                     ),
                     onBack = {},
@@ -89,40 +92,19 @@ class ArtistDetailAccessibilityTest {
             }
         }
 
-        composeRule.onNodeWithText("Artist unavailable")
+        composeRule.onNodeWithText("Album unavailable")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
         composeRule.onNode(hasPoliteLiveRegion()).assertExists()
-        composeRule.onNodeWithContentDescription("Back to search").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("Back").assertHasClickAction()
     }
 
-    @Test
-    fun releaseExposesNamedAlbumNavigationAction() {
-        var selectedAlbum: Album? = null
-        composeRule.setContent {
-            RakyzuMusicTheme(darkTheme = true) {
-                ArtistDetailScreen(
-                    state = READY_STATE,
-                    onBack = {},
-                    onTrackPlay = { _, _ -> },
-                    onAlbumClick = { selectedAlbum = it },
-                )
-            }
-        }
-
-        composeRule.onNode(hasPlayAction("Open Signal Zero album"))
-            .assertHasClickAction()
-            .assertHeightIsAtLeast(64.dp)
-            .performClick()
-        composeRule.runOnIdle { assertEquals(ALBUM, selectedAlbum) }
-    }
-
-    private fun setArtistContent(
+    private fun setAlbumContent(
         onBack: () -> Unit = {},
         onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     ) {
         composeRule.setContent {
             RakyzuMusicTheme(darkTheme = true) {
-                ArtistDetailScreen(
+                AlbumDetailScreen(
                     state = READY_STATE,
                     onBack = onBack,
                     onTrackPlay = onTrackPlay,
@@ -136,7 +118,7 @@ class ArtistDetailAccessibilityTest {
         LiveRegionMode.Polite,
     )
 
-    private fun hasPlayAction(label: String): SemanticsMatcher =
+    private fun hasClickAction(label: String): SemanticsMatcher =
         SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick) and
             SemanticsMatcher("OnClick action label is $label") { node ->
                 node.config[SemanticsActions.OnClick].label == label
@@ -146,18 +128,24 @@ class ArtistDetailAccessibilityTest {
         val ARTIST = Artist("artist-1", "Rakyzu Sessions")
         val ALBUM = Album("album-1", ARTIST.id, "Signal Zero", "2026-08-31")
         val TRACKS = listOf(
-            track("track-1", "Midnight Signal", 1),
-            track("track-2", "Signal Bloom", 2),
+            track("track-1", "Midnight Signal", disc = 1, number = 1),
+            track("track-2", "Signal Bloom", disc = 1, number = 2),
+            track("track-3", "Second Disc Signal", disc = 2, number = 1),
         )
-        val READY_STATE = ArtistDetailUiState(
-            artistId = ARTIST.id,
+        val READY_STATE = AlbumDetailUiState(
+            albumId = ALBUM.id,
             hasObservedCatalog = true,
+            album = ALBUM,
             artist = ARTIST,
-            releases = listOf(ArtistRelease(ALBUM, TRACKS.size)),
             tracks = TRACKS,
         )
 
-        fun track(id: String, title: String, number: Int) = Track(
+        fun track(
+            id: String,
+            title: String,
+            disc: Int,
+            number: Int,
+        ) = Track(
             id = id,
             title = title,
             artist = ARTIST.name,
@@ -165,6 +153,7 @@ class ArtistDetailAccessibilityTest {
             artistId = ARTIST.id,
             albumId = ALBUM.id,
             albumTitle = ALBUM.title,
+            discNumber = disc,
             trackNumber = number,
         )
     }
