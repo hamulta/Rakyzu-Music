@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.3.0**
+Current version: **0.3.3**
 
 ## Technology baseline
 
@@ -10,7 +10,7 @@ Current version: **0.3.0**
 - Playback: AndroidX Media3 ExoPlayer, MediaSessionService, and system notification controls
 - Data and identity: Supabase Postgres, Auth, Realtime, and Row Level Security
 - API and delivery: Cloudflare Workers, Pages, and R2
-- Automation: GitHub Actions; Appetize browser-device verification for Android 0.3.0
+- Automation: GitHub Actions; Appetize browser-device runtime verification
 
 The app uses `my.id.rakyzumusic` as its Android application ID. Spotify informs product capabilities and engineering principles, but Rakyzu Music uses its own brand, implementation, content rights, data model, and infrastructure.
 
@@ -34,9 +34,9 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.3-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
-The final 0.3.0 candidate can also be launched in the [Rakyzu Music Appetize device](https://appetize.io/app/vwisvcqbaeicaznfamnumltolq). Its sign-in, sign-up, and password-recovery entry flows were exercised against the configured APK before release.
+Validated candidates can also be launched in the [Rakyzu Music Appetize device](https://appetize.io/app/vwisvcqbaeicaznfamnumltolq). The `0.3.0` sign-in, sign-up, and password-recovery entry flows were exercised there before release; each later release records its own runtime evidence.
 
 ## Configuration and security
 
@@ -70,12 +70,12 @@ Album results and artist releases open a typed offline-first album destination u
 
 Track rows in Search, artist detail, and album detail expose an accessible context sheet with catalog metadata, playback, and Like/unlike actions. Artist and album actions appear only when the current surface supplies a safe internal destination and the track contains the corresponding canonical ID. Metadata actions reuse an existing matching destination in the nested Search back stack instead of duplicating it. The sheet adds no share intent, clipboard access, browser handoff, analytics, or logging path.
 
-Library is an account-scoped offline-first surface backed by Room schema 3. It resolves liked tracks, saved albums, and followed artists against the last verified catalog, plays the complete liked-song queue, and opens album or artist detail without losing top-level navigation ownership. Search and detail screens send authenticated idempotent mutations through Supabase `security invoker` functions; forced RLS isolates every canonical relationship by listener, failed refreshes preserve cache, failed mutations do not create local divergence, and unpublished catalog entries are never projected.
+Library is an account-scoped offline-first surface backed by Room schema 3. It resolves liked tracks, saved albums, and followed artists against the last verified catalog and preserves their saved timestamps for deterministic Recently added, Oldest added, and A–Z ordering. Bounded local search, type filters, and sort choices restore within the listener-scoped shell. Bulk and row playback use the exact visible Liked Songs queue, while album and artist rows retain typed detail navigation. Search, detail, Home, and Now Playing send authenticated idempotent mutations through Supabase `security invoker` functions; forced RLS isolates every canonical relationship by listener, failed refreshes preserve cache, failed mutations do not create local divergence, and unpublished catalog entries are never projected.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 
 Album artwork follows the same authenticated boundary through `GET /v1/albums/{uuid}/artwork`; the Android client never receives an R2 credential or direct object URL. Coil keeps a bounded 25% memory cache and 128 MiB disk cache, honors the Worker's private 24-hour cache contract and ETags, and shows distinct loading, placeholder, and failure visuals. Authorization remains request-only and is redacted from media-request diagnostics.
 
-Playback runs in a Media3 `MediaSessionService` with automatic MediaStyle notification controls, audio-focus handling, and noisy-output protection. The player receives only internal track UUID URIs; the current bearer session is resolved into an HTTPS Worker request just before each data-source open and is never placed in media metadata, logs, or a persisted queue. Home selections populate a Media3 playlist, while the compact player and branded Now Playing surface expose synchronized progress, seeking, previous/next actions, and queue navigation. Actual Media3 item transitions update the active listener's bounded local recently-played history. Progress sampling is suspended whenever playback is inactive, and queue metadata is rebuilt only when the Media3 timeline changes. Playback clears when the listener session is no longer signed in.
+Playback runs in a Media3 `MediaSessionService` with automatic MediaStyle notification controls, audio-focus handling, and noisy-output protection. The player receives only internal track UUID URIs; the current bearer session is resolved into an HTTPS Worker request just before each data-source open and is never placed in media metadata, logs, or a persisted queue. Public canonical album and artist IDs remain with queue display metadata so Now Playing can target Like, Save, and Follow safely without deriving identity from labels. Home selections populate a Media3 playlist, while the compact player and branded Now Playing surface expose synchronized progress, seeking, previous/next actions, Library actions, and queue navigation. Actual Media3 item transitions update the active listener's bounded local recently-played history. Progress sampling is suspended whenever playback is inactive, and queue metadata is rebuilt only when the Media3 timeline changes. Playback clears when the listener session is no longer signed in.
 
 See [Architecture](docs/ARCHITECTURE.md), [Database](docs/DATABASE.md), [Roadmap](docs/ROADMAP.md), and [Security](SECURITY.md).

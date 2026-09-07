@@ -26,6 +26,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -35,6 +38,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -169,6 +174,15 @@ fun HomeRoute(
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
+    likedTrackIds: Set<String> = emptySet(),
+    savedAlbumIds: Set<String> = emptySet(),
+    followedArtistIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    pendingAlbumIds: Set<String> = emptySet(),
+    pendingArtistIds: Set<String> = emptySet(),
+    onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
 ) {
     val homeViewModel: HomeViewModel = viewModel(
         key = "home-$userId",
@@ -188,6 +202,15 @@ fun HomeRoute(
             onRetryCatalog = homeViewModel::refresh,
             onTrackPlay = onTrackPlay,
             onProfileClick = onProfileClick,
+            likedTrackIds = likedTrackIds,
+            savedAlbumIds = savedAlbumIds,
+            followedArtistIds = followedArtistIds,
+            pendingTrackIds = pendingTrackIds,
+            pendingAlbumIds = pendingAlbumIds,
+            pendingArtistIds = pendingArtistIds,
+            onTrackLikeChange = onTrackLikeChange,
+            onAlbumSaveChange = onAlbumSaveChange,
+            onArtistFollowChange = onArtistFollowChange,
         )
     }
 }
@@ -203,6 +226,15 @@ fun HomeScreen(
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
+    likedTrackIds: Set<String> = emptySet(),
+    savedAlbumIds: Set<String> = emptySet(),
+    followedArtistIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    pendingAlbumIds: Set<String> = emptySet(),
+    pendingArtistIds: Set<String> = emptySet(),
+    onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
 ) {
     var selectedFilterKey by rememberSaveable {
         mutableStateOf(HomeFilter.Music.storageKey)
@@ -267,6 +299,15 @@ fun HomeScreen(
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onFeaturedTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
                     )
                 }
             }
@@ -301,6 +342,15 @@ fun HomeScreen(
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
                     )
                 }
             }
@@ -316,6 +366,15 @@ fun HomeScreen(
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
                     )
                 }
             }
@@ -328,6 +387,15 @@ fun HomeScreen(
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
                     )
                 }
             }
@@ -340,6 +408,15 @@ fun HomeScreen(
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
                     )
                 }
             }
@@ -607,6 +684,15 @@ private fun FeaturedCard(
     layoutSpec: HomeLayoutSpec,
     artworkRequestProvider: ArtworkRequestProvider,
     onTrackPlay: () -> Unit,
+    likedTrackIds: Set<String>,
+    savedAlbumIds: Set<String>,
+    followedArtistIds: Set<String>,
+    pendingTrackIds: Set<String>,
+    pendingAlbumIds: Set<String>,
+    pendingArtistIds: Set<String>,
+    onTrackLikeChange: (Track, Boolean) -> Unit,
+    onAlbumSaveChange: (Track, Boolean) -> Unit,
+    onArtistFollowChange: (Track, Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -634,6 +720,22 @@ private fun FeaturedCard(
                 FeaturedDetails(
                     track = track,
                     onTrackPlay = onTrackPlay,
+                    libraryActions = track?.let {
+                        {
+                            TrackLibraryMenu(
+                                track = it,
+                                likedTrackIds = likedTrackIds,
+                                savedAlbumIds = savedAlbumIds,
+                                followedArtistIds = followedArtistIds,
+                                pendingTrackIds = pendingTrackIds,
+                                pendingAlbumIds = pendingAlbumIds,
+                                pendingArtistIds = pendingArtistIds,
+                                onTrackLikeChange = onTrackLikeChange,
+                                onAlbumSaveChange = onAlbumSaveChange,
+                                onArtistFollowChange = onArtistFollowChange,
+                            )
+                        }
+                    },
                 )
             }
         } else {
@@ -651,6 +753,22 @@ private fun FeaturedCard(
                 FeaturedDetails(
                     track = track,
                     onTrackPlay = onTrackPlay,
+                    libraryActions = track?.let {
+                        {
+                            TrackLibraryMenu(
+                                track = it,
+                                likedTrackIds = likedTrackIds,
+                                savedAlbumIds = savedAlbumIds,
+                                followedArtistIds = followedArtistIds,
+                                pendingTrackIds = pendingTrackIds,
+                                pendingAlbumIds = pendingAlbumIds,
+                                pendingArtistIds = pendingArtistIds,
+                                onTrackLikeChange = onTrackLikeChange,
+                                onAlbumSaveChange = onAlbumSaveChange,
+                                onArtistFollowChange = onArtistFollowChange,
+                            )
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -663,6 +781,7 @@ private fun FeaturedDetails(
     track: Track?,
     onTrackPlay: () -> Unit,
     modifier: Modifier = Modifier,
+    libraryActions: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = modifier) {
         Text(
@@ -682,34 +801,37 @@ private fun FeaturedDetails(
             style = MaterialTheme.typography.bodyMedium,
         )
         Spacer(Modifier.height(10.dp))
-        Surface(
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .clickable(
-                    enabled = track != null,
-                    onClickLabel = track?.homePlayActionLabel(),
-                    role = Role.Button,
-                    onClick = onTrackPlay,
-                ),
-            shape = CircleShape,
-            color = RakyzuAqua,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .clickable(
+                        enabled = track != null,
+                        onClickLabel = track?.homePlayActionLabel(),
+                        role = Role.Button,
+                        onClick = onTrackPlay,
+                    ),
+                shape = CircleShape,
+                color = RakyzuAqua,
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    tint = RakyzuBlack,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(
-                    text = "Play",
-                    color = RakyzuBlack,
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = RakyzuBlack,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = "Play",
+                        color = RakyzuBlack,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
             }
+            libraryActions?.invoke()
         }
     }
 }
@@ -722,6 +844,15 @@ internal fun TrackShelf(
     layoutSpec: HomeLayoutSpec = HomeLayoutSpec.Standard,
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     onTrackPlay: (List<Track>, Int) -> Unit,
+    likedTrackIds: Set<String> = emptySet(),
+    savedAlbumIds: Set<String> = emptySet(),
+    followedArtistIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    pendingAlbumIds: Set<String> = emptySet(),
+    pendingArtistIds: Set<String> = emptySet(),
+    onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
 ) {
     val shelfListState = rememberLazyListState()
     Column(
@@ -777,32 +908,111 @@ internal fun TrackShelf(
                         .semantics { traversalIndex = index.toFloat() },
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {
-                    Column {
-                        AlbumArtwork(
-                            albumId = track.albumId,
-                            colors = catalogGradients[index % catalogGradients.size],
-                            artworkRequestProvider = artworkRequestProvider,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f),
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = track.title,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = layoutSpec.trackTextMaxLines,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = subtitle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = layoutSpec.trackTextMaxLines,
-                            overflow = TextOverflow.Ellipsis,
+                    Box {
+                        Column {
+                            AlbumArtwork(
+                                albumId = track.albumId,
+                                colors = catalogGradients[index % catalogGradients.size],
+                                artworkRequestProvider = artworkRequestProvider,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f),
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = track.title,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = layoutSpec.trackTextMaxLines,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = subtitle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = layoutSpec.trackTextMaxLines,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        TrackLibraryMenu(
+                            track = track,
+                            likedTrackIds = likedTrackIds,
+                            savedAlbumIds = savedAlbumIds,
+                            followedArtistIds = followedArtistIds,
+                            pendingTrackIds = pendingTrackIds,
+                            pendingAlbumIds = pendingAlbumIds,
+                            pendingArtistIds = pendingArtistIds,
+                            onTrackLikeChange = onTrackLikeChange,
+                            onAlbumSaveChange = onAlbumSaveChange,
+                            onArtistFollowChange = onArtistFollowChange,
+                            modifier = Modifier.align(Alignment.TopEnd),
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackLibraryMenu(
+    track: Track,
+    likedTrackIds: Set<String>,
+    savedAlbumIds: Set<String>,
+    followedArtistIds: Set<String>,
+    pendingTrackIds: Set<String>,
+    pendingAlbumIds: Set<String>,
+    pendingArtistIds: Set<String>,
+    onTrackLikeChange: (Track, Boolean) -> Unit,
+    onAlbumSaveChange: (Track, Boolean) -> Unit,
+    onArtistFollowChange: (Track, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = "Library actions for ${track.title}",
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            val liked = track.id in likedTrackIds
+            DropdownMenuItem(
+                text = { Text(if (liked) "Remove from Liked Songs" else "Add to Liked Songs") },
+                leadingIcon = { Icon(Icons.Rounded.Favorite, contentDescription = null) },
+                enabled = track.id !in pendingTrackIds,
+                onClick = {
+                    expanded = false
+                    onTrackLikeChange(track, !liked)
+                },
+            )
+            if (track.albumId.isNotBlank()) {
+                val saved = track.albumId in savedAlbumIds
+                DropdownMenuItem(
+                    text = { Text(if (saved) "Remove album from Library" else "Save album") },
+                    leadingIcon = { Icon(Icons.Rounded.Bookmark, contentDescription = null) },
+                    enabled = track.albumId !in pendingAlbumIds,
+                    onClick = {
+                        expanded = false
+                        onAlbumSaveChange(track, !saved)
+                    },
+                )
+            }
+            if (track.artistId.isNotBlank()) {
+                val followed = track.artistId in followedArtistIds
+                DropdownMenuItem(
+                    text = { Text(if (followed) "Unfollow artist" else "Follow artist") },
+                    leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
+                    enabled = track.artistId !in pendingArtistIds,
+                    onClick = {
+                        expanded = false
+                        onArtistFollowChange(track, !followed)
+                    },
+                )
             }
         }
     }
@@ -824,6 +1034,6 @@ internal fun Track.homeSubtitle(): String {
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.3.0")
+        HomeScreen(versionName = "0.3.3")
     }
 }

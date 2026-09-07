@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,23 +23,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -50,6 +52,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,13 +66,6 @@ import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.formattedDuration
 
-private enum class LibraryFilter(val label: String) {
-    All("All"),
-    Songs("Liked Songs"),
-    Albums("Albums"),
-    Artists("Artists"),
-}
-
 @Composable
 fun LibraryRoute(
     viewModel: LibraryViewModel,
@@ -82,6 +78,10 @@ fun LibraryRoute(
     LibraryScreen(
         state = state,
         onRefresh = viewModel::refresh,
+        onQueryChange = viewModel::updateQuery,
+        onClearQuery = viewModel::clearQuery,
+        onFilterSelected = viewModel::selectFilter,
+        onSortSelected = viewModel::selectSort,
         onTrackPlay = onTrackPlay,
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
@@ -96,6 +96,10 @@ fun LibraryRoute(
 fun LibraryScreen(
     state: LibraryUiState,
     onRefresh: () -> Unit,
+    onQueryChange: (String) -> Unit = {},
+    onClearQuery: () -> Unit = {},
+    onFilterSelected: (LibraryFilter) -> Unit = {},
+    onSortSelected: (LibrarySort) -> Unit = {},
     onTrackPlay: (List<Track>, Int) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
@@ -105,9 +109,6 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
-    var filterName by rememberSaveable { mutableStateOf(LibraryFilter.All.name) }
-    val filter = LibraryFilter.entries.firstOrNull { it.name == filterName } ?: LibraryFilter.All
-
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -173,58 +174,59 @@ fun LibraryScreen(
                 )
             }
             else -> {
-                item(key = "library-filters") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        LibraryFilter.entries.forEach { option ->
-                            AssistChip(
-                                onClick = { filterName = option.name },
-                                label = { Text(option.label) },
-                                leadingIcon = if (option == filter) {
-                                    { Icon(Icons.Rounded.Favorite, contentDescription = null) }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
-                    }
+                item(key = "library-controls") {
+                    LibraryControls(
+                        query = state.query,
+                        filter = state.filter,
+                        sort = state.sort,
+                        onQueryChange = onQueryChange,
+                        onClearQuery = onClearQuery,
+                        onFilterSelected = onFilterSelected,
+                        onSortSelected = onSortSelected,
+                    )
                 }
 
-                if (filter == LibraryFilter.All || filter == LibraryFilter.Songs) {
-                    if (state.library.likedTracks.isNotEmpty()) {
+                if (state.hasNoMatchingItems) {
+                    item(key = "library-no-results") {
+                        LibraryStatus(
+                            icon = Icons.Rounded.Search,
+                            title = "No Library matches",
+                            message = "Try another search or Library filter.",
+                            actionLabel = "Clear Library search".takeIf { state.query.isNotBlank() },
+                            onAction = onClearQuery,
+                        )
+                    }
+                } else {
+                    if (state.visibleLikedTracks.isNotEmpty()) {
                         item(key = "liked-heading") {
                             LibrarySectionHeading(
                                 title = "Liked Songs",
-                                count = state.library.likedTracks.size,
-                                onPlay = { onTrackPlay(state.library.likedTracks, 0) },
+                                count = state.visibleLikedTracks.size,
+                                playActionDescription =
+                                    "Play ${state.visibleLikedTracks.size} liked songs " +
+                                    "in ${state.sort.label} order",
+                                onPlay = { onTrackPlay(state.visibleLikedTracks, 0) },
                             )
                         }
                         itemsIndexed(
-                            items = state.library.likedTracks,
+                            items = state.visibleLikedTracks,
                             key = { _, track -> "liked-${track.id}" },
                         ) { index, track ->
                             LibraryTrackRow(
                                 track = track,
                                 isPending = state.isPending(LibraryItemKind.Track, track.id),
-                                onPlay = { onTrackPlay(state.library.likedTracks, index) },
+                                onPlay = { onTrackPlay(state.visibleLikedTracks, index) },
                                 onRemove = { onRemoveTrack(track) },
                             )
                         }
                     }
-                }
 
-                if (filter == LibraryFilter.All || filter == LibraryFilter.Albums) {
-                    if (state.library.savedAlbums.isNotEmpty()) {
+                    if (state.visibleSavedAlbums.isNotEmpty()) {
                         item(key = "albums-heading") {
-                            LibrarySectionHeading("Saved Albums", state.library.savedAlbums.size)
+                            LibrarySectionHeading("Saved Albums", state.visibleSavedAlbums.size)
                         }
                         items(
-                            items = state.library.savedAlbums,
+                            items = state.visibleSavedAlbums,
                             key = { "saved-${it.album.id}" },
                         ) { saved ->
                             LibraryCollectionRow(
@@ -238,18 +240,16 @@ fun LibraryScreen(
                             )
                         }
                     }
-                }
 
-                if (filter == LibraryFilter.All || filter == LibraryFilter.Artists) {
-                    if (state.library.followedArtists.isNotEmpty()) {
+                    if (state.visibleFollowedArtists.isNotEmpty()) {
                         item(key = "artists-heading") {
                             LibrarySectionHeading(
                                 "Followed Artists",
-                                state.library.followedArtists.size,
+                                state.visibleFollowedArtists.size,
                             )
                         }
                         items(
-                            items = state.library.followedArtists,
+                            items = state.visibleFollowedArtists,
                             key = { "followed-${it.id}" },
                         ) { artist ->
                             LibraryCollectionRow(
@@ -309,9 +309,81 @@ private fun LibraryHeader(isRefreshing: Boolean, onRefresh: () -> Unit) {
 }
 
 @Composable
+private fun LibraryControls(
+    query: String,
+    filter: LibraryFilter,
+    sort: LibrarySort,
+    onQueryChange: (String) -> Unit,
+    onClearQuery: () -> Unit,
+    onFilterSelected: (LibraryFilter) -> Unit,
+    onSortSelected: (LibrarySort) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            label = { Text("Search your Library") },
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            trailingIcon = if (query.isNotBlank()) {
+                {
+                    IconButton(onClick = onClearQuery) {
+                        Icon(Icons.Rounded.Clear, contentDescription = "Clear Library search")
+                    }
+                }
+            } else {
+                null
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            singleLine = true,
+            shape = RoundedCornerShape(18.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            LibraryFilter.entries.forEach { option ->
+                FilterChip(
+                    selected = option == filter,
+                    onClick = { onFilterSelected(option) },
+                    label = { Text(option.label) },
+                )
+            }
+        }
+        Text(
+            text = "Sort Library",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            LibrarySort.entries.forEach { option ->
+                FilterChip(
+                    selected = option == sort,
+                    onClick = { onSortSelected(option) },
+                    label = { Text(option.label) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun LibrarySectionHeading(
     title: String,
     count: Int,
+    playActionDescription: String = "Play all liked songs",
     onPlay: (() -> Unit)? = null,
 ) {
     Row(
@@ -331,7 +403,7 @@ private fun LibrarySectionHeading(
         )
         onPlay?.let {
             IconButton(onClick = it, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = "Play all liked songs")
+                Icon(Icons.Rounded.PlayArrow, contentDescription = playActionDescription)
             }
         }
     }
@@ -451,6 +523,8 @@ private fun LibraryStatus(
     title: String,
     message: String,
     showProgress: Boolean = false,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -473,5 +547,10 @@ private fun LibraryStatus(
             style = MaterialTheme.typography.bodyLarge,
         )
         if (showProgress) CircularProgressIndicator(modifier = Modifier.size(28.dp))
+        actionLabel?.let { label ->
+            Button(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(label)
+            }
+        }
     }
 }

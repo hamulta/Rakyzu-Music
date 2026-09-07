@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.feature.library
 
+import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,7 +14,11 @@ import my.id.rakyzumusic.core.data.library.LibraryActionResult
 import my.id.rakyzumusic.core.data.library.LibraryFailure
 import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.model.LibraryItemKind
+import my.id.rakyzumusic.core.model.Album
+import my.id.rakyzumusic.core.model.Artist
+import my.id.rakyzumusic.core.model.LibraryAlbum
 import my.id.rakyzumusic.core.model.LibrarySnapshot
+import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -99,10 +104,58 @@ class LibraryViewModelTest {
         )
     }
 
+    @Test
+    fun searchIsAccentCaseAndWhitespaceInsensitiveAcrossMetadata() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel("listener-1", FakeRepository(SEARCHABLE))
+        testScheduler.advanceUntilIdle()
+
+        viewModel.updateQuery("  cafe   sessions ")
+
+        assertEquals(listOf("track-cafe"), viewModel.uiState.value.visibleLikedTracks.map(Track::id))
+        assertTrue(viewModel.uiState.value.visibleSavedAlbums.isEmpty())
+        assertTrue(viewModel.uiState.value.visibleFollowedArtists.isEmpty())
+    }
+
+    @Test
+    fun queryFilterAndSortRestoreForTheListenerDestination() = runTest(dispatcher) {
+        val savedState = SavedStateHandle(
+            mapOf(
+                SAVED_LIBRARY_QUERY_KEY to "signal",
+                SAVED_LIBRARY_FILTER_KEY to LibraryFilter.Songs.name,
+                SAVED_LIBRARY_SORT_KEY to LibrarySort.OldestAdded.name,
+            ),
+        )
+
+        val viewModel = LibraryViewModel("listener-1", FakeRepository(ORDERED), savedState)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("signal", viewModel.uiState.value.query)
+        assertEquals(LibraryFilter.Songs, viewModel.uiState.value.filter)
+        assertEquals(LibrarySort.OldestAdded, viewModel.uiState.value.sort)
+        assertEquals(listOf("track-old", "track-new"), viewModel.uiState.value.visibleLikedTracks.map(Track::id))
+    }
+
+    @Test
+    fun likedSongsUsePersistedTimestampsAndDeterministicTieBreaks() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel("listener-1", FakeRepository(ORDERED))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf("track-new", "track-old"), viewModel.uiState.value.visibleLikedTracks.map(Track::id))
+
+        viewModel.selectSort(LibrarySort.OldestAdded)
+        assertEquals(listOf("track-old", "track-new"), viewModel.uiState.value.visibleLikedTracks.map(Track::id))
+
+        viewModel.selectSort(LibrarySort.Alphabetical)
+        assertEquals(listOf("track-old", "track-new"), viewModel.uiState.value.visibleLikedTracks.map(Track::id))
+    }
+
     private class FakeRepository(
         private val refreshGate: CompletableDeferred<Unit>? = null,
+        snapshot: LibrarySnapshot = CACHED,
     ) : LibraryRepository {
-        private val library = MutableStateFlow(CACHED)
+        constructor(snapshot: LibrarySnapshot) : this(refreshGate = null, snapshot = snapshot)
+
+        private val library = MutableStateFlow(snapshot)
         var refreshResult: LibraryActionResult = LibraryActionResult.Success
         var mutationResult: LibraryActionResult = LibraryActionResult.Success
         var lastMutation: Mutation? = null
@@ -136,5 +189,46 @@ class LibraryViewModelTest {
 
     private companion object {
         val CACHED = LibrarySnapshot(emptyList(), emptyList(), emptyList(), 42L)
+        val OLD_TRACK = Track(
+            id = "track-old",
+            title = "Alpha Signal",
+            artist = "Rakyzu Sessions",
+            durationMs = 180_000L,
+            artistId = "artist-1",
+            albumId = "album-1",
+            albumTitle = "Signal Zero",
+        )
+        val NEW_TRACK = Track(
+            id = "track-new",
+            title = "Beta Signal",
+            artist = "Rakyzu Sessions",
+            durationMs = 190_000L,
+            artistId = "artist-1",
+            albumId = "album-1",
+            albumTitle = "Signal Zero",
+        )
+        val ORDERED = LibrarySnapshot(
+            likedTracks = listOf(OLD_TRACK, NEW_TRACK),
+            savedAlbums = emptyList(),
+            followedArtists = emptyList(),
+            lastSyncedAtEpochMillis = 42L,
+            likedTrackSavedAtEpochMillis = mapOf("track-old" to 10L, "track-new" to 20L),
+        )
+        val SEARCHABLE = LibrarySnapshot(
+            likedTracks = listOf(
+                Track(
+                    id = "track-cafe",
+                    title = "Café Signal",
+                    artist = "Rakyzu Sessions",
+                    durationMs = 180_000L,
+                ),
+                Track("track-other", "Other", "Elsewhere", 100_000L),
+            ),
+            savedAlbums = listOf(
+                LibraryAlbum(Album("album-1", "artist-1", "Quiet Room", null), "Elsewhere"),
+            ),
+            followedArtists = listOf(Artist("artist-1", "Elsewhere")),
+            lastSyncedAtEpochMillis = 42L,
+        )
     }
 }

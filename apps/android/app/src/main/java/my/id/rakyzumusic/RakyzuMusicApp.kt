@@ -358,6 +358,21 @@ private fun AuthenticatedRakyzuMusicApp(
                                 signOutMessage = null
                                 showAccount = true
                             },
+                            likedTrackIds = libraryState.likedTrackIds,
+                            savedAlbumIds = libraryState.savedAlbumIds,
+                            followedArtistIds = libraryState.followedArtistIds,
+                            pendingTrackIds = libraryState.pendingTrackIds,
+                            pendingAlbumIds = libraryState.pendingAlbumIds,
+                            pendingArtistIds = libraryState.pendingArtistIds,
+                            onTrackLikeChange = { track, saved ->
+                                libraryViewModel.setSaved(LibraryItemKind.Track, track.id, saved)
+                            },
+                            onAlbumSaveChange = { track, saved ->
+                                libraryViewModel.setSaved(LibraryItemKind.Album, track.albumId, saved)
+                            },
+                            onArtistFollowChange = { track, saved ->
+                                libraryViewModel.setSaved(LibraryItemKind.Artist, track.artistId, saved)
+                            },
                         )
                     }
                     entry<RakyzuRoute.Search> {
@@ -475,6 +490,51 @@ private fun AuthenticatedRakyzuMusicApp(
                     entry<RakyzuRoute.NowPlaying> {
                         NowPlayingScreen(
                             snapshot = playbackSnapshot,
+                            isLiked = playbackSnapshot.mediaId in libraryState.likedTrackIds,
+                            isAlbumSaved = playbackSnapshot.queue
+                                .getOrNull(playbackSnapshot.currentIndex)
+                                ?.albumId in libraryState.savedAlbumIds,
+                            isArtistFollowed = playbackSnapshot.queue
+                                .getOrNull(playbackSnapshot.currentIndex)
+                                ?.artistId in libraryState.followedArtistIds,
+                            isLikePending = playbackSnapshot.mediaId in libraryState.pendingTrackIds,
+                            isAlbumPending = playbackSnapshot.queue
+                                .getOrNull(playbackSnapshot.currentIndex)
+                                ?.albumId in libraryState.pendingAlbumIds,
+                            isArtistPending = playbackSnapshot.queue
+                                .getOrNull(playbackSnapshot.currentIndex)
+                                ?.artistId in libraryState.pendingArtistIds,
+                            onLikeChange = { saved ->
+                                playbackSnapshot.mediaId?.let { trackId ->
+                                    libraryViewModel.setSaved(LibraryItemKind.Track, trackId, saved)
+                                }
+                            },
+                            onAlbumSaveChange = { saved ->
+                                playbackSnapshot.queue
+                                    .getOrNull(playbackSnapshot.currentIndex)
+                                    ?.albumId
+                                    ?.takeIf(String::isNotBlank)
+                                    ?.let { albumId ->
+                                        libraryViewModel.setSaved(
+                                            LibraryItemKind.Album,
+                                            albumId,
+                                            saved,
+                                        )
+                                    }
+                            },
+                            onArtistFollowChange = { saved ->
+                                playbackSnapshot.queue
+                                    .getOrNull(playbackSnapshot.currentIndex)
+                                    ?.artistId
+                                    ?.takeIf(String::isNotBlank)
+                                    ?.let { artistId ->
+                                        libraryViewModel.setSaved(
+                                            LibraryItemKind.Artist,
+                                            artistId,
+                                            saved,
+                                        )
+                                    }
+                            },
                             onDismiss = { dismissNowPlaying(backStack) },
                             onTogglePlayPause = playbackController::togglePlayPause,
                             onPrevious = playbackController::skipToPrevious,

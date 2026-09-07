@@ -38,6 +38,8 @@ data class PlaybackQueueItem(
     val artist: String,
     val albumTitle: String?,
     val durationMs: Long,
+    val artistId: String = "",
+    val albumId: String = "",
 )
 
 enum class PlaybackStatus {

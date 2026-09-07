@@ -101,6 +101,9 @@ class RakyzuDatabaseTest {
         assertEquals(listOf("track-1"), listenerOne.likedTracks.map(Track::id))
         assertEquals(listOf("album-1"), listenerOne.savedAlbums.map { it.album.id })
         assertEquals(listOf("artist-1"), listenerOne.followedArtists.map { it.id })
+        assertEquals(mapOf("track-1" to 30L), listenerOne.likedTrackSavedAtEpochMillis)
+        assertEquals(mapOf("album-1" to 20L), listenerOne.savedAlbumSavedAtEpochMillis)
+        assertEquals(mapOf("artist-1" to 10L), listenerOne.followedArtistSavedAtEpochMillis)
         assertEquals(true, listenerTwo.isEmpty)
     }
 

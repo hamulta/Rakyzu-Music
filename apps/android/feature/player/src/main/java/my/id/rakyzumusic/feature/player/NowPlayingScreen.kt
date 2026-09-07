@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,9 +24,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
@@ -47,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -74,7 +79,17 @@ fun NowPlayingScreen(
     onSeek: (Long) -> Unit,
     onQueueItemClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    isLiked: Boolean = false,
+    isAlbumSaved: Boolean = false,
+    isArtistFollowed: Boolean = false,
+    isLikePending: Boolean = false,
+    isAlbumPending: Boolean = false,
+    isArtistPending: Boolean = false,
+    onLikeChange: (Boolean) -> Unit = {},
+    onAlbumSaveChange: (Boolean) -> Unit = {},
+    onArtistFollowChange: (Boolean) -> Unit = {},
 ) {
+    val currentItem = snapshot.queue.getOrNull(snapshot.currentIndex)
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -94,6 +109,22 @@ fun NowPlayingScreen(
         }
         item {
             TrackDetails(snapshot)
+        }
+        currentItem?.let { queueItem ->
+            item {
+                NowPlayingLibraryActions(
+                    item = queueItem,
+                    isLiked = isLiked,
+                    isAlbumSaved = isAlbumSaved,
+                    isArtistFollowed = isArtistFollowed,
+                    isLikePending = isLikePending,
+                    isAlbumPending = isAlbumPending,
+                    isArtistPending = isArtistPending,
+                    onLikeChange = onLikeChange,
+                    onAlbumSaveChange = onAlbumSaveChange,
+                    onArtistFollowChange = onArtistFollowChange,
+                )
+            }
         }
         if (snapshot.error != null) {
             item {
@@ -128,6 +159,106 @@ fun NowPlayingScreen(
                 onClick = { onQueueItemClick(index) },
             )
         }
+    }
+}
+
+@Composable
+private fun NowPlayingLibraryActions(
+    item: PlaybackQueueItem,
+    isLiked: Boolean,
+    isAlbumSaved: Boolean,
+    isArtistFollowed: Boolean,
+    isLikePending: Boolean,
+    isAlbumPending: Boolean,
+    isArtistPending: Boolean,
+    onLikeChange: (Boolean) -> Unit,
+    onAlbumSaveChange: (Boolean) -> Unit,
+    onArtistFollowChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        LibraryActionButton(
+            icon = Icons.Rounded.Favorite,
+            label = if (isLiked) "Liked" else "Like",
+            actionDescription = if (isLiked) {
+                "Remove ${item.title} from Liked Songs"
+            } else {
+                "Add ${item.title} to Liked Songs"
+            },
+            selected = isLiked,
+            pending = isLikePending,
+            enabled = item.mediaId.isNotBlank(),
+            onClick = { onLikeChange(!isLiked) },
+        )
+        LibraryActionButton(
+            icon = Icons.Rounded.Bookmark,
+            label = if (isAlbumSaved) "Saved" else "Save album",
+            actionDescription = if (isAlbumSaved) {
+                "Remove ${item.albumTitle} from Library"
+            } else {
+                "Save ${item.albumTitle} to Library"
+            },
+            selected = isAlbumSaved,
+            pending = isAlbumPending,
+            enabled = item.albumId.isNotBlank(),
+            onClick = { onAlbumSaveChange(!isAlbumSaved) },
+        )
+        LibraryActionButton(
+            icon = Icons.Rounded.Person,
+            label = if (isArtistFollowed) "Following" else "Follow",
+            actionDescription = if (isArtistFollowed) {
+                "Unfollow ${item.artist}"
+            } else {
+                "Follow ${item.artist}"
+            },
+            selected = isArtistFollowed,
+            pending = isArtistPending,
+            enabled = item.artistId.isNotBlank(),
+            onClick = { onArtistFollowChange(!isArtistFollowed) },
+        )
+    }
+}
+
+@Composable
+private fun LibraryActionButton(
+    icon: ImageVector,
+    label: String,
+    actionDescription: String,
+    selected: Boolean,
+    pending: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.widthIn(min = 88.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        IconButton(
+            onClick = onClick,
+            enabled = enabled && !pending,
+            modifier = Modifier.size(48.dp),
+        ) {
+            if (pending) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = actionDescription,
+                    tint = if (selected) RakyzuAqua else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            text = label,
+            modifier = Modifier.heightIn(min = 20.dp),
+            color = if (selected) RakyzuAqua else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
     }
 }
 

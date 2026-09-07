@@ -6,10 +6,12 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
@@ -87,6 +89,77 @@ class LibraryAccessibilityTest {
         composeRule.onNode(hasPoliteLiveRegion()).assertExists()
     }
 
+    @Test
+    fun controlsExposeSearchFilterAndSortCallbacks() {
+        var query = ""
+        var filter = LibraryFilter.All
+        var sort = LibrarySort.RecentlyAdded
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                LibraryScreen(
+                    state = POPULATED,
+                    onRefresh = {},
+                    onQueryChange = { query = it },
+                    onFilterSelected = { filter = it },
+                    onSortSelected = { sort = it },
+                    onTrackPlay = { _, _ -> },
+                    onAlbumClick = {},
+                    onArtistClick = {},
+                    onRemoveTrack = {},
+                    onRemoveAlbum = {},
+                    onUnfollowArtist = {},
+                )
+            }
+        }
+
+        composeRule.onNode(hasSetTextAction()).performTextInput("signal")
+        composeRule.onNodeWithText("Albums").performClick()
+        composeRule.onNodeWithText("Oldest added").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals("signal", query)
+            assertEquals(LibraryFilter.Albums, filter)
+            assertEquals(LibrarySort.OldestAdded, sort)
+        }
+    }
+
+    @Test
+    fun bulkAndRowPlaybackUseTheExactVisibleLikedSongsOrder() {
+        var playedIds = emptyList<String>()
+        var playIndex = -1
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                LibraryScreen(
+                    state = ORDERED,
+                    onRefresh = {},
+                    onTrackPlay = { tracks, index ->
+                        playedIds = tracks.map(Track::id)
+                        playIndex = index
+                    },
+                    onAlbumClick = {},
+                    onArtistClick = {},
+                    onRemoveTrack = {},
+                    onRemoveAlbum = {},
+                    onUnfollowArtist = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(
+            "Play 2 liked songs in Recently added order",
+        ).performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf("track-new", "track-old"), playedIds)
+            assertEquals(0, playIndex)
+        }
+
+        composeRule.onNodeWithText("Alpha Signal").performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf("track-new", "track-old"), playedIds)
+            assertEquals(1, playIndex)
+        }
+    }
+
     private fun setLibraryContent(state: LibraryUiState) {
         composeRule.setContent {
             RakyzuMusicTheme(darkTheme = true) {
@@ -129,6 +202,22 @@ class LibraryAccessibilityTest {
                 savedAlbums = listOf(LibraryAlbum(ALBUM, ARTIST.name)),
                 followedArtists = listOf(ARTIST),
                 lastSyncedAtEpochMillis = 42L,
+            ),
+        )
+        val ORDERED = LibraryUiState(
+            hasObservedLibrary = true,
+            library = LibrarySnapshot(
+                likedTracks = listOf(
+                    Track("track-old", "Alpha Signal", "Rakyzu Sessions", 180_000L),
+                    Track("track-new", "Beta Signal", "Rakyzu Sessions", 190_000L),
+                ),
+                savedAlbums = emptyList(),
+                followedArtists = emptyList(),
+                lastSyncedAtEpochMillis = 42L,
+                likedTrackSavedAtEpochMillis = mapOf(
+                    "track-old" to 10L,
+                    "track-new" to 20L,
+                ),
             ),
         )
     }

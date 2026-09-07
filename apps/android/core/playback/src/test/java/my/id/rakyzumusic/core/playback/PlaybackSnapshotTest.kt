@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.core.playback
 
+import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -83,6 +84,22 @@ class PlaybackSnapshotTest {
         }
 
         assertEquals(2, rebuilt.size)
+    }
+
+    @Test
+    fun queueItemKeepsCanonicalLibraryIdentifiers() {
+        val queueItem = Track(
+            id = "track-1",
+            title = "Midnight Signal",
+            artist = "Rakyzu Sessions",
+            durationMs = 185_900L,
+            artistId = "artist-1",
+            albumId = "album-1",
+            albumTitle = "Signal Zero",
+        ).toPlaybackQueueItem()
+
+        assertEquals("artist-1", queueItem.artistId)
+        assertEquals("album-1", queueItem.albumId)
     }
 
     private fun queueItem(id: String) = PlaybackQueueItem(

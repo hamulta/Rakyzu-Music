@@ -65,6 +65,9 @@ data class LibrarySnapshot(
     val savedAlbums: List<LibraryAlbum>,
     val followedArtists: List<Artist>,
     val lastSyncedAtEpochMillis: Long?,
+    val likedTrackSavedAtEpochMillis: Map<String, Long> = emptyMap(),
+    val savedAlbumSavedAtEpochMillis: Map<String, Long> = emptyMap(),
+    val followedArtistSavedAtEpochMillis: Map<String, Long> = emptyMap(),
 ) {
     val isEmpty: Boolean
         get() = likedTracks.isEmpty() && savedAlbums.isEmpty() && followedArtists.isEmpty()

@@ -39,17 +39,17 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.2.8` — search resilience and offline/online transition hardening.
 - [x] `0.2.9` — privacy-safe Search observability and performance hardening.
 - [x] `0.2.10` — final Search regression, accessibility, resilience, and performance gate before Library.
-- [x] `0.3.0` - account-scoped offline-first Library foundation with liked songs, saved albums, followed artists, playback, Search/detail mutations, Room persistence, Supabase synchronization, and RLS isolation.
-- [ ] `0.3.1` - Like, save, and follow entry points across Home and Now Playing.
-- [ ] `0.3.2` - Library search, sort, filter, and listener-scoped UI-state restoration.
-- [ ] `0.3.3` - Liked Songs ordering, bulk playback, and deterministic queue controls.
-- [ ] `0.3.4` - Saved-album and followed-artist navigation, artwork, and empty-state polish.
-- [ ] `0.3.5` - optimistic offline mutations, durable outbox, conflict handling, and recovery.
-- [ ] `0.3.6` - bounded pagination and incremental Library synchronization.
-- [ ] `0.3.7` - freshness, validated-connectivity recovery, and retry hardening.
-- [ ] `0.3.8` - adaptive layouts, large-text behavior, and complete TalkBack contracts.
-- [ ] `0.3.9` - privacy-safe Library diagnostics and performance hardening.
-- [ ] `0.3.10` - final Library regression, accessibility, resilience, runtime, and performance gate before Playlists.
+- [x] `0.3.0` — account-scoped offline-first Library foundation with liked songs, saved albums, followed artists, playback, Search/detail mutations, Room persistence, Supabase synchronization, and RLS isolation.
+- [x] `0.3.1` — Like, save, and follow entry points across Home and Now Playing.
+- [x] `0.3.2` — Library search, sort, filter, and listener-scoped UI-state restoration.
+- [x] `0.3.3` — Liked Songs ordering, bulk playback, and deterministic queue controls.
+- [ ] `0.3.4` — Saved-album and followed-artist navigation, artwork, and empty-state polish.
+- [ ] `0.3.5` — optimistic offline mutations, durable outbox, conflict handling, and recovery.
+- [ ] `0.3.6` — bounded pagination and incremental Library synchronization.
+- [ ] `0.3.7` — freshness, validated-connectivity recovery, and retry hardening.
+- [ ] `0.3.8` — adaptive layouts, large-text behavior, and complete TalkBack contracts.
+- [ ] `0.3.9` — privacy-safe Library diagnostics and performance hardening.
+- [ ] `0.3.10` — final Library regression, accessibility, resilience, runtime, and performance gate before Playlists.
 - `0.4.x`: Playlist create/edit/order/share and concurrency handling.
 - `0.5.x`: Queue, playback recovery, devices, audio quality controls.
 - `0.6.x`: Offline downloads, storage controls, resilient sync.

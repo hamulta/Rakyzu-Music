@@ -245,12 +245,14 @@ class RakyzuPlaybackController(
     }
 }
 
-private fun Track.toPlaybackQueueItem(): PlaybackQueueItem = PlaybackQueueItem(
+internal fun Track.toPlaybackQueueItem(): PlaybackQueueItem = PlaybackQueueItem(
     mediaId = id,
     title = title,
     artist = artist,
     albumTitle = albumTitle.takeIf(String::isNotBlank),
     durationMs = durationMs.coerceAtLeast(0L),
+    artistId = artistId,
+    albumId = albumId,
 )
 
 private fun androidx.media3.common.MediaItem.toPlaybackQueueItem(): PlaybackQueueItem =
@@ -260,4 +262,6 @@ private fun androidx.media3.common.MediaItem.toPlaybackQueueItem(): PlaybackQueu
         artist = mediaMetadata.artist?.toString() ?: "Rakyzu Music",
         albumTitle = mediaMetadata.albumTitle?.toString(),
         durationMs = mediaMetadata.durationMs?.coerceAtLeast(0L) ?: 0L,
+        artistId = mediaMetadata.extras?.getString(PLAYBACK_ARTIST_ID_KEY).orEmpty(),
+        albumId = mediaMetadata.extras?.getString(PLAYBACK_ALBUM_ID_KEY).orEmpty(),
     )

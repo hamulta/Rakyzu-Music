@@ -49,20 +49,32 @@ internal class RoomLibraryLocalDataSource(
             val tracksById = catalog.tracks.associateBy(Track::id)
             val albumsById = catalog.albums.associateBy { album -> album.id }
             val artistsById = catalog.artists.associateBy { artist -> artist.id }
+            val likedTrackRows = dao.getLikedTracks(userId)
+            val savedAlbumRows = dao.getSavedAlbums(userId)
+            val followedArtistRows = dao.getFollowedArtists(userId)
             LibrarySnapshot(
-                likedTracks = dao.getLikedTracks(userId).mapNotNull { tracksById[it.itemId] },
-                savedAlbums = dao.getSavedAlbums(userId).mapNotNull { stored ->
+                likedTracks = likedTrackRows.mapNotNull { tracksById[it.itemId] },
+                savedAlbums = savedAlbumRows.mapNotNull { stored ->
                     val album = albumsById[stored.itemId] ?: return@mapNotNull null
                     LibraryAlbum(
                         album = album,
                         artistName = artistsById[album.artistId]?.name.orEmpty(),
                     )
                 },
-                followedArtists = dao.getFollowedArtists(userId)
+                followedArtists = followedArtistRows
                     .mapNotNull { artistsById[it.itemId] },
                 lastSyncedAtEpochMillis = dao.getLastSuccessfulSyncEpochMillis(
                     CatalogDao.librarySyncKey(userId),
                 ),
+                likedTrackSavedAtEpochMillis = likedTrackRows
+                    .filter { it.itemId in tracksById }
+                    .associate { it.itemId to it.savedAtEpochMillis },
+                savedAlbumSavedAtEpochMillis = savedAlbumRows
+                    .filter { it.itemId in albumsById }
+                    .associate { it.itemId to it.savedAtEpochMillis },
+                followedArtistSavedAtEpochMillis = followedArtistRows
+                    .filter { it.itemId in artistsById }
+                    .associate { it.itemId to it.savedAtEpochMillis },
             )
         }
 

@@ -217,6 +217,40 @@ class HomeShelfAccessibilityTest {
         composeRule.onNodeWithTag("album-artwork-failed-$albumId").assertExists()
     }
 
+    @Test
+    fun trackMenuExposesLikeSaveAndFollowEntryPoints() {
+        val track = track(id = "track-1", title = "Midnight Signal")
+        val actions = mutableListOf<String>()
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                TrackShelf(
+                    title = "All tracks",
+                    subtitle = null,
+                    tracks = listOf(track),
+                    onTrackPlay = { _, _ -> },
+                    onTrackLikeChange = { _, saved -> actions += "track:$saved" },
+                    onAlbumSaveChange = { _, saved -> actions += "album:$saved" },
+                    onArtistFollowChange = { _, saved -> actions += "artist:$saved" },
+                )
+            }
+        }
+
+        fun selectAction(label: String) {
+            composeRule.onNodeWithContentDescription("Library actions for Midnight Signal")
+                .assertHeightIsAtLeast(48.dp)
+                .performClick()
+            composeRule.onNodeWithText(label).assertHasClickAction().performClick()
+        }
+
+        selectAction("Add to Liked Songs")
+        selectAction("Save album")
+        selectAction("Follow artist")
+
+        composeRule.runOnIdle {
+            assertEquals(listOf("track:true", "album:true", "artist:true"), actions)
+        }
+    }
+
     private fun hasPlayAction(expectedLabel: String? = null): SemanticsMatcher =
         SemanticsMatcher("has a labeled Home playback action") { node ->
             val label = if (node.config.contains(SemanticsActions.OnClick)) {
@@ -232,5 +266,8 @@ class HomeShelfAccessibilityTest {
         title = title,
         artist = "Rakyzu Sessions",
         durationMs = 180_000L,
+        artistId = "artist-1",
+        albumId = "album-1",
+        albumTitle = "Signal Zero",
     )
 }
