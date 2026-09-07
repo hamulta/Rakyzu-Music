@@ -84,27 +84,30 @@ stable
 security invoker
 set search_path = public, pg_temp
 as $$
-  select 'track'::text, liked.track_id, liked.saved_at
-  from public.liked_tracks as liked
-  join public.tracks as track on track.id = liked.track_id
-  join public.albums as album on album.id = track.album_id
-  join public.artists as artist on artist.id = album.artist_id
-  where liked.user_id = (select auth.uid())
-    and track.is_published and album.is_published and artist.is_published
-  union all
-  select 'album'::text, saved.album_id, saved.saved_at
-  from public.saved_albums as saved
-  join public.albums as album on album.id = saved.album_id
-  join public.artists as artist on artist.id = album.artist_id
-  where saved.user_id = (select auth.uid())
-    and album.is_published and artist.is_published
-  union all
-  select 'artist'::text, followed.artist_id, followed.saved_at
-  from public.followed_artists as followed
-  join public.artists as artist on artist.id = followed.artist_id
-  where followed.user_id = (select auth.uid())
-    and artist.is_published
-  order by saved_at desc, kind, item_id;
+  select library.kind, library.item_id, library.saved_at
+  from (
+    select 'track'::text as kind, liked.track_id as item_id, liked.saved_at
+    from public.liked_tracks as liked
+    join public.tracks as track on track.id = liked.track_id
+    join public.albums as album on album.id = track.album_id
+    join public.artists as artist on artist.id = album.artist_id
+    where liked.user_id = (select auth.uid())
+      and track.is_published and album.is_published and artist.is_published
+    union all
+    select 'album'::text as kind, saved.album_id as item_id, saved.saved_at
+    from public.saved_albums as saved
+    join public.albums as album on album.id = saved.album_id
+    join public.artists as artist on artist.id = album.artist_id
+    where saved.user_id = (select auth.uid())
+      and album.is_published and artist.is_published
+    union all
+    select 'artist'::text as kind, followed.artist_id as item_id, followed.saved_at
+    from public.followed_artists as followed
+    join public.artists as artist on artist.id = followed.artist_id
+    where followed.user_id = (select auth.uid())
+      and artist.is_published
+  ) as library
+  order by library.saved_at desc, library.kind, library.item_id;
 $$;
 
 create function public.set_library_item(
