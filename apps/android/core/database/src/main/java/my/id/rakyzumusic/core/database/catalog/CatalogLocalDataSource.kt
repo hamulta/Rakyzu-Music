@@ -20,10 +20,21 @@ interface CatalogLocalDataSource {
     suspend fun recordRecentlyPlayed(userId: String, trackId: String, playedAtEpochMillis: Long): Boolean
 }
 
-fun createCatalogLocalDataSource(context: Context): CatalogLocalDataSource {
+data class RakyzuLocalDataSources(
+    val catalog: CatalogLocalDataSource,
+    val library: LibraryLocalDataSource,
+)
+
+fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
     val database = RakyzuDatabaseFactory.create(context)
-    return RoomCatalogLocalDataSource(database)
+    return RakyzuLocalDataSources(
+        catalog = RoomCatalogLocalDataSource(database),
+        library = RoomLibraryLocalDataSource(database),
+    )
 }
+
+fun createCatalogLocalDataSource(context: Context): CatalogLocalDataSource =
+    createRakyzuLocalDataSources(context).catalog
 
 internal class RoomCatalogLocalDataSource(
     private val database: RakyzuDatabase,
@@ -99,7 +110,7 @@ internal class RoomCatalogLocalDataSource(
     }
 }
 
-private fun CatalogEntitySnapshot.toDomain(): CatalogSnapshot {
+internal fun CatalogEntitySnapshot.toDomain(): CatalogSnapshot {
     val artistsById = artists.associateBy(ArtistEntity::id)
     val albumsById = albums.associateBy(AlbumEntity::id)
     val tracksById = tracks.associateBy(TrackEntity::id)

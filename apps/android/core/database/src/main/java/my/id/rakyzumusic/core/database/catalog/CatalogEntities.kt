@@ -112,3 +112,36 @@ internal data class RecentlyPlayedEntity(
     @ColumnInfo(name = "track_id") val trackId: String,
     @ColumnInfo(name = "played_at_epoch_ms") val playedAtEpochMs: Long,
 )
+
+@Entity(
+    tableName = "library_liked_tracks",
+    primaryKeys = ["user_id", "track_id"],
+    indices = [Index(value = ["user_id", "saved_at_epoch_ms"])],
+)
+internal data class LibraryLikedTrackEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    @ColumnInfo(name = "saved_at_epoch_ms") val savedAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "library_saved_albums",
+    primaryKeys = ["user_id", "album_id"],
+    indices = [Index(value = ["user_id", "saved_at_epoch_ms"])],
+)
+internal data class LibrarySavedAlbumEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "album_id") val albumId: String,
+    @ColumnInfo(name = "saved_at_epoch_ms") val savedAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "library_followed_artists",
+    primaryKeys = ["user_id", "artist_id"],
+    indices = [Index(value = ["user_id", "saved_at_epoch_ms"])],
+)
+internal data class LibraryFollowedArtistEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "artist_id") val artistId: String,
+    @ColumnInfo(name = "saved_at_epoch_ms") val savedAtEpochMillis: Long,
+)

@@ -6,6 +6,11 @@ import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
 import androidx.room3.Transaction
 
+internal data class StoredLibraryItem(
+    val itemId: String,
+    val savedAtEpochMillis: Long,
+)
+
 internal data class CatalogEntitySnapshot(
     val artists: List<ArtistEntity>,
     val albums: List<AlbumEntity>,
@@ -48,6 +53,27 @@ internal interface CatalogDao {
     @Query("SELECT last_successful_sync_epoch_ms FROM sync_metadata WHERE `key` = :key")
     suspend fun getLastSuccessfulSyncEpochMillis(key: String): Long?
 
+    @Query(
+        "SELECT track_id AS itemId, saved_at_epoch_ms AS savedAtEpochMillis " +
+            "FROM library_liked_tracks WHERE user_id = :userId " +
+            "ORDER BY saved_at_epoch_ms DESC, track_id",
+    )
+    suspend fun getLikedTracks(userId: String): List<StoredLibraryItem>
+
+    @Query(
+        "SELECT album_id AS itemId, saved_at_epoch_ms AS savedAtEpochMillis " +
+            "FROM library_saved_albums WHERE user_id = :userId " +
+            "ORDER BY saved_at_epoch_ms DESC, album_id",
+    )
+    suspend fun getSavedAlbums(userId: String): List<StoredLibraryItem>
+
+    @Query(
+        "SELECT artist_id AS itemId, saved_at_epoch_ms AS savedAtEpochMillis " +
+            "FROM library_followed_artists WHERE user_id = :userId " +
+            "ORDER BY saved_at_epoch_ms DESC, artist_id",
+    )
+    suspend fun getFollowedArtists(userId: String): List<StoredLibraryItem>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertArtists(artists: List<ArtistEntity>)
 
@@ -68,6 +94,42 @@ internal interface CatalogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecentlyPlayed(item: RecentlyPlayedEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLikedTracks(items: List<LibraryLikedTrackEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSavedAlbums(items: List<LibrarySavedAlbumEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFollowedArtists(items: List<LibraryFollowedArtistEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLikedTrack(item: LibraryLikedTrackEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSavedAlbum(item: LibrarySavedAlbumEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFollowedArtist(item: LibraryFollowedArtistEntity)
+
+    @Query("DELETE FROM library_liked_tracks WHERE user_id = :userId")
+    suspend fun deleteLikedTracks(userId: String)
+
+    @Query("DELETE FROM library_saved_albums WHERE user_id = :userId")
+    suspend fun deleteSavedAlbums(userId: String)
+
+    @Query("DELETE FROM library_followed_artists WHERE user_id = :userId")
+    suspend fun deleteFollowedArtists(userId: String)
+
+    @Query("DELETE FROM library_liked_tracks WHERE user_id = :userId AND track_id = :itemId")
+    suspend fun deleteLikedTrack(userId: String, itemId: String)
+
+    @Query("DELETE FROM library_saved_albums WHERE user_id = :userId AND album_id = :itemId")
+    suspend fun deleteSavedAlbum(userId: String, itemId: String)
+
+    @Query("DELETE FROM library_followed_artists WHERE user_id = :userId AND artist_id = :itemId")
+    suspend fun deleteFollowedArtist(userId: String, itemId: String)
 
     @Query(
         """
@@ -154,7 +216,30 @@ internal interface CatalogDao {
         return true
     }
 
+    @Transaction
+    suspend fun replaceLibrary(
+        userId: String,
+        likedTracks: List<LibraryLikedTrackEntity>,
+        savedAlbums: List<LibrarySavedAlbumEntity>,
+        followedArtists: List<LibraryFollowedArtistEntity>,
+        syncedAtEpochMillis: Long,
+    ) {
+        deleteLikedTracks(userId)
+        deleteSavedAlbums(userId)
+        deleteFollowedArtists(userId)
+        insertLikedTracks(likedTracks)
+        insertSavedAlbums(savedAlbums)
+        insertFollowedArtists(followedArtists)
+        insertSyncMetadata(
+            SyncMetadataEntity(
+                key = librarySyncKey(userId),
+                lastSuccessfulSyncEpochMs = syncedAtEpochMillis,
+            ),
+        )
+    }
+
     companion object {
         const val CATALOG_SYNC_KEY = "catalog"
+        fun librarySyncKey(userId: String) = "library:$userId"
     }
 }

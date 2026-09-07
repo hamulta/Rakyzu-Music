@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +55,9 @@ fun TrackContextSheet(
     onPlay: (() -> Unit)? = null,
     onViewArtist: (() -> Unit)? = null,
     onViewAlbum: (() -> Unit)? = null,
+    isLiked: Boolean = false,
+    isLikePending: Boolean = false,
+    onLikeChange: ((Boolean) -> Unit)? = null,
 ) {
     val capabilities = track.contextCapabilities()
     ModalBottomSheet(
@@ -116,6 +121,19 @@ fun TrackContextSheet(
                     onClick = action,
                 )
             }
+            onLikeChange?.let { action ->
+                TrackContextAction(
+                    icon = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    label = if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
+                    onClickLabel = if (isLiked) {
+                        "Remove ${track.title.trim()} from Liked Songs"
+                    } else {
+                        "Add ${track.title.trim()} to Liked Songs"
+                    },
+                    enabled = !isLikePending,
+                    onClick = { action(!isLiked) },
+                )
+            }
             if (capabilities.canViewArtist) {
                 onViewArtist?.let { action ->
                     TrackContextAction(
@@ -164,6 +182,7 @@ private fun TrackContextAction(
     icon: ImageVector,
     label: String,
     onClickLabel: String,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
@@ -171,6 +190,7 @@ private fun TrackContextAction(
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .clickable(
+                enabled = enabled,
                 onClickLabel = onClickLabel,
                 role = Role.Button,
                 onClick = onClick,

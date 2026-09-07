@@ -18,6 +18,11 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.catalog.OfflineFirstCatalogRepository
 import my.id.rakyzumusic.core.data.catalog.SupabaseCatalogRemoteDataSource
+import my.id.rakyzumusic.core.data.library.LibraryActionResult
+import my.id.rakyzumusic.core.data.library.LibraryFailure
+import my.id.rakyzumusic.core.data.library.LibraryRepository
+import my.id.rakyzumusic.core.data.library.OfflineFirstLibraryRepository
+import my.id.rakyzumusic.core.data.library.SupabaseLibraryRemoteDataSource
 import my.id.rakyzumusic.core.data.media.AccessTokenProvider
 import my.id.rakyzumusic.core.data.media.AuthenticatedMediaDeliveryRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
@@ -31,9 +36,11 @@ import my.id.rakyzumusic.core.data.profile.ProfileResult
 import my.id.rakyzumusic.core.data.profile.SupabaseProfileRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.data.search.createRecentSearchRepository
-import my.id.rakyzumusic.core.database.catalog.createCatalogLocalDataSource
+import my.id.rakyzumusic.core.database.catalog.createRakyzuLocalDataSources
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
+import my.id.rakyzumusic.core.model.LibraryItemKind
+import my.id.rakyzumusic.core.model.LibrarySnapshot
 
 data class SupabasePublicConfiguration(
     val url: String,
@@ -69,10 +76,12 @@ object RakyzuAuthFactory {
             profileRepository = UnavailableProfileRepository,
             catalogRepository = UnavailableCatalogRepository,
             mediaDeliveryRepository = UnavailableMediaDeliveryRepository,
+            libraryRepository = UnavailableLibraryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
         )
 
+        val localDataSources = createRakyzuLocalDataSources(context)
         val encryptedStore = EncryptedAuthStore(context)
         val sessionJson = Json {
             encodeDefaults = true
@@ -104,8 +113,12 @@ object RakyzuAuthFactory {
             ),
             profileRepository = SupabaseProfileRepository(client.auth, client.postgrest),
             catalogRepository = OfflineFirstCatalogRepository(
-                localDataSource = createCatalogLocalDataSource(context),
+                localDataSource = localDataSources.catalog,
                 remoteDataSource = SupabaseCatalogRemoteDataSource(client.postgrest),
+            ),
+            libraryRepository = OfflineFirstLibraryRepository(
+                localDataSource = localDataSources.library,
+                remoteDataSource = SupabaseLibraryRemoteDataSource(client.postgrest),
             ),
             mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
                 UnavailableMediaDeliveryRepository
@@ -125,10 +138,32 @@ data class RakyzuRepositories(
     val authRepository: AuthRepository,
     val profileRepository: ProfileRepository,
     val catalogRepository: CatalogRepository,
+    val libraryRepository: LibraryRepository,
     val mediaDeliveryRepository: MediaDeliveryRepository,
     val connectivityMonitor: ConnectivityMonitor,
     val recentSearchRepository: RecentSearchRepository,
 )
+
+private data object UnavailableLibraryRepository : LibraryRepository {
+    private val empty = LibrarySnapshot(
+        likedTracks = emptyList(),
+        savedAlbums = emptyList(),
+        followedArtists = emptyList(),
+        lastSyncedAtEpochMillis = null,
+    )
+
+    override fun observeLibrary(userId: String) = flowOf(empty)
+
+    override suspend fun refresh(userId: String) =
+        LibraryActionResult.Failure(LibraryFailure.ServiceUnavailable)
+
+    override suspend fun setSaved(
+        userId: String,
+        kind: LibraryItemKind,
+        itemId: String,
+        saved: Boolean,
+    ) = LibraryActionResult.Failure(LibraryFailure.ServiceUnavailable)
+}
 
 private data object UnavailableAuthRepository : AuthRepository {
     override val sessionState: StateFlow<AuthSessionState> = MutableStateFlow(

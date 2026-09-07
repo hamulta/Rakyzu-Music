@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.2.10**
+Current version: **0.3.0**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.2.10-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -66,7 +66,9 @@ Artist results open an offline-first detail destination while preserving the Sea
 
 Album results and artist releases open a typed offline-first album destination using the exact catalog album ID. The album screen derives its artist and complete track queue from Room, orders tracks by disc and track position with stable title/ID ties, exposes disc headings for multi-disc releases, and provides Play album plus accessible per-track playback. Loading, unavailable, and empty-album states remain explicit while Back restores the prior Search or artist-detail destination.
 
-Track rows in Search, artist detail, and album detail expose an accessible local context sheet with catalog metadata and playback. Artist and album actions appear only when the current surface supplies a safe internal destination and the track contains the corresponding canonical ID. Metadata actions reuse an existing matching destination in the nested Search back stack instead of duplicating it. The sheet adds no network request, share intent, clipboard access, browser handoff, mutation, analytics, or logging path.
+Track rows in Search, artist detail, and album detail expose an accessible context sheet with catalog metadata, playback, and Like/unlike actions. Artist and album actions appear only when the current surface supplies a safe internal destination and the track contains the corresponding canonical ID. Metadata actions reuse an existing matching destination in the nested Search back stack instead of duplicating it. The sheet adds no share intent, clipboard access, browser handoff, analytics, or logging path.
+
+Library is an account-scoped offline-first surface backed by Room schema 3. It resolves liked tracks, saved albums, and followed artists against the last verified catalog, plays the complete liked-song queue, and opens album or artist detail without losing top-level navigation ownership. Search and detail screens send authenticated idempotent mutations through Supabase `security invoker` functions; forced RLS isolates every canonical relationship by listener, failed refreshes preserve cache, failed mutations do not create local divergence, and unpublished catalog entries are never projected.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

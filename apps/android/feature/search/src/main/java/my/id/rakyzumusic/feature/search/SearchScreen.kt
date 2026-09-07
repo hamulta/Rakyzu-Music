@@ -94,6 +94,9 @@ fun SearchRoute(
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
+    likedTrackIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SearchScreen(
@@ -113,6 +116,9 @@ fun SearchRoute(
         onAlbumClick = onAlbumClick,
         onTrackArtistClick = onTrackArtistClick,
         onTrackAlbumClick = onTrackAlbumClick,
+        likedTrackIds = likedTrackIds,
+        pendingTrackIds = pendingTrackIds,
+        onTrackLikeChange = onTrackLikeChange,
         modifier = modifier,
     )
 }
@@ -137,6 +143,9 @@ fun SearchScreen(
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
+    likedTrackIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -167,6 +176,11 @@ fun SearchScreen(
                     contextualTrack = null
                     callback(track)
                 }
+            },
+            isLiked = track.id in likedTrackIds,
+            isLikePending = track.id in pendingTrackIds,
+            onLikeChange = onTrackLikeChange?.let { callback ->
+                { saved -> callback(track, saved) }
             },
         )
     }

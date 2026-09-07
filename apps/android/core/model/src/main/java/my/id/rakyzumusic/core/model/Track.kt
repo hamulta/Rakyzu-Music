@@ -49,6 +49,27 @@ data class HomeFeedSnapshot(
     val recentlyPlayed: List<Track>,
 )
 
+enum class LibraryItemKind {
+    Track,
+    Album,
+    Artist,
+}
+
+data class LibraryAlbum(
+    val album: Album,
+    val artistName: String,
+)
+
+data class LibrarySnapshot(
+    val likedTracks: List<Track>,
+    val savedAlbums: List<LibraryAlbum>,
+    val followedArtists: List<Artist>,
+    val lastSyncedAtEpochMillis: Long?,
+) {
+    val isEmpty: Boolean
+        get() = likedTracks.isEmpty() && savedAlbums.isEmpty() && followedArtists.isEmpty()
+}
+
 fun Track.formattedDuration(): String {
     val totalSeconds = durationMs.coerceAtLeast(0L) / 1_000L
     val minutes = totalSeconds / 60L

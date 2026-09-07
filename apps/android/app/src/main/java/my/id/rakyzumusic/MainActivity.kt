@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
                     authRepository = rakyzuApplication.authRepository,
                     profileRepository = rakyzuApplication.profileRepository,
                     catalogRepository = rakyzuApplication.catalogRepository,
+                    libraryRepository = rakyzuApplication.libraryRepository,
                     mediaDeliveryRepository = rakyzuApplication.mediaDeliveryRepository,
                     connectivityMonitor = rakyzuApplication.connectivityMonitor,
                     recentSearchRepository = rakyzuApplication.recentSearchRepository,

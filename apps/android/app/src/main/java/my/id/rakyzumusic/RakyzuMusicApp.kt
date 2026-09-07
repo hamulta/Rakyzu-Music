@@ -68,6 +68,7 @@ import my.id.rakyzumusic.core.data.auth.AuthFailure
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
@@ -76,11 +77,14 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
+import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.feature.auth.AuthRoute
 import my.id.rakyzumusic.feature.home.HomeRoute
+import my.id.rakyzumusic.feature.library.LibraryRoute
+import my.id.rakyzumusic.feature.library.LibraryViewModel
 import my.id.rakyzumusic.feature.player.NowPlayingScreen
 import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
@@ -120,6 +124,7 @@ fun RakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    libraryRepository: LibraryRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
@@ -157,6 +162,7 @@ fun RakyzuMusicApp(
             authRepository = authRepository,
             profileRepository = profileRepository,
             catalogRepository = catalogRepository,
+            libraryRepository = libraryRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
@@ -174,6 +180,7 @@ private fun ProfileGatedRakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    libraryRepository: LibraryRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
@@ -214,6 +221,7 @@ private fun ProfileGatedRakyzuMusicApp(
             onResetProfileDraft = profileViewModel::resetDraft,
             authRepository = authRepository,
             catalogRepository = catalogRepository,
+            libraryRepository = libraryRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
@@ -239,6 +247,7 @@ private fun AuthenticatedRakyzuMusicApp(
     onResetProfileDraft: () -> Unit,
     authRepository: AuthRepository,
     catalogRepository: CatalogRepository,
+    libraryRepository: LibraryRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
@@ -257,6 +266,11 @@ private fun AuthenticatedRakyzuMusicApp(
             connectivityMonitor = connectivityMonitor,
         ),
     )
+    val libraryViewModel: LibraryViewModel = viewModel(
+        key = "library-$userId",
+        factory = LibraryViewModel.factory(userId, libraryRepository),
+    )
+    val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
     var isSigningOut by remember { mutableStateOf(false) }
@@ -307,7 +321,7 @@ private fun AuthenticatedRakyzuMusicApp(
                     selected = currentRoute == destination.route ||
                         (currentRoute is RakyzuRoute.ArtistDetail ||
                             currentRoute is RakyzuRoute.AlbumDetail) &&
-                        destination.route == RakyzuRoute.Search,
+                        destination.route == backStack.firstOrNull(),
                     onClick = { selectTopLevelRoute(backStack, destination.route) },
                     icon = {
                         Icon(
@@ -362,6 +376,15 @@ private fun AuthenticatedRakyzuMusicApp(
                             onTrackAlbumClick = { track ->
                                 openAlbumDetail(backStack, track.albumId)
                             },
+                            likedTrackIds = libraryState.likedTrackIds,
+                            pendingTrackIds = libraryState.pendingTrackIds,
+                            onTrackLikeChange = { track, saved ->
+                                libraryViewModel.setSaved(
+                                    LibraryItemKind.Track,
+                                    track.id,
+                                    saved,
+                                )
+                            },
                         )
                     }
                     entry<RakyzuRoute.ArtistDetail> { route ->
@@ -382,6 +405,24 @@ private fun AuthenticatedRakyzuMusicApp(
                             onTrackAlbumClick = { track ->
                                 openAlbumDetail(backStack, track.albumId)
                             },
+                            isFollowed = route.artistId in libraryState.followedArtistIds,
+                            isFollowPending = route.artistId in libraryState.pendingArtistIds,
+                            onFollowChange = { saved ->
+                                libraryViewModel.setSaved(
+                                    LibraryItemKind.Artist,
+                                    route.artistId,
+                                    saved,
+                                )
+                            },
+                            likedTrackIds = libraryState.likedTrackIds,
+                            pendingTrackIds = libraryState.pendingTrackIds,
+                            onTrackLikeChange = { track, saved ->
+                                libraryViewModel.setSaved(
+                                    LibraryItemKind.Track,
+                                    track.id,
+                                    saved,
+                                )
+                            },
                         )
                     }
                     entry<RakyzuRoute.AlbumDetail> { route ->
@@ -399,13 +440,36 @@ private fun AuthenticatedRakyzuMusicApp(
                             onTrackArtistClick = { track ->
                                 openArtistDetail(backStack, track.artistId)
                             },
+                            isSaved = route.albumId in libraryState.savedAlbumIds,
+                            isSavePending = route.albumId in libraryState.pendingAlbumIds,
+                            onSaveChange = { saved ->
+                                libraryViewModel.setSaved(
+                                    LibraryItemKind.Album,
+                                    route.albumId,
+                                    saved,
+                                )
+                            },
+                            likedTrackIds = libraryState.likedTrackIds,
+                            pendingTrackIds = libraryState.pendingTrackIds,
+                            onTrackLikeChange = { track, saved ->
+                                libraryViewModel.setSaved(
+                                    LibraryItemKind.Track,
+                                    track.id,
+                                    saved,
+                                )
+                            },
                         )
                     }
                     entry<RakyzuRoute.Library> {
-                        FoundationDestination(
-                            title = "Your Library",
-                            message = "Library foundations arrive in the 0.3.x release line.",
-                            icon = Icons.Rounded.LibraryMusic,
+                        LibraryRoute(
+                            viewModel = libraryViewModel,
+                            onTrackPlay = playbackController::playQueue,
+                            onAlbumClick = { album ->
+                                openAlbumDetail(backStack, album.id)
+                            },
+                            onArtistClick = { artist ->
+                                openArtistDetail(backStack, artist.id)
+                            },
                         )
                     }
                     entry<RakyzuRoute.NowPlaying> {

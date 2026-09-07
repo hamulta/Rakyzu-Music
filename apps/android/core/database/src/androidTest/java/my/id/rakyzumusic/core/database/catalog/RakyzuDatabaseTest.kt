@@ -11,6 +11,7 @@ import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.EditorialShelf
+import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -23,6 +24,7 @@ import org.junit.runner.RunWith
 class RakyzuDatabaseTest {
     private lateinit var database: RakyzuDatabase
     private lateinit var dataSource: CatalogLocalDataSource
+    private lateinit var libraryDataSource: LibraryLocalDataSource
 
     @Before
     fun setUp() {
@@ -33,6 +35,7 @@ class RakyzuDatabaseTest {
             .setDriver(AndroidSQLiteDriver())
             .build()
         dataSource = RoomCatalogLocalDataSource(database)
+        libraryDataSource = RoomLibraryLocalDataSource(database)
     }
 
     @After
@@ -74,6 +77,31 @@ class RakyzuDatabaseTest {
 
         assertEquals(listOf("track-1"), listenerOne.recentlyPlayed.map(Track::id))
         assertEquals(emptyList<Track>(), listenerTwo.recentlyPlayed)
+    }
+
+    @Test
+    fun libraryCacheIsResolvedFromCatalogAndIsolatedByListener() = runTest {
+        dataSource.replaceCatalog(CATALOG, syncedAtEpochMillis = 1234L)
+        libraryDataSource.replaceLibrary(
+            userId = "listener-1",
+            selections = listOf(
+                StoredLibrarySelection(LibraryItemKind.Track, "track-1", 30L),
+                StoredLibrarySelection(LibraryItemKind.Album, "album-1", 20L),
+                StoredLibrarySelection(LibraryItemKind.Artist, "artist-1", 10L),
+                StoredLibrarySelection(LibraryItemKind.Track, "missing", 40L),
+            ),
+            syncedAtEpochMillis = 55L,
+        )
+
+        val listenerOne = libraryDataSource.observeLibrary("listener-1").first {
+            it.lastSyncedAtEpochMillis == 55L
+        }
+        val listenerTwo = libraryDataSource.observeLibrary("listener-2").first()
+
+        assertEquals(listOf("track-1"), listenerOne.likedTracks.map(Track::id))
+        assertEquals(listOf("album-1"), listenerOne.savedAlbums.map { it.album.id })
+        assertEquals(listOf("artist-1"), listenerOne.followedArtists.map { it.id })
+        assertEquals(true, listenerTwo.isEmpty)
     }
 
     private companion object {

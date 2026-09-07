@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -26,6 +28,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +66,12 @@ fun AlbumDetailRoute(
     onTrackPlay: (List<Track>, Int) -> Unit,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
+    isSaved: Boolean = false,
+    isSavePending: Boolean = false,
+    onSaveChange: ((Boolean) -> Unit)? = null,
+    likedTrackIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -72,6 +81,12 @@ fun AlbumDetailRoute(
         onTrackPlay = onTrackPlay,
         onTrackArtistClick = onTrackArtistClick,
         onTrackAlbumClick = onTrackAlbumClick,
+        isSaved = isSaved,
+        isSavePending = isSavePending,
+        onSaveChange = onSaveChange,
+        likedTrackIds = likedTrackIds,
+        pendingTrackIds = pendingTrackIds,
+        onTrackLikeChange = onTrackLikeChange,
         modifier = modifier,
     )
 }
@@ -83,6 +98,12 @@ fun AlbumDetailScreen(
     onTrackPlay: (List<Track>, Int) -> Unit,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
+    isSaved: Boolean = false,
+    isSavePending: Boolean = false,
+    onSaveChange: ((Boolean) -> Unit)? = null,
+    likedTrackIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -112,6 +133,11 @@ fun AlbumDetailScreen(
                     contextualTrack = null
                     callback(track)
                 }
+            },
+            isLiked = track.id in likedTrackIds,
+            isLikePending = track.id in pendingTrackIds,
+            onLikeChange = onTrackLikeChange?.let { callback ->
+                { saved -> callback(track, saved) }
             },
         )
     }
@@ -171,6 +197,9 @@ fun AlbumDetailScreen(
                         trackCount = state.tracks.size,
                         discCount = state.discCount,
                         onPlayAll = { onTrackPlay(state.tracks, 0) },
+                        isSaved = isSaved,
+                        isSavePending = isSavePending,
+                        onSaveChange = onSaveChange,
                     )
                 }
 
@@ -217,6 +246,9 @@ private fun AlbumHeader(
     trackCount: Int,
     discCount: Int,
     onPlayAll: () -> Unit,
+    isSaved: Boolean,
+    isSavePending: Boolean,
+    onSaveChange: ((Boolean) -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -264,6 +296,22 @@ private fun AlbumHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
+        onSaveChange?.let { action ->
+            OutlinedButton(
+                onClick = { action(!isSaved) },
+                enabled = !isSavePending,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Icon(
+                    if (isSaved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                    contentDescription = null,
+                )
+                Text(
+                    if (isSaved) "Saved" else "Save album",
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
         if (trackCount > 0) {
             Button(
                 onClick = onPlayAll,

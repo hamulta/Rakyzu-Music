@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.PersonRemove
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
@@ -29,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -69,6 +72,12 @@ fun ArtistDetailRoute(
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
+    isFollowed: Boolean = false,
+    isFollowPending: Boolean = false,
+    onFollowChange: ((Boolean) -> Unit)? = null,
+    likedTrackIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -79,6 +88,12 @@ fun ArtistDetailRoute(
         onAlbumClick = onAlbumClick,
         onTrackArtistClick = onTrackArtistClick,
         onTrackAlbumClick = onTrackAlbumClick,
+        isFollowed = isFollowed,
+        isFollowPending = isFollowPending,
+        onFollowChange = onFollowChange,
+        likedTrackIds = likedTrackIds,
+        pendingTrackIds = pendingTrackIds,
+        onTrackLikeChange = onTrackLikeChange,
         modifier = modifier,
     )
 }
@@ -91,6 +106,12 @@ fun ArtistDetailScreen(
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
+    isFollowed: Boolean = false,
+    isFollowPending: Boolean = false,
+    onFollowChange: ((Boolean) -> Unit)? = null,
+    likedTrackIds: Set<String> = emptySet(),
+    pendingTrackIds: Set<String> = emptySet(),
+    onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -120,6 +141,11 @@ fun ArtistDetailScreen(
                     contextualTrack = null
                     callback(track)
                 }
+            },
+            isLiked = track.id in likedTrackIds,
+            isLikePending = track.id in pendingTrackIds,
+            onLikeChange = onTrackLikeChange?.let { callback ->
+                { saved -> callback(track, saved) }
             },
         )
     }
@@ -175,6 +201,9 @@ fun ArtistDetailScreen(
                         releaseCount = state.releases.size,
                         trackCount = state.tracks.size,
                         onPlayAll = { onTrackPlay(state.tracks, 0) },
+                        isFollowed = isFollowed,
+                        isFollowPending = isFollowPending,
+                        onFollowChange = onFollowChange,
                     )
                 }
 
@@ -230,6 +259,9 @@ private fun ArtistHeader(
     releaseCount: Int,
     trackCount: Int,
     onPlayAll: () -> Unit,
+    isFollowed: Boolean,
+    isFollowPending: Boolean,
+    onFollowChange: ((Boolean) -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -269,6 +301,22 @@ private fun ArtistHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
+        onFollowChange?.let { action ->
+            OutlinedButton(
+                onClick = { action(!isFollowed) },
+                enabled = !isFollowPending,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Icon(
+                    if (isFollowed) Icons.Rounded.PersonRemove else Icons.Rounded.PersonAdd,
+                    contentDescription = null,
+                )
+                Text(
+                    if (isFollowed) "Following" else "Follow",
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
         if (trackCount > 0) {
             Button(
                 onClick = onPlayAll,

@@ -16,10 +16,16 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         EditorialShelfEntity::class,
         EditorialShelfTrackEntity::class,
         RecentlyPlayedEntity::class,
+        LibraryLikedTrackEntity::class,
+        LibrarySavedAlbumEntity::class,
+        LibraryFollowedArtistEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3),
+    ],
 )
 internal abstract class RakyzuDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao

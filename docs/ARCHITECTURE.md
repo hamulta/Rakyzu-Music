@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.2.10`.
+Status: baseline for `0.3.0`.
 
 ## Goals
 
@@ -19,8 +19,8 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 ## Android modules
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
-- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog synchronization, session state mapping, and encrypted Android persistence.
-- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, transactional replacement DAO, schema history, and observable local data source.
+- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog and Library synchronization, session state mapping, and encrypted Android persistence.
+- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history and Library selections, transactional replacement DAOs, schema history, and observable local data sources.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
@@ -28,9 +28,10 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `feature:home`: offline-first editorial feed, recently played, new releases, and complete-catalog shelves.
 - `feature:player`: branded Now Playing, seek controls, transport actions, and the current Media3 queue surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
-- `feature:search`: offline-first catalog discovery, deterministic local relevance, browse states, and track-result playback.
+- `feature:search`: offline-first catalog discovery, deterministic local relevance, browse states, detail navigation, and Library mutation entry points.
+- `feature:library`: liked songs, saved albums, followed artists, account-scoped cached state, collection playback, and navigation back into catalog detail.
 
-Planned boundaries include `core:network` and `feature:library`.
+A planned boundary remains `core:network`.
 
 ## Data and media security
 
@@ -60,7 +61,7 @@ Media3 item transitions are the listening-history event source, so manual select
 
 ## Reliability
 
-- Room is the single source of truth for cached Home/catalog data and device-local recently played; library persistence follows at its roadmap milestone.
+- Room is the single source of truth for cached Home/catalog data, device-local recently played, and the current listener's resolved Library selections.
 - Catalog synchronization currently uses a validated full snapshot. Pagination and incremental cursors are introduced when catalog scale requires them.
 - Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes; ExoPlayer owns audio focus and pauses for noisy-output events.
 - Queue order, current index, transport availability, and playback progress come from the Media3 timeline; UI-local slider state exists only during a seek gesture.
@@ -83,8 +84,10 @@ Media3 item transitions are the listening-history event source, so manual select
 - Search's final milestone gate covers cached repeated search over 10,000 tracks, deterministic top-50 ranking and totals, pagination eligibility, saved-result resilience, diagnostic privacy/failure isolation, and Compose accessibility states for initial loading, service failure/retry, and duplicate-resistant page loading. GitHub Actions compiles this focused unit/lint/instrumentation gate before global Android validation.
 - Artist detail is a typed nested Navigation 3 destination under Search. It resolves an exact artist ID from the observed Room catalog, derives only ID-associated albums and tracks, sorts releases newest-first with stable title/ID ties, and builds a stable release/disc/track/title/ID playback queue. Back navigation restores the shell-scoped Search query, and the Search top-level destination remains selected. Loading, unavailable, empty-discography, release, Play all, and per-track actions have explicit UI and accessibility contracts; no artist-detail request, cache, schema, or telemetry path is added.
 - Album detail is a typed nested Navigation 3 destination reachable from Search results and artist releases. It resolves one exact album ID from the observed Room catalog, derives the canonical artist and only ID-associated tracks, and orders the complete playback queue by disc, track number, title, and ID. Multi-disc headings, Back restoration, Play album, per-track playback, loading, unavailable, and empty-album states have explicit UI and accessibility contracts; no album-detail network, cache, schema, or telemetry path is added.
-- Search, artist-detail, and album-detail track rows expose one shared local metadata sheet. Playback is offered only for a track present in the displayed deterministic queue; artist and album navigation require both a supplied surface callback and a non-blank canonical catalog ID. Matching nested destinations are reused by removing only newer detail entries, so metadata actions cannot accumulate duplicate artist or album routes. The sheet is a read-only UI boundary with no network, share, clipboard, browser, mutation, logging, analytics, or persistence path.
+- Search, artist-detail, and album-detail track rows expose one shared context sheet. Playback is offered only for a track present in the displayed deterministic queue; artist and album navigation require both a supplied surface callback and a non-blank canonical catalog ID. Matching nested destinations are reused by removing only newer detail entries, so metadata actions cannot accumulate duplicate artist or album routes. In v0.3.0 the sheet may also Like or unlike a track through the dedicated Library repository; no share, clipboard, browser, logging, or analytics path is added.
+- Library observes account-scoped Room rows before starting a remote refresh. A successful `security invoker` Supabase projection replaces one listener's liked-track, saved-album, and followed-artist IDs transactionally; invalid or failed responses preserve the last verified cache. Mutations are confirmed remotely before changing Room, suppress duplicate in-flight item actions, and fail closed without optimistic divergence. Missing or unpublished catalog IDs remain stored but are omitted from the resolved UI graph.
+- Supabase owns canonical Library relationships in three listener-keyed tables with forced RLS, owner-only select/insert/delete policies, published-catalog checks, and anonymous function denial. The client receives IDs and save timestamps only; catalog metadata continues to come from its independently validated snapshot.
 
 ## Release topology
 
-GitHub Actions runs deterministic Android checks and publishes a branded debug APK artifact for every validated push. Android workflow actions are pinned to verified full-length commits, wrapper validation is enabled, and every run also builds the minified/resource-shrunk release variant to exercise R8 before publication. A separate path-filtered workflow type-checks, tests, checks generated Worker bindings, dry-runs the bundle, and deploys the API only after verification succeeds. Signed Android artifacts and Play Console delivery will be introduced only after signing secrets and the release channel are provisioned.
+GitHub Actions runs deterministic Android checks, launches the app and exercises its authentication entry on a hardware-accelerated cloud Android emulator, and publishes a branded debug APK artifact for every validated push. Android workflow actions are pinned to verified full-length commits, wrapper validation is enabled, and every run also builds the minified/resource-shrunk release variant to exercise R8 before publication. A separate path-filtered workflow type-checks, tests, checks generated Worker bindings, dry-runs the bundle, and deploys the API only after verification succeeds. Signed Android artifacts and Play Console delivery will be introduced only after signing secrets and the release channel are provisioned.

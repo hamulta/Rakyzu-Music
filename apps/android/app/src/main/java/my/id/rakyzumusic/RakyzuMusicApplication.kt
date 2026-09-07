@@ -16,6 +16,7 @@ import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
 import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
 import my.id.rakyzumusic.core.data.media.MediaStreamRequestFailure
@@ -58,6 +59,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
 
     val catalogRepository: CatalogRepository
         get() = repositories.catalogRepository
+
+    val libraryRepository: LibraryRepository
+        get() = repositories.libraryRepository
 
     val mediaDeliveryRepository: MediaDeliveryRepository
         get() = repositories.mediaDeliveryRepository
