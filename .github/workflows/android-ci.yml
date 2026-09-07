@@ -123,5 +123,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_7
+          disk-size: 4096M
+          ram-size: 2048M
           working-directory: apps/android
           script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
