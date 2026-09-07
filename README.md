@@ -10,7 +10,7 @@ Current version: **0.3.0**
 - Playback: AndroidX Media3 ExoPlayer, MediaSessionService, and system notification controls
 - Data and identity: Supabase Postgres, Auth, Realtime, and Row Level Security
 - API and delivery: Cloudflare Workers, Pages, and R2
-- Automation: GitHub Actions
+- Automation: GitHub Actions; Appetize browser-device verification for Android 0.3.0
 
 The app uses `my.id.rakyzumusic` as its Android application ID. Spotify informs product capabilities and engineering principles, but Rakyzu Music uses its own brand, implementation, content rights, data model, and infrastructure.
 
@@ -35,6 +35,8 @@ cd apps/android
 ```
 
 The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+
+The final 0.3.0 candidate can also be launched in the [Rakyzu Music Appetize device](https://appetize.io/app/vwisvcqbaeicaznfamnumltolq). Its sign-in, sign-up, and password-recovery entry flows were exercised against the configured APK before release.
 
 ## Configuration and security
 
