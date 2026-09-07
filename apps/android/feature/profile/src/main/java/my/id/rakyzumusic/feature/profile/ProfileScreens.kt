@@ -79,6 +79,7 @@ fun OnboardingScreen(
         Spacer(Modifier.height(22.dp))
         Text(
             text = "Make Rakyzu yours",
+            color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics { heading() },
@@ -92,6 +93,7 @@ fun OnboardingScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(24.dp),
         ) {
             Column(
@@ -176,6 +178,7 @@ fun ProfileUnavailableScreen(
     ) {
         Text(
             text = "Profile unavailable",
+            color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics { heading() },

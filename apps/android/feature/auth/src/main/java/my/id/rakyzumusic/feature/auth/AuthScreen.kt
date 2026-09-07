@@ -140,6 +140,7 @@ fun AuthScreen(
         Spacer(Modifier.height(18.dp))
         Text(
             text = "Rakyzu Music",
+            color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics { heading() },
@@ -159,6 +160,7 @@ fun AuthScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(24.dp),
         ) {
             Column(
