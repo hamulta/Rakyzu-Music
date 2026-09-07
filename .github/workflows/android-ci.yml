@@ -123,7 +123,8 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_7
-          disk-size: 4096M
-          ram-size: 2048M
+          emulator-options: >-
+            -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+            -partition-size 2048 -memory 2048 -no-metrics
           working-directory: apps/android
           script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
