@@ -478,12 +478,16 @@ private fun AuthenticatedRakyzuMusicApp(
                     entry<RakyzuRoute.Library> {
                         LibraryRoute(
                             viewModel = libraryViewModel,
+                            mediaDeliveryRepository = mediaDeliveryRepository,
                             onTrackPlay = playbackController::playQueue,
                             onAlbumClick = { album ->
                                 openAlbumDetail(backStack, album.id)
                             },
                             onArtistClick = { artist ->
                                 openArtistDetail(backStack, artist.id)
+                            },
+                            onBrowseMusic = {
+                                selectTopLevelRoute(backStack, RakyzuRoute.Search)
                             },
                         )
                     }

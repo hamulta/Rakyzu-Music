@@ -161,7 +161,7 @@ class LibraryViewModel internal constructor(
             mutableUiState.update {
                 it.copy(
                     isRefreshing = false,
-                    message = result.failureMessage(),
+                    message = result.statusMessage(),
                     messageIsError = result is LibraryActionResult.Failure,
                 )
             }
@@ -181,6 +181,7 @@ class LibraryViewModel internal constructor(
                     pendingItems = it.pendingItems - key,
                     message = when (result) {
                         LibraryActionResult.Success -> kind.successMessage(saved)
+                        is LibraryActionResult.Queued -> result.queuedMessage()
                         is LibraryActionResult.Failure -> result.failureMessage()
                     },
                     messageIsError = result is LibraryActionResult.Failure,
@@ -214,8 +215,9 @@ class LibraryViewModel internal constructor(
     }
 }
 
-private fun LibraryActionResult.failureMessage(): String? = when (this) {
+private fun LibraryActionResult.statusMessage(): String? = when (this) {
     LibraryActionResult.Success -> null
+    is LibraryActionResult.Queued -> queuedMessage()
     is LibraryActionResult.Failure -> when (reason) {
         LibraryFailure.NetworkUnavailable -> "Library sync needs an internet connection."
         LibraryFailure.ServiceUnavailable -> "Your Library is temporarily unavailable."
@@ -223,6 +225,16 @@ private fun LibraryActionResult.failureMessage(): String? = when (this) {
         LibraryFailure.InvalidPayload -> "Library returned an invalid response."
     }
 }
+
+private fun LibraryActionResult.Failure.failureMessage(): String =
+    (this as LibraryActionResult).statusMessage().orEmpty()
+
+private fun LibraryActionResult.Queued.queuedMessage(): String =
+    if (pendingMutationCount == 1) {
+        "Saved offline. 1 Library change is waiting to sync."
+    } else {
+        "Saved offline. $pendingMutationCount Library changes are waiting to sync."
+    }
 
 private fun LibraryItemKind.successMessage(saved: Boolean): String = when (this) {
     LibraryItemKind.Track -> if (saved) "Added to Liked Songs." else "Removed from Liked Songs."

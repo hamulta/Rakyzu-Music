@@ -41,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -56,6 +57,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import my.id.rakyzumusic.core.data.media.ArtworkRequestFailure
+import my.id.rakyzumusic.core.data.media.ArtworkRequestResult
+import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
@@ -69,12 +73,16 @@ import my.id.rakyzumusic.core.model.formattedDuration
 @Composable
 fun LibraryRoute(
     viewModel: LibraryViewModel,
+    mediaDeliveryRepository: MediaDeliveryRepository,
     onTrackPlay: (List<Track>, Int) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
+    onBrowseMusic: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val artworkRequestProvider: LibraryArtworkRequestProvider =
+        remember(mediaDeliveryRepository) { mediaDeliveryRepository::artworkRequest }
     LibraryScreen(
         state = state,
         onRefresh = viewModel::refresh,
@@ -85,6 +93,8 @@ fun LibraryRoute(
         onTrackPlay = onTrackPlay,
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
+        onBrowseMusic = onBrowseMusic,
+        artworkRequestProvider = artworkRequestProvider,
         onRemoveTrack = { viewModel.setSaved(LibraryItemKind.Track, it.id, false) },
         onRemoveAlbum = { viewModel.setSaved(LibraryItemKind.Album, it.id, false) },
         onUnfollowArtist = { viewModel.setSaved(LibraryItemKind.Artist, it.id, false) },
@@ -106,6 +116,10 @@ fun LibraryScreen(
     onRemoveTrack: (Track) -> Unit,
     onRemoveAlbum: (Album) -> Unit,
     onUnfollowArtist: (Artist) -> Unit,
+    onBrowseMusic: () -> Unit = {},
+    artworkRequestProvider: LibraryArtworkRequestProvider = {
+        ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
+    },
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -126,6 +140,7 @@ fun LibraryScreen(
         item(key = "library-header") {
             LibraryHeader(
                 isRefreshing = state.isRefreshing,
+                pendingMutationCount = state.library.pendingMutationCount,
                 onRefresh = onRefresh,
             )
         }
@@ -171,6 +186,8 @@ fun LibraryScreen(
                     icon = Icons.Rounded.LibraryMusic,
                     title = "Your Library is ready",
                     message = "Like tracks, save albums, or follow artists from Search to keep them here.",
+                    actionLabel = "Browse music",
+                    onAction = onBrowseMusic,
                 )
             }
             else -> {
@@ -188,12 +205,17 @@ fun LibraryScreen(
 
                 if (state.hasNoMatchingItems) {
                     item(key = "library-no-results") {
+                        val emptyCopy = state.emptyStateCopy()
                         LibraryStatus(
-                            icon = Icons.Rounded.Search,
-                            title = "No Library matches",
-                            message = "Try another search or Library filter.",
-                            actionLabel = "Clear Library search".takeIf { state.query.isNotBlank() },
-                            onAction = onClearQuery,
+                            icon = emptyCopy.icon,
+                            title = emptyCopy.title,
+                            message = emptyCopy.message,
+                            actionLabel = if (state.query.isNotBlank()) {
+                                "Clear Library search"
+                            } else {
+                                "Browse music"
+                            },
+                            onAction = if (state.query.isNotBlank()) onClearQuery else onBrowseMusic,
                         )
                     }
                 } else {
@@ -230,13 +252,18 @@ fun LibraryScreen(
                             key = { "saved-${it.album.id}" },
                         ) { saved ->
                             LibraryCollectionRow(
-                                icon = Icons.Rounded.Album,
                                 title = saved.album.title,
                                 subtitle = saved.artistName.ifBlank { "Unknown artist" },
                                 actionDescription = "Remove ${saved.album.title} from Library",
                                 isPending = state.isPending(LibraryItemKind.Album, saved.album.id),
                                 onClick = { onAlbumClick(saved.album) },
                                 onRemove = { onRemoveAlbum(saved.album) },
+                                leadingContent = {
+                                    LibraryAlbumArtwork(
+                                        albumId = saved.album.id,
+                                        requestProvider = artworkRequestProvider,
+                                    )
+                                },
                             )
                         }
                     }
@@ -253,13 +280,13 @@ fun LibraryScreen(
                             key = { "followed-${it.id}" },
                         ) { artist ->
                             LibraryCollectionRow(
-                                icon = Icons.Rounded.Person,
                                 title = artist.name,
                                 subtitle = "Artist",
                                 actionDescription = "Unfollow ${artist.name}",
                                 isPending = state.isPending(LibraryItemKind.Artist, artist.id),
                                 onClick = { onArtistClick(artist) },
                                 onRemove = { onUnfollowArtist(artist) },
+                                leadingContent = { LibraryArtistAvatar(artist.name) },
                             )
                         }
                     }
@@ -270,7 +297,11 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryHeader(isRefreshing: Boolean, onRefresh: () -> Unit) {
+private fun LibraryHeader(
+    isRefreshing: Boolean,
+    pendingMutationCount: Int,
+    onRefresh: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,7 +317,11 @@ private fun LibraryHeader(isRefreshing: Boolean, onRefresh: () -> Unit) {
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "Saved for your Rakyzu Music account",
+                text = if (pendingMutationCount > 0) {
+                    "$pendingMutationCount offline change${if (pendingMutationCount == 1) "" else "s"} waiting to sync"
+                } else {
+                    "Saved for your Rakyzu Music account"
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -458,13 +493,13 @@ private fun LibraryTrackRow(
 
 @Composable
 private fun LibraryCollectionRow(
-    icon: ImageVector,
     title: String,
     subtitle: String,
     actionDescription: String,
     isPending: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
+    leadingContent: @Composable () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -474,7 +509,7 @@ private fun LibraryCollectionRow(
             .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LibraryIcon(icon)
+        leadingContent()
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -500,6 +535,57 @@ private fun LibraryCollectionRow(
             else Icon(Icons.Rounded.Bookmark, contentDescription = actionDescription)
         }
     }
+}
+
+@Composable
+private fun LibraryArtistAvatar(name: String) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = name.trim().firstOrNull()?.uppercase() ?: "R",
+            color = RakyzuBlack,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Black,
+        )
+    }
+}
+
+private data class LibraryEmptyCopy(
+    val icon: ImageVector,
+    val title: String,
+    val message: String,
+)
+
+private fun LibraryUiState.emptyStateCopy(): LibraryEmptyCopy = when {
+    query.isNotBlank() -> LibraryEmptyCopy(
+        Icons.Rounded.Search,
+        "No Library matches",
+        "Try another title, artist, album, or Library filter.",
+    )
+    filter == LibraryFilter.Songs -> LibraryEmptyCopy(
+        Icons.Rounded.Favorite,
+        "No liked songs yet",
+        "Find a track you love and add it to Liked Songs.",
+    )
+    filter == LibraryFilter.Albums -> LibraryEmptyCopy(
+        Icons.Rounded.Album,
+        "No saved albums yet",
+        "Save an album to keep the whole release close.",
+    )
+    filter == LibraryFilter.Artists -> LibraryEmptyCopy(
+        Icons.Rounded.Person,
+        "No followed artists yet",
+        "Follow an artist to see them here.",
+    )
+    else -> LibraryEmptyCopy(
+        Icons.Rounded.LibraryMusic,
+        "Nothing to show",
+        "Browse Rakyzu Music to grow your Library.",
+    )
 }
 
 @Composable

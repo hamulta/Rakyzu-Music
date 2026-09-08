@@ -20,6 +20,8 @@ interface LibraryRepository {
 sealed interface LibraryActionResult {
     data object Success : LibraryActionResult
 
+    data class Queued(val pendingMutationCount: Int) : LibraryActionResult
+
     data class Failure(val reason: LibraryFailure) : LibraryActionResult
 }
 

@@ -107,6 +107,45 @@ class RakyzuDatabaseTest {
         assertEquals(true, listenerTwo.isEmpty)
     }
 
+    @Test
+    fun libraryOutboxSurvivesSnapshotReplacementAndRemoteDeleteAdvancesCursor() = runTest {
+        dataSource.replaceCatalog(CATALOG, syncedAtEpochMillis = 1234L)
+        val mutation = StoredLibraryMutation(
+            kind = LibraryItemKind.Artist,
+            itemId = "artist-1",
+            saved = true,
+            queuedAtEpochMillis = 70L,
+        )
+
+        libraryDataSource.enqueueLibraryMutation("listener-1", mutation)
+        libraryDataSource.replaceLibrary("listener-1", emptyList(), syncedAtEpochMillis = 80L)
+
+        val optimistic = libraryDataSource.observeLibrary("listener-1").first {
+            it.pendingMutationCount == 1
+        }
+        assertEquals(listOf("artist-1"), optimistic.followedArtists.map { it.id })
+
+        assertEquals(true, libraryDataSource.acknowledgeLibraryMutation("listener-1", mutation))
+        libraryDataSource.applyRemoteLibraryChanges(
+            "listener-1",
+            listOf(
+                StoredRemoteLibraryChange(
+                    sequence = 9L,
+                    kind = LibraryItemKind.Artist,
+                    itemId = "artist-1",
+                    saved = false,
+                    savedAtEpochMillis = 90L,
+                ),
+            ),
+        )
+
+        val synchronized = libraryDataSource.observeLibrary("listener-1").first {
+            it.pendingMutationCount == 0 && it.followedArtists.isEmpty()
+        }
+        assertEquals(true, synchronized.isEmpty)
+        assertEquals(9L, libraryDataSource.getLibraryChangeCursor("listener-1"))
+    }
+
     private companion object {
         val CATALOG = CatalogSnapshot(
             artists = listOf(Artist("artist-1", "Rakyzu Sessions")),

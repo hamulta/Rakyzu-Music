@@ -105,6 +105,24 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun offlineMutationIsReportedAsQueuedInsteadOfAnError() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            mutationResult = LibraryActionResult.Queued(1)
+        }
+        val viewModel = LibraryViewModel("listener-1", repository)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.setSaved(LibraryItemKind.Track, "track-1", true)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.messageIsError)
+        assertEquals(
+            "Saved offline. 1 Library change is waiting to sync.",
+            viewModel.uiState.value.message,
+        )
+    }
+
+    @Test
     fun searchIsAccentCaseAndWhitespaceInsensitiveAcrossMetadata() = runTest(dispatcher) {
         val viewModel = LibraryViewModel("listener-1", FakeRepository(SEARCHABLE))
         testScheduler.advanceUntilIdle()

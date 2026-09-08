@@ -13,6 +13,22 @@ data class StoredLibrarySelection(
     val savedAtEpochMillis: Long,
 )
 
+data class StoredLibraryMutation(
+    val kind: LibraryItemKind,
+    val itemId: String,
+    val saved: Boolean,
+    val queuedAtEpochMillis: Long,
+    val attemptCount: Int = 0,
+)
+
+data class StoredRemoteLibraryChange(
+    val sequence: Long,
+    val kind: LibraryItemKind,
+    val itemId: String,
+    val saved: Boolean,
+    val savedAtEpochMillis: Long,
+)
+
 interface LibraryLocalDataSource {
     fun observeLibrary(userId: String): Flow<LibrarySnapshot>
 
@@ -27,6 +43,25 @@ interface LibraryLocalDataSource {
         selection: StoredLibrarySelection,
         saved: Boolean,
     )
+
+    suspend fun enqueueLibraryMutation(userId: String, mutation: StoredLibraryMutation)
+
+    suspend fun getPendingLibraryMutations(userId: String, limit: Int): List<StoredLibraryMutation>
+
+    suspend fun countPendingLibraryMutations(userId: String): Int
+
+    suspend fun acknowledgeLibraryMutation(userId: String, mutation: StoredLibraryMutation): Boolean
+
+    suspend fun recordLibraryMutationAttempt(userId: String, mutation: StoredLibraryMutation)
+
+    suspend fun getLibraryChangeCursor(userId: String): Long?
+
+    suspend fun applyRemoteLibraryChanges(
+        userId: String,
+        changes: List<StoredRemoteLibraryChange>,
+    )
+
+    suspend fun setLibraryChangeCursor(userId: String, sequence: Long)
 }
 
 internal class RoomLibraryLocalDataSource(
@@ -42,6 +77,7 @@ internal class RoomLibraryLocalDataSource(
             "library_liked_tracks",
             "library_saved_albums",
             "library_followed_artists",
+            "library_mutation_outbox",
             "sync_metadata",
         )
         .map {
@@ -75,6 +111,7 @@ internal class RoomLibraryLocalDataSource(
                 followedArtistSavedAtEpochMillis = followedArtistRows
                     .filter { it.itemId in artistsById }
                     .associate { it.itemId to it.savedAtEpochMillis },
+                pendingMutationCount = dao.countPendingLibraryMutations(userId),
             )
         }
 
@@ -128,5 +165,103 @@ internal class RoomLibraryLocalDataSource(
                 dao.deleteFollowedArtist(userId, selection.itemId)
             }
         }
+    }
+
+    override suspend fun enqueueLibraryMutation(
+        userId: String,
+        mutation: StoredLibraryMutation,
+    ) {
+        require(userId.isNotBlank() && mutation.itemId.isNotBlank())
+        dao.enqueueLibraryMutation(
+            LibraryMutationOutboxEntity(
+                userId = userId,
+                itemKind = mutation.kind.name,
+                itemId = mutation.itemId,
+                desiredSaved = mutation.saved,
+                queuedAtEpochMillis = mutation.queuedAtEpochMillis,
+                attemptCount = mutation.attemptCount,
+            ),
+        )
+    }
+
+    override suspend fun getPendingLibraryMutations(
+        userId: String,
+        limit: Int,
+    ): List<StoredLibraryMutation> {
+        require(userId.isNotBlank() && limit in 1..MAX_OUTBOX_READ_LIMIT)
+        return dao.getPendingLibraryMutations(userId, limit).map { row ->
+            StoredLibraryMutation(
+                kind = runCatching { LibraryItemKind.valueOf(row.itemKind) }
+                    .getOrElse { error("Invalid persisted Library item kind") },
+                itemId = row.itemId,
+                saved = row.desiredSaved,
+                queuedAtEpochMillis = row.queuedAtEpochMillis,
+                attemptCount = row.attemptCount,
+            )
+        }
+    }
+
+    override suspend fun acknowledgeLibraryMutation(
+        userId: String,
+        mutation: StoredLibraryMutation,
+    ): Boolean = dao.acknowledgeLibraryMutation(
+        userId = userId,
+        itemKind = mutation.kind.name,
+        itemId = mutation.itemId,
+        desiredSaved = mutation.saved,
+        queuedAtEpochMillis = mutation.queuedAtEpochMillis,
+    ) > 0
+
+    override suspend fun countPendingLibraryMutations(userId: String): Int {
+        require(userId.isNotBlank())
+        return dao.countPendingLibraryMutations(userId)
+    }
+
+    override suspend fun recordLibraryMutationAttempt(
+        userId: String,
+        mutation: StoredLibraryMutation,
+    ) {
+        dao.recordLibraryMutationAttempt(
+            userId = userId,
+            itemKind = mutation.kind.name,
+            itemId = mutation.itemId,
+            queuedAtEpochMillis = mutation.queuedAtEpochMillis,
+        )
+    }
+
+    override suspend fun getLibraryChangeCursor(userId: String): Long? =
+        dao.getLastSuccessfulSyncEpochMillis(CatalogDao.libraryChangeCursorKey(userId))
+
+    override suspend fun applyRemoteLibraryChanges(
+        userId: String,
+        changes: List<StoredRemoteLibraryChange>,
+    ) {
+        require(userId.isNotBlank() && changes.zipWithNext().all { (first, second) ->
+            first.sequence < second.sequence
+        })
+        changes.forEach { change ->
+            dao.applyRemoteLibraryChange(
+                userId = userId,
+                itemKind = change.kind.name,
+                itemId = change.itemId,
+                saved = change.saved,
+                savedAtEpochMillis = change.savedAtEpochMillis,
+                sequence = change.sequence,
+            )
+        }
+    }
+
+    override suspend fun setLibraryChangeCursor(userId: String, sequence: Long) {
+        require(userId.isNotBlank() && sequence >= 0L)
+        dao.insertSyncMetadata(
+            SyncMetadataEntity(
+                key = CatalogDao.libraryChangeCursorKey(userId),
+                lastSuccessfulSyncEpochMs = sequence,
+            ),
+        )
+    }
+
+    private companion object {
+        const val MAX_OUTBOX_READ_LIMIT = 100
     }
 }

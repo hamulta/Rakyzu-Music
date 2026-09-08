@@ -43,9 +43,9 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.3.1` — Like, save, and follow entry points across Home and Now Playing.
 - [x] `0.3.2` — Library search, sort, filter, and listener-scoped UI-state restoration.
 - [x] `0.3.3` — Liked Songs ordering, bulk playback, and deterministic queue controls.
-- [ ] `0.3.4` — Saved-album and followed-artist navigation, artwork, and empty-state polish.
-- [ ] `0.3.5` — optimistic offline mutations, durable outbox, conflict handling, and recovery.
-- [ ] `0.3.6` — bounded pagination and incremental Library synchronization.
+- [x] `0.3.4` — Saved-album and followed-artist navigation, artwork, and empty-state polish.
+- [x] `0.3.5` — optimistic offline mutations, durable outbox, conflict handling, and recovery.
+- [x] `0.3.6` — bounded pagination and incremental Library synchronization.
 - [ ] `0.3.7` — freshness, validated-connectivity recovery, and retry hardening.
 - [ ] `0.3.8` — adaptive layouts, large-text behavior, and complete TalkBack contracts.
 - [ ] `0.3.9` — privacy-safe Library diagnostics and performance hardening.

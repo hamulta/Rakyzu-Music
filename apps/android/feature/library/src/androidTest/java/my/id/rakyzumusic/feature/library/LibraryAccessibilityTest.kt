@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -41,6 +42,41 @@ class LibraryAccessibilityTest {
         composeRule.onNodeWithText(
             "Like tracks, save albums, or follow artists from Search to keep them here.",
         ).assertIsDisplayed()
+        composeRule.onNodeWithText("Browse music").assertHasClickAction()
+    }
+
+    @Test
+    fun savedAlbumArtworkKeepsDetailNavigation() {
+        var albumId: String? = null
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                LibraryScreen(
+                    state = POPULATED,
+                    onRefresh = {},
+                    onTrackPlay = { _, _ -> },
+                    onAlbumClick = { albumId = it.id },
+                    onArtistClick = {},
+                    onRemoveTrack = {},
+                    onRemoveAlbum = {},
+                    onUnfollowArtist = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("library-album-artwork-failed-album-1")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Signal Zero").performClick()
+        composeRule.runOnIdle { assertEquals("album-1", albumId) }
+    }
+
+    @Test
+    fun followedArtistKeepsDetailNavigation() {
+        var artistId: String? = null
+        setLibraryContent(POPULATED.copy(filter = LibraryFilter.Artists)) {
+            artistId = it.id
+        }
+        composeRule.onNodeWithText("Rakyzu Sessions").performClick()
+        composeRule.runOnIdle { assertEquals("artist-1", artistId) }
     }
 
     @Test
@@ -160,7 +196,10 @@ class LibraryAccessibilityTest {
         }
     }
 
-    private fun setLibraryContent(state: LibraryUiState) {
+    private fun setLibraryContent(
+        state: LibraryUiState,
+        onArtistClick: (Artist) -> Unit = {},
+    ) {
         composeRule.setContent {
             RakyzuMusicTheme(darkTheme = true) {
                 LibraryScreen(
@@ -168,7 +207,7 @@ class LibraryAccessibilityTest {
                     onRefresh = {},
                     onTrackPlay = { _, _ -> },
                     onAlbumClick = {},
-                    onArtistClick = {},
+                    onArtistClick = onArtistClick,
                     onRemoveTrack = {},
                     onRemoveAlbum = {},
                     onUnfollowArtist = {},

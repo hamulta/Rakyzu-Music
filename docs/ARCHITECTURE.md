@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.3.3`.
+Status: baseline for `0.3.6`.
 
 ## Goals
 
@@ -20,7 +20,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
 - `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog and Library synchronization, session state mapping, and encrypted Android persistence.
-- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history and Library selections, transactional replacement DAOs, schema history, and observable local data sources.
+- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, Library selections and mutation outbox, transactional replacement DAOs, schema history, and observable local data sources.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
@@ -86,9 +86,11 @@ Media3 item transitions are the listening-history event source, so manual select
 - Artist detail is a typed nested Navigation 3 destination under Search. It resolves an exact artist ID from the observed Room catalog, derives only ID-associated albums and tracks, sorts releases newest-first with stable title/ID ties, and builds a stable release/disc/track/title/ID playback queue. Back navigation restores the shell-scoped Search query, and the Search top-level destination remains selected. Loading, unavailable, empty-discography, release, Play all, and per-track actions have explicit UI and accessibility contracts; no artist-detail request, cache, schema, or telemetry path is added.
 - Album detail is a typed nested Navigation 3 destination reachable from Search results and artist releases. It resolves one exact album ID from the observed Room catalog, derives the canonical artist and only ID-associated tracks, and orders the complete playback queue by disc, track number, title, and ID. Multi-disc headings, Back restoration, Play album, per-track playback, loading, unavailable, and empty-album states have explicit UI and accessibility contracts; no album-detail network, cache, schema, or telemetry path is added.
 - Search, artist-detail, and album-detail track rows expose one shared context sheet. Playback is offered only for a track present in the displayed deterministic queue; artist and album navigation require both a supplied surface callback and a non-blank canonical catalog ID. Matching nested destinations are reused by removing only newer detail entries, so metadata actions cannot accumulate duplicate artist or album routes. In v0.3.0 the sheet may also Like or unlike a track through the dedicated Library repository; no share, clipboard, browser, logging, or analytics path is added.
-- Library observes account-scoped Room rows before starting a remote refresh. A successful `security invoker` Supabase projection replaces one listener's liked-track, saved-album, and followed-artist IDs transactionally; invalid or failed responses preserve the last verified cache. Mutations are confirmed remotely before changing Room, suppress duplicate in-flight item actions, and fail closed without optimistic divergence. Missing or unpublished catalog IDs remain stored but are omitted from the resolved UI graph.
-- Supabase owns canonical Library relationships in three listener-keyed tables with forced RLS, owner-only select/insert/delete policies, published-catalog checks, and anonymous function denial. The client receives IDs and save timestamps only; catalog metadata continues to come from its independently validated snapshot.
+- Library observes account-scoped Room rows before network work. Like, Save, and Follow write the desired state and a coalescing listener/item outbox row in one transaction, so the latest local intent appears immediately and survives process death. Accepted idempotent mutations acknowledge only the exact queued intent; transient failures increment retry metadata, while a rejected item rolls back to the prior state. Snapshot replacement and remote changes never override an item with a newer pending intent.
+- The first Library sync captures a server change anchor, reads validated 50-row keyset pages, merges the snapshot with pending intents, then consumes changes after that anchor. Later refreshes fetch only bounded ordered cursor pages. Each applied page persists its sequence, deletion tombstones remove local relationships, and interrupted refreshes resume without discarding verified state.
+- Supabase owns canonical Library relationships and an append-only listener change stream with forced RLS, owner-only reads, published-catalog checks, and anonymous function denial. Security-invoker RPCs bound page sizes and retain RLS; a locked-down trigger function records insert/delete events without exposing write access to clients.
 - Room preserves each resolved selection's canonical save timestamp in the Library snapshot. The listener-scoped state holder restores a bounded query, filter, and sort choice through `SavedStateHandle`; matching is case/accent/whitespace tolerant and remains local. Recently/oldest-added ordering uses persisted timestamps with stable ID ties, while bulk and row playback send the exact visible Liked Songs list and index to Media3.
+- Saved albums reuse the authenticated artwork delivery contract and credential-free cache key. Album and artist rows navigate with canonical IDs, while type-specific empty states lead listeners back to Search. Pending offline work is announced as a non-error status.
 - Playback queue metadata retains canonical track, album, and artist IDs without credentials or private media locations. Now Playing uses those IDs for direct Like, Save, and Follow controls, and disables unavailable or pending actions without inventing metadata from display labels.
 
 ## Release topology

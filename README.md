@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.3.3**
+Current version: **0.3.6**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.3-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.6-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -68,7 +68,7 @@ Album results and artist releases open a typed offline-first album destination u
 
 Track rows in Search, artist detail, and album detail expose an accessible context sheet with catalog metadata, playback, and Like/unlike actions. Artist and album actions appear only when the current surface supplies a safe internal destination and the track contains the corresponding canonical ID. Metadata actions reuse an existing matching destination in the nested Search back stack instead of duplicating it. The sheet adds no share intent, clipboard access, browser handoff, analytics, or logging path.
 
-Library is an account-scoped offline-first surface backed by Room schema 3. It resolves liked tracks, saved albums, and followed artists against the last verified catalog and preserves their saved timestamps for deterministic Recently added, Oldest added, and A–Z ordering. Bounded local search, type filters, and sort choices restore within the listener-scoped shell. Bulk and row playback use the exact visible Liked Songs queue, while album and artist rows retain typed detail navigation. Search, detail, Home, and Now Playing send authenticated idempotent mutations through Supabase `security invoker` functions; forced RLS isolates every canonical relationship by listener, failed refreshes preserve cache, failed mutations do not create local divergence, and unpublished catalog entries are never projected.
+Library is an account-scoped offline-first surface backed by Room schema 4. It resolves liked tracks, saved albums, and followed artists against the last verified catalog and preserves their saved timestamps for deterministic ordering. Saved albums display authenticated artwork, while album and artist rows retain typed detail navigation. Like, Save, and Follow intents update Room immediately and persist in a listener-scoped outbox. The latest intent for one item wins, transient failures remain queued, and later refreshes retry safely. Initial server state uses 50-row keyset pages; subsequent refreshes consume an RLS-isolated change cursor including deletion tombstones without replacing the whole Library.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

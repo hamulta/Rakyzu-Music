@@ -145,3 +145,17 @@ internal data class LibraryFollowedArtistEntity(
     @ColumnInfo(name = "artist_id") val artistId: String,
     @ColumnInfo(name = "saved_at_epoch_ms") val savedAtEpochMillis: Long,
 )
+
+@Entity(
+    tableName = "library_mutation_outbox",
+    primaryKeys = ["user_id", "item_kind", "item_id"],
+    indices = [Index(value = ["user_id", "queued_at_epoch_ms", "item_kind", "item_id"])],
+)
+internal data class LibraryMutationOutboxEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "item_kind") val itemKind: String,
+    @ColumnInfo(name = "item_id") val itemId: String,
+    @ColumnInfo(name = "desired_saved") val desiredSaved: Boolean,
+    @ColumnInfo(name = "queued_at_epoch_ms") val queuedAtEpochMillis: Long,
+    @ColumnInfo(name = "attempt_count") val attemptCount: Int,
+)

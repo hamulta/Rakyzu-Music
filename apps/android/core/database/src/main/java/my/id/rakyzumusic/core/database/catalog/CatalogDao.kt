@@ -74,6 +74,30 @@ internal interface CatalogDao {
     )
     suspend fun getFollowedArtists(userId: String): List<StoredLibraryItem>
 
+    @Query(
+        "SELECT * FROM library_mutation_outbox WHERE user_id = :userId " +
+            "ORDER BY queued_at_epoch_ms, item_kind, item_id LIMIT :limit",
+    )
+    suspend fun getPendingLibraryMutations(
+        userId: String,
+        limit: Int,
+    ): List<LibraryMutationOutboxEntity>
+
+    @Query(
+        "SELECT COUNT(*) FROM library_mutation_outbox WHERE user_id = :userId",
+    )
+    suspend fun countPendingLibraryMutations(userId: String): Int
+
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM library_mutation_outbox " +
+            "WHERE user_id = :userId AND item_kind = :itemKind AND item_id = :itemId)",
+    )
+    suspend fun hasPendingLibraryMutation(
+        userId: String,
+        itemKind: String,
+        itemId: String,
+    ): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertArtists(artists: List<ArtistEntity>)
 
@@ -113,6 +137,9 @@ internal interface CatalogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFollowedArtist(item: LibraryFollowedArtistEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLibraryMutation(item: LibraryMutationOutboxEntity)
+
     @Query("DELETE FROM library_liked_tracks WHERE user_id = :userId")
     suspend fun deleteLikedTracks(userId: String)
 
@@ -130,6 +157,31 @@ internal interface CatalogDao {
 
     @Query("DELETE FROM library_followed_artists WHERE user_id = :userId AND artist_id = :itemId")
     suspend fun deleteFollowedArtist(userId: String, itemId: String)
+
+    @Query(
+        "DELETE FROM library_mutation_outbox WHERE user_id = :userId " +
+            "AND item_kind = :itemKind AND item_id = :itemId " +
+            "AND desired_saved = :desiredSaved AND queued_at_epoch_ms = :queuedAtEpochMillis",
+    )
+    suspend fun acknowledgeLibraryMutation(
+        userId: String,
+        itemKind: String,
+        itemId: String,
+        desiredSaved: Boolean,
+        queuedAtEpochMillis: Long,
+    ): Int
+
+    @Query(
+        "UPDATE library_mutation_outbox SET attempt_count = attempt_count + 1 " +
+            "WHERE user_id = :userId AND item_kind = :itemKind AND item_id = :itemId " +
+            "AND queued_at_epoch_ms = :queuedAtEpochMillis",
+    )
+    suspend fun recordLibraryMutationAttempt(
+        userId: String,
+        itemKind: String,
+        itemId: String,
+        queuedAtEpochMillis: Long,
+    )
 
     @Query(
         """
@@ -224,12 +276,22 @@ internal interface CatalogDao {
         followedArtists: List<LibraryFollowedArtistEntity>,
         syncedAtEpochMillis: Long,
     ) {
+        val pending = getPendingLibraryMutations(userId, Int.MAX_VALUE)
         deleteLikedTracks(userId)
         deleteSavedAlbums(userId)
         deleteFollowedArtists(userId)
         insertLikedTracks(likedTracks)
         insertSavedAlbums(savedAlbums)
         insertFollowedArtists(followedArtists)
+        pending.forEach { mutation ->
+            applyLibraryItem(
+                userId = userId,
+                itemKind = mutation.itemKind,
+                itemId = mutation.itemId,
+                saved = mutation.desiredSaved,
+                savedAtEpochMillis = mutation.queuedAtEpochMillis,
+            )
+        }
         insertSyncMetadata(
             SyncMetadataEntity(
                 key = librarySyncKey(userId),
@@ -238,8 +300,70 @@ internal interface CatalogDao {
         )
     }
 
+    @Transaction
+    suspend fun enqueueLibraryMutation(
+        mutation: LibraryMutationOutboxEntity,
+    ) {
+        applyLibraryItem(
+            userId = mutation.userId,
+            itemKind = mutation.itemKind,
+            itemId = mutation.itemId,
+            saved = mutation.desiredSaved,
+            savedAtEpochMillis = mutation.queuedAtEpochMillis,
+        )
+        insertLibraryMutation(mutation)
+    }
+
+    @Transaction
+    suspend fun applyRemoteLibraryChange(
+        userId: String,
+        itemKind: String,
+        itemId: String,
+        saved: Boolean,
+        savedAtEpochMillis: Long,
+        sequence: Long,
+    ) {
+        if (!hasPendingLibraryMutation(userId, itemKind, itemId)) {
+            applyLibraryItem(userId, itemKind, itemId, saved, savedAtEpochMillis)
+        }
+        insertSyncMetadata(
+            SyncMetadataEntity(
+                key = libraryChangeCursorKey(userId),
+                lastSuccessfulSyncEpochMs = sequence,
+            ),
+        )
+    }
+
+    suspend fun applyLibraryItem(
+        userId: String,
+        itemKind: String,
+        itemId: String,
+        saved: Boolean,
+        savedAtEpochMillis: Long,
+    ) {
+        when (itemKind) {
+            "Track" -> if (saved) {
+                insertLikedTrack(LibraryLikedTrackEntity(userId, itemId, savedAtEpochMillis))
+            } else {
+                deleteLikedTrack(userId, itemId)
+            }
+            "Album" -> if (saved) {
+                insertSavedAlbum(LibrarySavedAlbumEntity(userId, itemId, savedAtEpochMillis))
+            } else {
+                deleteSavedAlbum(userId, itemId)
+            }
+            "Artist" -> if (saved) {
+                insertFollowedArtist(LibraryFollowedArtistEntity(userId, itemId, savedAtEpochMillis))
+            } else {
+                deleteFollowedArtist(userId, itemId)
+            }
+            else -> error("Unsupported Library item kind")
+        }
+    }
+
     companion object {
         const val CATALOG_SYNC_KEY = "catalog"
         fun librarySyncKey(userId: String) = "library:$userId"
+        fun libraryChangeCursorKey(userId: String) = "library-change-cursor:$userId"
     }
 }
