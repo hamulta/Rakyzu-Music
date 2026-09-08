@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -49,12 +50,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import my.id.rakyzumusic.core.data.media.ArtworkRequestFailure
@@ -69,6 +76,37 @@ import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.formattedDuration
+
+internal data class LibraryLayoutSpec(
+    val horizontalPadding: Dp,
+    val rowMinimumHeight: Dp,
+    val artworkSize: Dp,
+    val textMaxLines: Int,
+) {
+    companion object {
+        val Standard = LibraryLayoutSpec(
+            horizontalPadding = 20.dp,
+            rowMinimumHeight = 72.dp,
+            artworkSize = 48.dp,
+            textMaxLines = 1,
+        )
+    }
+}
+
+internal fun resolveLibraryLayoutSpec(
+    availableWidth: Dp,
+    fontScale: Float,
+): LibraryLayoutSpec {
+    val isCompactScreen = availableWidth < 360.dp
+    val usesLargeText = fontScale >= 1.3f
+    if (!isCompactScreen && !usesLargeText) return LibraryLayoutSpec.Standard
+    return LibraryLayoutSpec(
+        horizontalPadding = if (isCompactScreen) 16.dp else 20.dp,
+        rowMinimumHeight = if (usesLargeText) 88.dp else 72.dp,
+        artworkSize = if (usesLargeText) 56.dp else 48.dp,
+        textMaxLines = 2,
+    )
+}
 
 @Composable
 fun LibraryRoute(
@@ -123,7 +161,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
-    LazyColumn(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(
@@ -135,159 +173,214 @@ fun LibraryScreen(
                     ),
                 ),
             ),
-        contentPadding = contentPadding,
     ) {
-        item(key = "library-header") {
-            LibraryHeader(
-                isRefreshing = state.isRefreshing,
-                pendingMutationCount = state.library.pendingMutationCount,
-                onRefresh = onRefresh,
-            )
+        val fontScale = LocalDensity.current.fontScale
+        val layoutSpec = remember(maxWidth, fontScale) {
+            resolveLibraryLayoutSpec(maxWidth, fontScale)
         }
+        val visibleContent = remember(state.library, state.query, state.filter, state.sort) {
+            deriveLibraryVisibleContent(state.library, state.query, state.filter, state.sort)
+        }
+        val hasNoMatchingItems = state.hasObservedLibrary &&
+            !state.library.isEmpty && !visibleContent.hasItems
 
-        state.message?.let { message ->
-            item(key = "library-message") {
-                Surface(
-                    color = if (state.messageIsError) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        RakyzuSurface
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 6.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                ) {
-                    Text(
-                        text = message,
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { isTraversalGroup = true },
+            contentPadding = contentPadding,
+        ) {
+            item(key = "library-header") {
+                LibraryHeader(
+                    isRefreshing = state.isRefreshing,
+                    pendingMutationCount = state.library.pendingMutationCount,
+                    freshness = state.freshness,
+                    isOnline = state.isOnline,
+                    horizontalPadding = layoutSpec.horizontalPadding,
+                    onRefresh = onRefresh,
+                )
+            }
+
+            state.message?.let { message ->
+                item(key = "library-message") {
+                    Surface(
                         color = if (state.messageIsError) {
-                            MaterialTheme.colorScheme.onErrorContainer
+                            MaterialTheme.colorScheme.errorContainer
                         } else {
-                            MaterialTheme.colorScheme.onSurface
+                            RakyzuSurface
                         },
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
-        }
-
-        when {
-            !state.hasObservedLibrary -> item(key = "library-loading") {
-                LibraryStatus(
-                    icon = Icons.Rounded.LibraryMusic,
-                    title = "Loading your Library",
-                    message = "Reading your saved music from this device.",
-                    showProgress = true,
-                )
-            }
-            state.library.isEmpty -> item(key = "library-empty") {
-                LibraryStatus(
-                    icon = Icons.Rounded.LibraryMusic,
-                    title = "Your Library is ready",
-                    message = "Like tracks, save albums, or follow artists from Search to keep them here.",
-                    actionLabel = "Browse music",
-                    onAction = onBrowseMusic,
-                )
-            }
-            else -> {
-                item(key = "library-controls") {
-                    LibraryControls(
-                        query = state.query,
-                        filter = state.filter,
-                        sort = state.sort,
-                        onQueryChange = onQueryChange,
-                        onClearQuery = onClearQuery,
-                        onFilterSelected = onFilterSelected,
-                        onSortSelected = onSortSelected,
-                    )
-                }
-
-                if (state.hasNoMatchingItems) {
-                    item(key = "library-no-results") {
-                        val emptyCopy = state.emptyStateCopy()
-                        LibraryStatus(
-                            icon = emptyCopy.icon,
-                            title = emptyCopy.title,
-                            message = emptyCopy.message,
-                            actionLabel = if (state.query.isNotBlank()) {
-                                "Clear Library search"
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = layoutSpec.horizontalPadding,
+                                vertical = 6.dp,
+                            )
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                    ) {
+                        Text(
+                            text = if (state.isShowingStaleSavedLibrary) {
+                                "$message Saved Library data may be out of date " +
+                                    "(${state.freshness.label.lowercase()})."
                             } else {
-                                "Browse music"
+                                message
                             },
-                            onAction = if (state.query.isNotBlank()) onClearQuery else onBrowseMusic,
+                            color = if (state.messageIsError) {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.padding(16.dp),
                         )
                     }
-                } else {
-                    if (state.visibleLikedTracks.isNotEmpty()) {
-                        item(key = "liked-heading") {
-                            LibrarySectionHeading(
-                                title = "Liked Songs",
-                                count = state.visibleLikedTracks.size,
-                                playActionDescription =
-                                    "Play ${state.visibleLikedTracks.size} liked songs " +
-                                    "in ${state.sort.label} order",
-                                onPlay = { onTrackPlay(state.visibleLikedTracks, 0) },
-                            )
-                        }
-                        itemsIndexed(
-                            items = state.visibleLikedTracks,
-                            key = { _, track -> "liked-${track.id}" },
-                        ) { index, track ->
-                            LibraryTrackRow(
-                                track = track,
-                                isPending = state.isPending(LibraryItemKind.Track, track.id),
-                                onPlay = { onTrackPlay(state.visibleLikedTracks, index) },
-                                onRemove = { onRemoveTrack(track) },
-                            )
-                        }
+                }
+            }
+
+            when {
+                !state.hasObservedLibrary -> item(key = "library-loading") {
+                    LibraryStatus(
+                        icon = Icons.Rounded.LibraryMusic,
+                        title = "Loading your Library",
+                        message = "Reading your saved music from this device.",
+                        showProgress = true,
+                    )
+                }
+                state.library.isEmpty -> item(key = "library-empty") {
+                    LibraryStatus(
+                        icon = Icons.Rounded.LibraryMusic,
+                        title = "Your Library is ready",
+                        message = "Like tracks, save albums, or follow artists from Search to keep them here.",
+                        actionLabel = "Browse music",
+                        onAction = onBrowseMusic,
+                    )
+                }
+                else -> {
+                    item(key = "library-controls") {
+                        LibraryControls(
+                            query = state.query,
+                            filter = state.filter,
+                            sort = state.sort,
+                            horizontalPadding = layoutSpec.horizontalPadding,
+                            onQueryChange = onQueryChange,
+                            onClearQuery = onClearQuery,
+                            onFilterSelected = onFilterSelected,
+                            onSortSelected = onSortSelected,
+                        )
                     }
 
-                    if (state.visibleSavedAlbums.isNotEmpty()) {
-                        item(key = "albums-heading") {
-                            LibrarySectionHeading("Saved Albums", state.visibleSavedAlbums.size)
-                        }
-                        items(
-                            items = state.visibleSavedAlbums,
-                            key = { "saved-${it.album.id}" },
-                        ) { saved ->
-                            LibraryCollectionRow(
-                                title = saved.album.title,
-                                subtitle = saved.artistName.ifBlank { "Unknown artist" },
-                                actionDescription = "Remove ${saved.album.title} from Library",
-                                isPending = state.isPending(LibraryItemKind.Album, saved.album.id),
-                                onClick = { onAlbumClick(saved.album) },
-                                onRemove = { onRemoveAlbum(saved.album) },
-                                leadingContent = {
-                                    LibraryAlbumArtwork(
-                                        albumId = saved.album.id,
-                                        requestProvider = artworkRequestProvider,
-                                    )
+                    if (hasNoMatchingItems) {
+                        item(key = "library-no-results") {
+                            val emptyCopy = state.emptyStateCopy()
+                            LibraryStatus(
+                                icon = emptyCopy.icon,
+                                title = emptyCopy.title,
+                                message = emptyCopy.message,
+                                actionLabel = if (state.query.isNotBlank()) {
+                                    "Clear Library search"
+                                } else {
+                                    "Browse music"
+                                },
+                                onAction = if (state.query.isNotBlank()) {
+                                    onClearQuery
+                                } else {
+                                    onBrowseMusic
                                 },
                             )
                         }
-                    }
-
-                    if (state.visibleFollowedArtists.isNotEmpty()) {
-                        item(key = "artists-heading") {
-                            LibrarySectionHeading(
-                                "Followed Artists",
-                                state.visibleFollowedArtists.size,
-                            )
+                    } else {
+                        if (visibleContent.likedTracks.isNotEmpty()) {
+                            item(key = "liked-heading") {
+                                LibrarySectionHeading(
+                                    title = "Liked Songs",
+                                    count = visibleContent.likedTracks.size,
+                                    playActionDescription =
+                                        "Play ${visibleContent.likedTracks.size} liked songs " +
+                                        "in ${state.sort.label} order",
+                                    onPlay = { onTrackPlay(visibleContent.likedTracks, 0) },
+                                    horizontalPadding = layoutSpec.horizontalPadding,
+                                )
+                            }
+                            itemsIndexed(
+                                items = visibleContent.likedTracks,
+                                key = { _, track -> "liked-${track.id}" },
+                            ) { index, track ->
+                                LibraryTrackRow(
+                                    track = track,
+                                    isPending = state.isPending(LibraryItemKind.Track, track.id),
+                                    onPlay = { onTrackPlay(visibleContent.likedTracks, index) },
+                                    onRemove = { onRemoveTrack(track) },
+                                    layoutSpec = layoutSpec,
+                                )
+                            }
                         }
-                        items(
-                            items = state.visibleFollowedArtists,
-                            key = { "followed-${it.id}" },
-                        ) { artist ->
-                            LibraryCollectionRow(
-                                title = artist.name,
-                                subtitle = "Artist",
-                                actionDescription = "Unfollow ${artist.name}",
-                                isPending = state.isPending(LibraryItemKind.Artist, artist.id),
-                                onClick = { onArtistClick(artist) },
-                                onRemove = { onUnfollowArtist(artist) },
-                                leadingContent = { LibraryArtistAvatar(artist.name) },
-                            )
+
+                        if (visibleContent.savedAlbums.isNotEmpty()) {
+                            item(key = "albums-heading") {
+                                LibrarySectionHeading(
+                                    title = "Saved Albums",
+                                    count = visibleContent.savedAlbums.size,
+                                    horizontalPadding = layoutSpec.horizontalPadding,
+                                )
+                            }
+                            items(
+                                items = visibleContent.savedAlbums,
+                                key = { "saved-${it.album.id}" },
+                            ) { saved ->
+                                LibraryCollectionRow(
+                                    title = saved.album.title,
+                                    subtitle = saved.artistName.ifBlank { "Unknown artist" },
+                                    actionDescription = "Remove ${saved.album.title} from Library",
+                                    openDescription = "Open album ${saved.album.title}",
+                                    isPending = state.isPending(
+                                        LibraryItemKind.Album,
+                                        saved.album.id,
+                                    ),
+                                    onClick = { onAlbumClick(saved.album) },
+                                    onRemove = { onRemoveAlbum(saved.album) },
+                                    leadingContent = {
+                                        LibraryAlbumArtwork(
+                                            albumId = saved.album.id,
+                                            requestProvider = artworkRequestProvider,
+                                            size = layoutSpec.artworkSize,
+                                        )
+                                    },
+                                    layoutSpec = layoutSpec,
+                                )
+                            }
+                        }
+
+                        if (visibleContent.followedArtists.isNotEmpty()) {
+                            item(key = "artists-heading") {
+                                LibrarySectionHeading(
+                                    title = "Followed Artists",
+                                    count = visibleContent.followedArtists.size,
+                                    horizontalPadding = layoutSpec.horizontalPadding,
+                                )
+                            }
+                            items(
+                                items = visibleContent.followedArtists,
+                                key = { "followed-${it.id}" },
+                            ) { artist ->
+                                LibraryCollectionRow(
+                                    title = artist.name,
+                                    subtitle = "Artist",
+                                    actionDescription = "Unfollow ${artist.name}",
+                                    openDescription = "Open artist ${artist.name}",
+                                    isPending = state.isPending(
+                                        LibraryItemKind.Artist,
+                                        artist.id,
+                                    ),
+                                    onClick = { onArtistClick(artist) },
+                                    onRemove = { onUnfollowArtist(artist) },
+                                    leadingContent = {
+                                        LibraryArtistAvatar(
+                                            artist.name,
+                                            layoutSpec.artworkSize,
+                                        )
+                                    },
+                                    layoutSpec = layoutSpec,
+                                )
+                            }
                         }
                     }
                 }
@@ -300,12 +393,20 @@ fun LibraryScreen(
 private fun LibraryHeader(
     isRefreshing: Boolean,
     pendingMutationCount: Int,
+    freshness: LibraryFreshness,
+    isOnline: Boolean,
+    horizontalPadding: Dp,
     onRefresh: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
+            .padding(
+                start = horizontalPadding,
+                end = 8.dp,
+                top = 20.dp,
+                bottom = 8.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -324,6 +425,29 @@ private fun LibraryHeader(
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.semantics {
+                    stateDescription = if (pendingMutationCount > 0) {
+                        "Library synchronization pending"
+                    } else {
+                        "Library synchronized"
+                    }
+                },
+            )
+            Text(
+                text = freshness.label,
+                color = if (freshness.isStale) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.semantics {
+                    stateDescription = if (freshness.isStale) {
+                        "Saved Library data is stale"
+                    } else {
+                        "Saved Library freshness"
+                    }
+                },
             )
         }
         IconButton(
@@ -333,11 +457,20 @@ private fun LibraryHeader(
         ) {
             if (isRefreshing) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier
+                        .size(24.dp)
+                        .semantics { contentDescription = "Refreshing Library" },
                     strokeWidth = 2.dp,
                 )
             } else {
-                Icon(Icons.Rounded.Refresh, contentDescription = "Refresh Library")
+                Icon(
+                    Icons.Rounded.Refresh,
+                    contentDescription = if (isOnline) {
+                        "Refresh Library"
+                    } else {
+                        "Retry Library sync when online"
+                    },
+                )
             }
         }
     }
@@ -348,18 +481,23 @@ private fun LibraryControls(
     query: String,
     filter: LibraryFilter,
     sort: LibrarySort,
+    horizontalPadding: Dp,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { isTraversalGroup = true },
+    ) {
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = horizontalPadding, vertical = 8.dp),
             label = { Text("Search your Library") },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             trailingIcon = if (query.isNotBlank()) {
@@ -379,7 +517,7 @@ private fun LibraryControls(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 4.dp),
+                .padding(horizontal = horizontalPadding, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             LibraryFilter.entries.forEach { option ->
@@ -387,6 +525,13 @@ private fun LibraryControls(
                     selected = option == filter,
                     onClick = { onFilterSelected(option) },
                     label = { Text(option.label) },
+                    modifier = Modifier.semantics {
+                        stateDescription = if (option == filter) {
+                            "Selected Library filter"
+                        } else {
+                            "Library filter"
+                        }
+                    },
                 )
             }
         }
@@ -394,13 +539,19 @@ private fun LibraryControls(
             text = "Sort Library",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
+            modifier = Modifier
+                .padding(
+                    start = horizontalPadding,
+                    end = horizontalPadding,
+                    top = 8.dp,
+                )
+                .semantics { heading() },
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 4.dp),
+                .padding(horizontal = horizontalPadding, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             LibrarySort.entries.forEach { option ->
@@ -408,6 +559,13 @@ private fun LibraryControls(
                     selected = option == sort,
                     onClick = { onSortSelected(option) },
                     label = { Text(option.label) },
+                    modifier = Modifier.semantics {
+                        stateDescription = if (option == sort) {
+                            "Selected Library sort order"
+                        } else {
+                            "Library sort order"
+                        }
+                    },
                 )
             }
         }
@@ -420,11 +578,12 @@ private fun LibrarySectionHeading(
     count: Int,
     playActionDescription: String = "Play all liked songs",
     onPlay: (() -> Unit)? = null,
+    horizontalPadding: Dp = LibraryLayoutSpec.Standard.horizontalPadding,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 8.dp, top = 18.dp, bottom = 6.dp),
+            .padding(start = horizontalPadding, end = 8.dp, top = 18.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -450,16 +609,22 @@ private fun LibraryTrackRow(
     isPending: Boolean,
     onPlay: () -> Unit,
     onRemove: () -> Unit,
+    layoutSpec: LibraryLayoutSpec = LibraryLayoutSpec.Standard,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = layoutSpec.rowMinimumHeight)
             .clickable(role = Role.Button, onClickLabel = "Play ${track.title}", onClick = onPlay)
-            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            .padding(
+                start = layoutSpec.horizontalPadding,
+                end = 8.dp,
+                top = 8.dp,
+                bottom = 8.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LibraryIcon(Icons.Rounded.Favorite)
+        LibraryIcon(Icons.Rounded.Favorite, layoutSpec.artworkSize)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -469,14 +634,14 @@ private fun LibraryTrackRow(
                 text = track.title,
                 color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
+                maxLines = layoutSpec.textMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = "${track.artist} · ${track.formattedDuration()}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
+                maxLines = layoutSpec.textMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -485,8 +650,21 @@ private fun LibraryTrackRow(
             enabled = !isPending,
             modifier = Modifier.size(48.dp),
         ) {
-            if (isPending) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            else Icon(Icons.Rounded.Favorite, contentDescription = "Remove ${track.title} from Liked Songs")
+            if (isPending) {
+                CircularProgressIndicator(
+                    Modifier
+                        .size(20.dp)
+                        .semantics {
+                            contentDescription = "Updating ${track.title} in Liked Songs"
+                        },
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    Icons.Rounded.Favorite,
+                    contentDescription = "Remove ${track.title} from Liked Songs",
+                )
+            }
         }
     }
 }
@@ -496,17 +674,24 @@ private fun LibraryCollectionRow(
     title: String,
     subtitle: String,
     actionDescription: String,
+    openDescription: String,
     isPending: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     leadingContent: @Composable () -> Unit,
+    layoutSpec: LibraryLayoutSpec = LibraryLayoutSpec.Standard,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            .heightIn(min = layoutSpec.rowMinimumHeight)
+            .clickable(role = Role.Button, onClickLabel = openDescription, onClick = onClick)
+            .padding(
+                start = layoutSpec.horizontalPadding,
+                end = 8.dp,
+                top = 8.dp,
+                bottom = 8.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         leadingContent()
@@ -519,30 +704,39 @@ private fun LibraryCollectionRow(
                 text = title,
                 color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
+                maxLines = layoutSpec.textMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = subtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
+                maxLines = layoutSpec.textMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         IconButton(onClick = onRemove, enabled = !isPending, modifier = Modifier.size(48.dp)) {
-            if (isPending) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            else Icon(Icons.Rounded.Bookmark, contentDescription = actionDescription)
+            if (isPending) {
+                CircularProgressIndicator(
+                    Modifier
+                        .size(20.dp)
+                        .semantics { contentDescription = "$actionDescription pending" },
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(Icons.Rounded.Bookmark, contentDescription = actionDescription)
+            }
         }
     }
 }
 
 @Composable
-private fun LibraryArtistAvatar(name: String) {
+private fun LibraryArtistAvatar(name: String, size: Dp) {
     Box(
         modifier = Modifier
-            .size(48.dp)
-            .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)), CircleShape),
+            .size(size)
+            .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)), CircleShape)
+            .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -589,14 +783,15 @@ private fun LibraryUiState.emptyStateCopy(): LibraryEmptyCopy = when {
 }
 
 @Composable
-private fun LibraryIcon(icon: ImageVector) {
+private fun LibraryIcon(icon: ImageVector, size: Dp) {
     Box(
         modifier = Modifier
-            .size(48.dp)
+            .size(size)
             .background(
                 Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)),
                 CircleShape,
-            ),
+            )
+            .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = RakyzuBlack)
@@ -626,6 +821,7 @@ private fun LibraryStatus(
             color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
         )
         Text(
             text = message,

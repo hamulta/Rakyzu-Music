@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.3.6`.
+Status: baseline for `0.3.9`.
 
 ## Goals
 
@@ -91,6 +91,9 @@ Media3 item transitions are the listening-history event source, so manual select
 - Supabase owns canonical Library relationships and an append-only listener change stream with forced RLS, owner-only reads, published-catalog checks, and anonymous function denial. Security-invoker RPCs bound page sizes and retain RLS; a locked-down trigger function records insert/delete events without exposing write access to clients.
 - Room preserves each resolved selection's canonical save timestamp in the Library snapshot. The listener-scoped state holder restores a bounded query, filter, and sort choice through `SavedStateHandle`; matching is case/accent/whitespace tolerant and remains local. Recently/oldest-added ordering uses persisted timestamps with stable ID ties, while bulk and row playback send the exact visible Liked Songs list and index to Media3.
 - Saved albums reuse the authenticated artwork delivery contract and credential-free cache key. Album and artist rows navigate with canonical IDs, while type-specific empty states lead listeners back to Search. Pending offline work is announced as a non-error status.
+- Library freshness derives only from Room's persisted successful-sync timestamp. A 24-hour threshold distinguishes stale saved data, refresh coalescing prevents duplicate work, two transient retries use bounded 1- and 3-second delays, and loss of validated connectivity stops backoff. Offline failures and queued mutations wait for exactly one recovery refresh when Android validates the default network again.
+- Library resolves one width/font-scale layout policy. Screens below 360dp reduce horizontal padding; text at 1.3x and above expands collection rows and artwork, while compact or large-text layouts allow two title and metadata lines. Headings, status live regions, filters, sort controls, refresh state, pending mutations, playback, and detail navigation expose explicit TalkBack contracts with at least 48dp interactive targets.
+- Library derives the visible filtered/sorted projection once per immutable snapshot and control tuple in Compose, normalizing the bounded query once per derivation. Process-local diagnostics use only coarse content buckets, fixed refresh/mutation enums, booleans, retry ordinals, and monotonic duration buckets; they exclude account/content identifiers, titles, queries, URLs, tokens, payloads, and raw exceptions. The isolated FIFO retains 32 events under a hard ceiling of 64 and caps rendered lines at 240 characters.
 - Playback queue metadata retains canonical track, album, and artist IDs without credentials or private media locations. Now Playing uses those IDs for direct Like, Save, and Follow controls, and disables unavailable or pending actions without inventing metadata from display labels.
 
 ## Release topology

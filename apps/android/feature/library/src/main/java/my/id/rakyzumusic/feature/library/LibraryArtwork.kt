@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
@@ -45,6 +46,7 @@ private enum class LibraryArtworkState {
 internal fun LibraryAlbumArtwork(
     albumId: String,
     requestProvider: LibraryArtworkRequestProvider,
+    size: Dp = 48.dp,
     modifier: Modifier = Modifier,
 ) {
     val delivery = remember(albumId, requestProvider) { requestProvider(albumId) }
@@ -54,7 +56,7 @@ internal fun LibraryAlbumArtwork(
     }
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(size)
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)))
             .testTag("library-album-artwork-${state.name.lowercase()}-$albumId"),

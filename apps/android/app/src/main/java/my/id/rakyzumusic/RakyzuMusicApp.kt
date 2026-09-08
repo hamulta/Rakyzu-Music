@@ -268,7 +268,11 @@ private fun AuthenticatedRakyzuMusicApp(
     )
     val libraryViewModel: LibraryViewModel = viewModel(
         key = "library-$userId",
-        factory = LibraryViewModel.factory(userId, libraryRepository),
+        factory = LibraryViewModel.factory(
+            userId = userId,
+            repository = libraryRepository,
+            connectivityMonitor = connectivityMonitor,
+        ),
     )
     val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()

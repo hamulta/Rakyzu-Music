@@ -46,9 +46,9 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.3.4` — Saved-album and followed-artist navigation, artwork, and empty-state polish.
 - [x] `0.3.5` — optimistic offline mutations, durable outbox, conflict handling, and recovery.
 - [x] `0.3.6` — bounded pagination and incremental Library synchronization.
-- [ ] `0.3.7` — freshness, validated-connectivity recovery, and retry hardening.
-- [ ] `0.3.8` — adaptive layouts, large-text behavior, and complete TalkBack contracts.
-- [ ] `0.3.9` — privacy-safe Library diagnostics and performance hardening.
+- [x] `0.3.7` — freshness, validated-connectivity recovery, and retry hardening.
+- [x] `0.3.8` — adaptive layouts, large-text behavior, and complete TalkBack contracts.
+- [x] `0.3.9` — privacy-safe Library diagnostics and performance hardening.
 - [ ] `0.3.10` — final Library regression, accessibility, resilience, runtime, and performance gate before Playlists.
 - `0.4.x`: Playlist create/edit/order/share and concurrency handling.
 - `0.5.x`: Queue, playback recovery, devices, audio quality controls.

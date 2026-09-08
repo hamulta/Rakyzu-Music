@@ -1,6 +1,9 @@
 package my.id.rakyzumusic.feature.library
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHasClickAction
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
@@ -196,6 +200,63 @@ class LibraryAccessibilityTest {
         }
     }
 
+    @Test
+    fun albumAndArtistRowsExposeExplicitTalkBackNavigationActions() {
+        setLibraryContent(POPULATED.copy(filter = LibraryFilter.Albums))
+
+        composeRule.onNode(hasClickLabel("Open album Signal Zero"))
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
+
+        setLibraryContent(POPULATED.copy(filter = LibraryFilter.Artists))
+        composeRule.onNode(hasClickLabel("Open artist Rakyzu Sessions"))
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun freshnessOfflineAndPendingStatesRemainExplicit() {
+        setLibraryContent(
+            POPULATED.copy(
+                freshness = LibraryFreshness(ageMinutes = 1_440L),
+                isOnline = false,
+                message = "You're offline. Rakyzu Music will sync your Library when your connection returns.",
+                pendingItems = setOf("Track:track-1"),
+            ),
+        )
+
+        composeRule.onNodeWithText("Updated 1 day ago").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Library sync when online")
+            .assertHasClickAction()
+        composeRule.onNodeWithContentDescription(
+            "Updating Midnight Signal in Liked Songs",
+            useUnmergedTree = true,
+        ).assertExists()
+    }
+
+    @Test
+    fun largeTextPolicyProvidesExpandedNavigationRows() {
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                    LibraryScreen(
+                        state = POPULATED.copy(filter = LibraryFilter.Albums),
+                        onRefresh = {},
+                        onTrackPlay = { _, _ -> },
+                        onAlbumClick = {},
+                        onArtistClick = {},
+                        onRemoveTrack = {},
+                        onRemoveAlbum = {},
+                        onUnfollowArtist = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNode(hasClickLabel("Open album Signal Zero"))
+            .assertHeightIsAtLeast(88.dp)
+    }
+
     private fun setLibraryContent(
         state: LibraryUiState,
         onArtistClick: (Artist) -> Unit = {},
@@ -220,6 +281,13 @@ class LibraryAccessibilityTest {
         SemanticsProperties.LiveRegion,
         LiveRegionMode.Polite,
     )
+
+    private fun hasClickLabel(label: String): SemanticsMatcher = SemanticsMatcher(
+        "has click label '$label'",
+    ) { node ->
+        node.config.contains(SemanticsActions.OnClick) &&
+            node.config[SemanticsActions.OnClick].label == label
+    }
 
     private companion object {
         val TRACK = Track(

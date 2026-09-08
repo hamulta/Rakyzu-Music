@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.setMain
 import my.id.rakyzumusic.core.data.library.LibraryActionResult
 import my.id.rakyzumusic.core.data.library.LibraryFailure
 import my.id.rakyzumusic.core.data.library.LibraryRepository
+import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
@@ -167,23 +168,226 @@ class LibraryViewModelTest {
         assertEquals(listOf("track-old", "track-new"), viewModel.uiState.value.visibleLikedTracks.map(Track::id))
     }
 
+    @Test
+    fun transientRefreshUsesExactlyTwoBoundedRetries() = runTest(dispatcher) {
+        val failure = LibraryActionResult.Failure(LibraryFailure.ServiceUnavailable)
+        val repository = FakeRepository(
+            initialRefreshResult = failure,
+            additionalRefreshResults = listOf(failure, failure),
+        )
+
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = FakeConnectivityMonitor(true),
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(3, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertTrue(viewModel.uiState.value.message?.contains("after retrying") == true)
+    }
+
+    @Test
+    fun invalidPayloadIsNotRetried() = runTest(dispatcher) {
+        val repository = FakeRepository(
+            initialRefreshResult = LibraryActionResult.Failure(LibraryFailure.InvalidPayload),
+        )
+
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = FakeConnectivityMonitor(true),
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.refreshCalls)
+        assertEquals(
+            "The latest Library update could not be verified.",
+            viewModel.uiState.value.message,
+        )
+    }
+
+    @Test
+    fun offlineFailureRecoversOnceWhenValidatedConnectivityReturns() = runTest(dispatcher) {
+        val offlineFailure = LibraryActionResult.Failure(LibraryFailure.NetworkUnavailable)
+        val repository = FakeRepository(
+            initialRefreshResult = offlineFailure,
+            additionalRefreshResults = listOf(LibraryActionResult.Success),
+        )
+        val connectivity = FakeConnectivityMonitor(false)
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = connectivity,
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isWaitingForConnection)
+        assertFalse(viewModel.uiState.value.messageIsError)
+        assertEquals(1, repository.refreshCalls)
+
+        connectivity.online.value = true
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isWaitingForConnection)
+        assertEquals(null, viewModel.uiState.value.message)
+
+        connectivity.online.value = true
+        testScheduler.advanceUntilIdle()
+        assertEquals(2, repository.refreshCalls)
+    }
+
+    @Test
+    fun connectivityLossDuringBackoffStopsRetryAndRecoversOnce() = runTest(dispatcher) {
+        val repository = FakeRepository(
+            initialRefreshResult = LibraryActionResult.Failure(
+                LibraryFailure.ServiceUnavailable,
+            ),
+            additionalRefreshResults = listOf(LibraryActionResult.Success),
+        )
+        val connectivity = FakeConnectivityMonitor(true)
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = connectivity,
+            retryDelaysMillis = listOf(1_000L),
+        )
+        testScheduler.runCurrent()
+
+        connectivity.online.value = false
+        testScheduler.runCurrent()
+        testScheduler.advanceTimeBy(1_000L)
+        testScheduler.runCurrent()
+
+        assertEquals(1, repository.refreshCalls)
+        assertTrue(viewModel.uiState.value.isWaitingForConnection)
+
+        connectivity.online.value = true
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isWaitingForConnection)
+    }
+
+    @Test
+    fun queuedOfflineMutationTriggersRecoveryRefresh() = runTest(dispatcher) {
+        val connectivity = FakeConnectivityMonitor(false)
+        val repository = FakeRepository().apply {
+            mutationResult = LibraryActionResult.Queued(1)
+        }
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = repository,
+            connectivityMonitor = connectivity,
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.setSaved(LibraryItemKind.Track, "track-1", true)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isWaitingForConnection)
+        assertEquals(1, repository.refreshCalls)
+
+        connectivity.online.value = true
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repository.refreshCalls)
+        assertFalse(viewModel.uiState.value.isWaitingForConnection)
+    }
+
+    @Test
+    fun concurrentRefreshIsCoalescedAndDiagnosed() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeRepository(refreshGate = gate)
+        val diagnostics = RecordingLibraryDiagnostics()
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = repository,
+            diagnostics = diagnostics,
+        )
+        testScheduler.runCurrent()
+
+        viewModel.refresh()
+
+        assertEquals(1, repository.refreshCalls)
+        assertTrue(
+            diagnostics.events.contains(
+                LibraryDiagnosticEvent.RefreshCoalesced(LibraryRefreshTrigger.Manual),
+            ),
+        )
+        gate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun freshnessUsesPersistedSyncTimeAndStalesAfterOneDay() = runTest(dispatcher) {
+        val now = 1_800_000_000_000L
+        val staleTime = now - (24L * 60L * 60L * 1_000L)
+        val snapshot = CACHED.copy(lastSyncedAtEpochMillis = staleTime)
+        val viewModel = LibraryViewModel(
+            userId = "listener-1",
+            repository = FakeRepository(snapshot = snapshot),
+            currentTimeMillis = { now },
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Updated 1 day ago", viewModel.uiState.value.freshness.label)
+        assertTrue(viewModel.uiState.value.freshness.isStale)
+    }
+
+    @Test(timeout = 2_000L)
+    fun largeLibraryProjectionKeepsDeterministicOrder() {
+        val tracks = (0 until 5_000).map { index ->
+            Track(
+                id = "track-$index",
+                title = "Signal $index",
+                artist = "Rakyzu Sessions",
+                durationMs = 180_000L,
+            )
+        }
+        val snapshot = CACHED.copy(likedTracks = tracks)
+
+        val content = deriveLibraryVisibleContent(
+            library = snapshot,
+            query = "rakyzu signal",
+            filter = LibraryFilter.Songs,
+            sort = LibrarySort.Alphabetical,
+        )
+
+        assertEquals(5_000, content.likedTracks.size)
+        assertEquals("track-0", content.likedTracks.first().id)
+        assertEquals("track-999", content.likedTracks.last().id)
+    }
+
     private class FakeRepository(
         private val refreshGate: CompletableDeferred<Unit>? = null,
         snapshot: LibrarySnapshot = CACHED,
+        initialRefreshResult: LibraryActionResult = LibraryActionResult.Success,
+        additionalRefreshResults: List<LibraryActionResult> = emptyList(),
     ) : LibraryRepository {
         constructor(snapshot: LibrarySnapshot) : this(refreshGate = null, snapshot = snapshot)
 
         private val library = MutableStateFlow(snapshot)
-        var refreshResult: LibraryActionResult = LibraryActionResult.Success
+        private val refreshResults = ArrayDeque(
+            listOf(initialRefreshResult) + additionalRefreshResults,
+        )
         var mutationResult: LibraryActionResult = LibraryActionResult.Success
         var lastMutation: Mutation? = null
         var mutationCalls = 0
+        var refreshCalls = 0
 
         override fun observeLibrary(userId: String): Flow<LibrarySnapshot> = library
 
         override suspend fun refresh(userId: String): LibraryActionResult {
+            refreshCalls += 1
             refreshGate?.await()
-            return refreshResult
+            return if (refreshResults.size > 1) {
+                refreshResults.removeFirst()
+            } else {
+                refreshResults.first()
+            }
         }
 
         override suspend fun setSaved(
@@ -195,6 +399,22 @@ class LibraryViewModelTest {
             mutationCalls += 1
             lastMutation = Mutation(userId, kind, itemId, saved)
             return mutationResult
+        }
+    }
+
+    private class FakeConnectivityMonitor(initiallyOnline: Boolean) : ConnectivityMonitor {
+        val online = MutableStateFlow(initiallyOnline)
+
+        override val isOnline: Flow<Boolean> = online
+
+        override fun isCurrentlyOnline(): Boolean = online.value
+    }
+
+    private class RecordingLibraryDiagnostics : LibraryDiagnosticSink {
+        val events = mutableListOf<LibraryDiagnosticEvent>()
+
+        override fun record(event: LibraryDiagnosticEvent) {
+            events += event
         }
     }
 
