@@ -88,3 +88,6 @@ commit/CI cycle solely to record identifiers that only exist after publication.
 - The first Android 35 CI emulator attempt could not create its default 7.37 GB userdata
   partition after the build left 5.40 GB free. The pinned runner's documented `disk-size`
   input now caps the disposable AVD at 2048 MB; no application test failed in that attempt.
+- Emulator v37 still enforced the `google_apis` image's 7.37 GB minimum despite that AVD
+  setting. Runtime CI now uses the smaller Android 35 `aosp_atd` image; these tests do not
+  depend on Google APIs or Play Services.
