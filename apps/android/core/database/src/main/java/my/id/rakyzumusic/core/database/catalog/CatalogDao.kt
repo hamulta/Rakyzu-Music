@@ -22,6 +22,21 @@ internal data class CatalogEntitySnapshot(
 
 @Dao
 internal interface CatalogDao {
+    @Query("SELECT payload FROM playlist_details WHERE user_id = :userId AND playlist_id = :playlistId")
+    fun observePlaylistDetail(userId: String, playlistId: String): kotlinx.coroutines.flow.Flow<String?>
+
+    @Query("SELECT payload FROM playlist_details WHERE user_id = :userId AND playlist_id = :playlistId")
+    suspend fun getPlaylistDetail(userId: String, playlistId: String): String?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylistDetail(detail: PlaylistDetailEntity)
+
+    @Transaction
+    suspend fun storePlaylistDetail(detail: PlaylistDetailEntity, playlist: PlaylistEntity) {
+        insertPlaylistDetail(detail)
+        insertPlaylist(playlist)
+    }
+
     @Query("SELECT * FROM artists ORDER BY name COLLATE NOCASE, id")
     suspend fun getArtists(): List<ArtistEntity>
 

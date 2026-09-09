@@ -81,6 +81,8 @@ class OfflineFirstPlaylistRepositoryTest {
     }
 
     private class FakeLocalDataSource : PlaylistLocalDataSource {
+        override fun observeDetailPayload(userId: String, playlistId: String) = kotlinx.coroutines.flow.flowOf<String?>(null)
+        override suspend fun storeDetailPayload(userId: String, playlist: PlaylistSummary, payload: String) = Unit
         val snapshot = MutableStateFlow(PlaylistSnapshot(emptyList(), null))
         var replacedUserId: String? = null
         var upserted: PlaylistSummary? = null
@@ -105,6 +107,8 @@ class OfflineFirstPlaylistRepositoryTest {
     private class FakeRemoteDataSource(
         private val playlists: List<PlaylistSummary>,
     ) : PlaylistRemoteDataSource {
+        override suspend fun detail(id: String): my.id.rakyzumusic.core.model.PlaylistDetail = error("Not used")
+        override suspend fun mutate(id: String, revision: Long, mutation: PlaylistMutation): my.id.rakyzumusic.core.model.PlaylistDetail = error("Not used")
         var createdName: String? = null
         var createdDescription: String? = null
 

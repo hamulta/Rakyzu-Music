@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.4.0`.
+Status: cumulative implementation for `0.4.4`; release evidence in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -97,6 +97,9 @@ Media3 item transitions are the listening-history event source, so manual select
 - Library derives the visible filtered/sorted projection once per immutable snapshot and control tuple in Compose, normalizing the bounded query once per derivation. Process-local diagnostics use only coarse content buckets, fixed refresh/mutation enums, booleans, retry ordinals, and monotonic duration buckets; they exclude account/content identifiers, titles, queries, URLs, tokens, payloads, and raw exceptions. The isolated FIFO retains 32 events under a hard ceiling of 64 and caps rendered lines at 240 characters.
 - The final Library gate reruns its unit, lint, Compose instrumentation-compilation, Room schema, resilience, accessibility, diagnostic privacy, and 5,000-item deterministic projection contracts before any Playlist code is released.
 - Playlist metadata is owned by Supabase and protected by forced owner-only RLS. Security-invoker list/create RPCs normalize bounded metadata, deny anonymous callers, and start every playlist at revision one. Android validates UUIDs, timestamps, counts, revisions, collection size, and duplicate IDs before a transactional Room schema 5 replacement; a failed refresh preserves the last verified account-scoped cache.
+- From 0.4.4, Room schema 6 adds atomic, account/playlist-keyed serialized detail snapshots. These are independent of the bounded Home catalog. A snapshot contains ordered membership, nullable playable metadata, and the matching playlist revision; malformed responses never replace the cache. Repository operations check the active account before requests and again before persistence.
+- `mutate_playlist` is a narrowly granted security-definer RPC with an empty search path, explicit authenticated ownership, a row lock and exact expected revision. Clients have no direct item write or revision/count update grants. Membership is unique, bounded to 500, and reorder must be an exact permutation. No-op changes do not advance the revision. Conflict refresh does not automatically replay the user's intent. Metadata drafts keep the revision at which editing began.
+- Cover lifecycle is isolated in the Worker/R2 boundary: owner authorization precedes every read/write/delete, object paths are constructed from verified identity and validated playlist UUID, payload bytes/dimensions are bounded, and responses cannot enter a shared cache. A fixed owner-scoped key prevents upload-orphan accumulation; cover changes intentionally use last-successful-write-wins independently of playlist revisions. Collaboration/ownership transfer must revisit this contract in later milestones.
 - `feature:playlist` keeps bounded name and description drafts in `SavedStateHandle`, exposes explicit loading/empty/error/success states, and writes only a server-verified create response into the local source of truth. Ordered entries, reorder mutations, share visibility, and collaboration are intentionally staged across later `0.4.x` versions against the existing monotonic revision contract.
 - Playback queue metadata retains canonical track, album, and artist IDs without credentials or private media locations. Now Playing uses those IDs for direct Like, Save, and Follow controls, and disables unavailable or pending actions without inventing metadata from display labels.
 

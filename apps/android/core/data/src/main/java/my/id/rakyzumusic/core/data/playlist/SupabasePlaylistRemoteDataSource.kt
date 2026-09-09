@@ -6,11 +6,38 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import my.id.rakyzumusic.core.model.PlaylistDetail
 import my.id.rakyzumusic.core.model.PlaylistSummary
 
 internal class SupabasePlaylistRemoteDataSource(
     private val postgrest: Postgrest,
 ) : PlaylistRemoteDataSource {
+    override suspend fun detail(id: String): PlaylistDetail = postgrest.rpc(
+        "get_playlist_detail", buildJsonObject { put("playlist_id", id) },
+    ).decodeAs<PlaylistDetail>()
+
+    override suspend fun mutate(id: String, revision: Long, mutation: PlaylistMutation): PlaylistDetail = postgrest.rpc(
+        "mutate_playlist", buildJsonObject {
+            put("playlist_id", id)
+            put("expected_revision", revision)
+            when (mutation) {
+                is PlaylistMutation.Add -> { put("action", "add"); put("track_id", mutation.trackId) }
+                is PlaylistMutation.Remove -> { put("action", "remove"); put("track_id", mutation.trackId) }
+                is PlaylistMutation.Reorder -> {
+                    put("action", "reorder")
+                    put("ordered_ids", JsonArray(mutation.trackIds.map(::JsonPrimitive)))
+                }
+                is PlaylistMutation.Metadata -> {
+                    put("action", "metadata")
+                    put("playlist_name", mutation.name)
+                    put("playlist_description", mutation.description)
+                }
+            }
+        },
+    ).decodeAs<PlaylistDetail>()
+
     override suspend fun getMine(limit: Int): List<PlaylistSummary> = postgrest.rpc(
         function = GET_MY_PLAYLISTS_FUNCTION,
         parameters = buildJsonObject { put("page_size", limit) },

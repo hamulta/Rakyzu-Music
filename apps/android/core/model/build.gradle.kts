@@ -1,5 +1,6 @@
 plugins {
     id("com.android.library")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -17,5 +18,6 @@ android {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     testImplementation("junit:junit:4.13.2")
 }

@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.4.0**
+Current version: **0.4.4** (cumulative 0.4.1–0.4.4, versionCode 44)
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.4-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -72,7 +72,11 @@ Library is an account-scoped offline-first surface backed by Room schema 4. It r
 
 Library now reports freshness from its last verified synchronization, retries transient refresh failures twice, and waits for validated Android connectivity before recovering offline refreshes or queued changes once. Its adaptive layout expands rows and text at 1.3x font scale and reduces padding below 360dp, with explicit TalkBack actions and 48dp controls throughout. Visible content is derived once per immutable render input, and process-local diagnostics expose only coarse counts and fixed lifecycle buckets—never listener/content identifiers, titles, queries, URLs, tokens, payloads, or raw exceptions.
 
-Playlists begin as an account-scoped offline-first collection. The Create destination validates and restores bounded drafts, creates playlist metadata through an authenticated security-invoker Supabase RPC, and immediately persists the verified response in Room schema 5. Forced RLS isolates every playlist by owner. A monotonic revision starts at one and forms the explicit concurrency boundary for ordered items and collaboration in later `0.4.x` milestones; the Android client contains no privileged credential.
+Create lists the 100 most recently updated playlists. Open a playlist to play its ordered songs, add from the cached catalog, remove songs, move songs up/down, edit metadata, and choose/remove its private cover. Detail snapshots are account-scoped and persisted atomically in Room schema 6. The server validates published catalog membership, rejects duplicates and stale revisions, and caps playlists at 500 items until the pagination milestone. Unavailable songs retain their position but are excluded from playback. Reorder is optimistic; failures restore the verified order and require reconciliation before another edit. Metadata drafts retain their starting revision to prevent overwriting concurrent edits.
+
+Playlist cover GET/HEAD/PUT/DELETE requests go through the authenticated Worker, which verifies ownership against Supabase RLS before accessing private R2. Android uses the system photo picker, bounds input/decoded dimensions, and re-encodes a PNG thumbnail without EXIF/location metadata. Worker accepts only PNG, at most 1 MiB and 1024×1024 pixels, and returns `private, no-store`. Covers use a separate last-successful-write-wins lifecycle, not the item revision. No privileged credentials are embedded in Android.
+
+The cumulative CI gate builds all variants once, runs unit tests/lint, then executes Playlist UI and Room migration tests on an Android 35 emulator (no Appetize). See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.4.4.md) for actual gate status and limitations.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

@@ -23,6 +23,14 @@ room3 {
     schemaDirectory("$projectDir/schemas")
 }
 
+androidComponents {
+    onVariants { variant ->
+        variant.deviceTests.values.forEach { test ->
+            test.sources.assets?.addStaticSourceDirectory("schemas")
+        }
+    }
+}
+
 dependencies {
     implementation(project(":core:model"))
 

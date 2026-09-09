@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -41,6 +43,7 @@ import my.id.rakyzumusic.core.model.PlaylistSummary
 @Composable
 fun PlaylistRoute(
     viewModel: PlaylistViewModel,
+    onPlaylistClick: (PlaylistSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -51,6 +54,7 @@ fun PlaylistRoute(
         onCreate = viewModel::create,
         onRefresh = viewModel::refresh,
         modifier = modifier,
+        onPlaylistClick = onPlaylistClick,
     )
 }
 
@@ -62,9 +66,10 @@ internal fun PlaylistScreen(
     onCreate: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    onPlaylistClick: (PlaylistSummary) -> Unit = {},
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().testTag("playlist-list"),
         contentPadding = PaddingValues(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -74,7 +79,7 @@ internal fun PlaylistScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Create",
                         style = MaterialTheme.typography.headlineLarge,
@@ -86,7 +91,7 @@ internal fun PlaylistScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onRefresh, enabled = !state.isRefreshing) {
+                IconButton(onClick = onRefresh, enabled = !state.isRefreshing, modifier = Modifier.size(48.dp)) {
                     if (state.isRefreshing) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     } else {
@@ -104,6 +109,7 @@ internal fun PlaylistScreen(
                     Text("New playlist", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = state.name,
+                        enabled = !state.isCreating,
                         onValueChange = onNameChange,
                         label = { Text("Name") },
                         supportingText = { Text("${state.name.length}/$MAX_PLAYLIST_NAME_LENGTH") },
@@ -112,6 +118,7 @@ internal fun PlaylistScreen(
                     )
                     OutlinedTextField(
                         value = state.description,
+                        enabled = !state.isCreating,
                         onValueChange = onDescriptionChange,
                         label = { Text("Description (optional)") },
                         supportingText = {
@@ -124,10 +131,11 @@ internal fun PlaylistScreen(
                     Button(
                         onClick = onCreate,
                         enabled = state.canCreate,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) {
                         if (state.isCreating) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Text("Creating playlist…")
                         } else {
                             Icon(Icons.Rounded.Add, contentDescription = null)
                             Text("Create playlist", modifier = Modifier.padding(start = 8.dp))
@@ -152,6 +160,7 @@ internal fun PlaylistScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
+            Text("Most recently updated · up to 100 playlists", style = MaterialTheme.typography.bodySmall)
         }
         if (state.hasObservedPlaylists && state.playlists.isEmpty()) {
             item {
@@ -162,15 +171,15 @@ internal fun PlaylistScreen(
             }
         } else {
             items(state.playlists, key = PlaylistSummary::id) { playlist ->
-                PlaylistRow(playlist)
+                PlaylistRow(playlist, onClick = { onPlaylistClick(playlist) })
             }
         }
     }
 }
 
 @Composable
-private fun PlaylistRow(playlist: PlaylistSummary) {
-    Surface(color = RakyzuSurface, shape = MaterialTheme.shapes.medium) {
+private fun PlaylistRow(playlist: PlaylistSummary, onClick: () -> Unit) {
+    Surface(onClick = onClick, color = RakyzuSurface, shape = MaterialTheme.shapes.medium) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,

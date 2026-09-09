@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.core.model
 
+@kotlinx.serialization.Serializable
 data class Track(
     val id: String,
     val title: String,

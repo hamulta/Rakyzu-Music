@@ -130,6 +130,10 @@ object RakyzuAuthFactory {
             playlistRepository = OfflineFirstPlaylistRepository(
                 localDataSource = localDataSources.playlist,
                 remoteDataSource = SupabasePlaylistRemoteDataSource(client.postgrest),
+                activeUserId = { client.auth.currentUserOrNull()?.id },
+                artworkRemote = my.id.rakyzumusic.core.data.playlist.PlaylistArtworkRemoteDataSource(
+                    apiConfiguration, AccessTokenProvider(client.auth::currentAccessTokenOrNull),
+                ),
             ),
             mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
                 UnavailableMediaDeliveryRepository
@@ -157,6 +161,17 @@ data class RakyzuRepositories(
 )
 
 private data object UnavailablePlaylistRepository : PlaylistRepository {
+    override suspend fun artwork(userId: String, playlistId: String) =
+        my.id.rakyzumusic.core.data.playlist.PlaylistArtworkResult.Failed
+    override suspend fun updateArtwork(userId: String, playlistId: String, png: ByteArray?) =
+        my.id.rakyzumusic.core.data.playlist.PlaylistArtworkResult.Failed
+    override fun observeDetail(userId: String, playlistId: String) =
+        flowOf<my.id.rakyzumusic.core.model.PlaylistDetail?>(null)
+    override suspend fun refreshDetail(userId: String, playlistId: String) =
+        PlaylistActionResult.Failure(PlaylistFailure.ServiceUnavailable)
+    override suspend fun mutate(userId: String, playlistId: String, revision: Long,
+        mutation: my.id.rakyzumusic.core.data.playlist.PlaylistMutation) =
+        PlaylistActionResult.Failure(PlaylistFailure.ServiceUnavailable)
     override fun observePlaylists(userId: String) = flowOf(
         PlaylistSnapshot(playlists = emptyList(), lastSyncedAtEpochMillis = null),
     )

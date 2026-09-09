@@ -89,6 +89,8 @@ import my.id.rakyzumusic.feature.library.LibraryRoute
 import my.id.rakyzumusic.feature.library.LibraryViewModel
 import my.id.rakyzumusic.feature.player.NowPlayingScreen
 import my.id.rakyzumusic.feature.playlist.PlaylistRoute
+import my.id.rakyzumusic.feature.playlist.PlaylistDetailRoute
+import my.id.rakyzumusic.feature.playlist.PlaylistDetailViewModel
 import my.id.rakyzumusic.feature.playlist.PlaylistViewModel
 import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
@@ -338,7 +340,8 @@ private fun AuthenticatedRakyzuMusicApp(
                 item(
                     selected = currentRoute == destination.route ||
                         (currentRoute is RakyzuRoute.ArtistDetail ||
-                            currentRoute is RakyzuRoute.AlbumDetail) &&
+                            currentRoute is RakyzuRoute.AlbumDetail ||
+                            currentRoute is RakyzuRoute.PlaylistDetail) &&
                         destination.route == backStack.firstOrNull(),
                     onClick = { selectTopLevelRoute(backStack, destination.route) },
                     icon = {
@@ -510,7 +513,20 @@ private fun AuthenticatedRakyzuMusicApp(
                         )
                     }
                     entry<RakyzuRoute.Create> {
-                        PlaylistRoute(viewModel = playlistViewModel)
+                        PlaylistRoute(viewModel = playlistViewModel, onPlaylistClick = { playlist ->
+                            val route = RakyzuRoute.PlaylistDetail(playlist.id)
+                            if (backStack.lastOrNull() != route) backStack.add(route)
+                        })
+                    }
+                    entry<RakyzuRoute.PlaylistDetail> { route ->
+                        val detailViewModel: PlaylistDetailViewModel = viewModel(
+                            key = "playlist-$userId-${route.playlistId}",
+                            factory = PlaylistDetailViewModel.factory(userId, route.playlistId,
+                                playlistRepository, catalogRepository),
+                        )
+                        PlaylistDetailRoute(detailViewModel,
+                            onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                            onPlay = playbackController::playQueue)
                     }
                     entry<RakyzuRoute.NowPlaying> {
                         NowPlayingScreen(

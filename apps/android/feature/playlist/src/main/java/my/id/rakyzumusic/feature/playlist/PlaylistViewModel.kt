@@ -61,12 +61,14 @@ class PlaylistViewModel internal constructor(
     }
 
     fun updateName(value: String) {
+        if (mutableUiState.value.isCreating) return
         val bounded = value.take(MAX_PLAYLIST_NAME_LENGTH)
         savedStateHandle[SAVED_NAME_KEY] = bounded
         mutableUiState.update { it.copy(name = bounded, message = null) }
     }
 
     fun updateDescription(value: String) {
+        if (mutableUiState.value.isCreating) return
         val bounded = value.take(MAX_PLAYLIST_DESCRIPTION_LENGTH)
         savedStateHandle[SAVED_DESCRIPTION_KEY] = bounded
         mutableUiState.update { it.copy(description = bounded, message = null) }
@@ -129,7 +131,8 @@ class PlaylistViewModel internal constructor(
     }
 }
 
-private fun PlaylistFailure.toMessage(hasSavedContent: Boolean): String = when (this) {
+internal fun PlaylistFailure.toMessage(hasSavedContent: Boolean): String = when (this) {
+    PlaylistFailure.Conflict -> "Playlist changed on another device. Refresh and review before trying again."
     PlaylistFailure.NetworkUnavailable -> if (hasSavedContent) {
         "You're offline. Showing playlists saved on this device."
     } else {

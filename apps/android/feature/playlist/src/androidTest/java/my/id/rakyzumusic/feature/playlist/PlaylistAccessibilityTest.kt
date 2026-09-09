@@ -10,6 +10,10 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
@@ -34,11 +38,14 @@ class PlaylistAccessibilityTest {
             ),
         )
 
+        scrollTo("No playlists yet. Create your first one above.")
         composeRule.onNodeWithText("No playlists yet. Create your first one above.")
             .assertIsDisplayed()
+        scrollTo("Playlists are temporarily unavailable. Try again.")
         composeRule.onNodeWithText("Playlists are temporarily unavailable. Try again.")
             .assertIsDisplayed()
         composeRule.onNode(hasPoliteLiveRegion()).assertIsDisplayed()
+        composeRule.onNodeWithTag("playlist-list").performScrollToNode(hasContentDescription("Refresh playlists"))
         composeRule.onNodeWithContentDescription("Refresh playlists")
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
@@ -52,6 +59,7 @@ class PlaylistAccessibilityTest {
             onCreate = { creates += 1 },
         )
 
+        scrollTo("Create playlist")
         composeRule.onNodeWithText("Create playlist")
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
@@ -78,6 +86,7 @@ class PlaylistAccessibilityTest {
             ),
         )
 
+        scrollTo("Road Trip")
         composeRule.onNodeWithText("Road Trip").assertIsDisplayed()
         composeRule.onNodeWithText("12 songs").assertIsDisplayed()
     }
@@ -103,4 +112,8 @@ class PlaylistAccessibilityTest {
         SemanticsProperties.LiveRegion,
         LiveRegionMode.Polite,
     )
+
+    private fun scrollTo(text: String) {
+        composeRule.onNodeWithTag("playlist-list").performScrollToNode(hasText(text))
+    }
 }

@@ -175,3 +175,11 @@ internal data class PlaylistEntity(
     @ColumnInfo(name = "created_at_epoch_ms") val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
 )
+
+/** Versioned, atomic detail snapshot; independent of the bounded Home catalog cache. */
+@Entity(tableName = "playlist_details", primaryKeys = ["user_id", "playlist_id"])
+internal data class PlaylistDetailEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "playlist_id") val playlistId: String,
+    val payload: String,
+)

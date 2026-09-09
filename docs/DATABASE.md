@@ -44,6 +44,27 @@ Android mirrors the catalog and editorial graph in Room 3 using checked-in schem
 
 `public.playlists` stores owner-scoped playlist metadata. Forced RLS and security-invoker `get_my_playlists` and `create_playlist` functions keep reads and creates inside `auth.uid()`, normalize bounded names/descriptions, and deny anonymous execution. `revision` begins at one as the optimistic-concurrency snapshot boundary for later ordered-item and collaboration migrations. Room schema 5 caches only the authenticated listener's validated collection and updates it transactionally without storing the owner identifier in the domain/UI model.
 
+### Ordered playlist mutations — 0.4.1–0.4.4
+
+Forward migration `20260909120000_playlist_items_and_mutations.sql` adds forced-RLS
+`playlist_items`, unique `(playlist_id, track_id)` membership and deferred unique positions.
+Authenticated clients have SELECT only; writes must use `mutate_playlist`. That function
+locks the caller's own playlist, compares `expected_revision`, validates action-specific
+parameters/publication/exact permutations, and atomically updates membership, count and
+revision. It returns the same ordered JSON contract as `get_playlist_detail`. Both definer
+functions have an empty search path, explicit `auth.uid()` checks, and no anonymous grants.
+Unpublished tracks keep a removable membership placeholder; their metadata is not returned.
+No catalog/auth data is deleted by a playlist mutation. No existing migration is rewritten.
+
+Room schema 6 has an additive 5→6 migration and a `playlist_details` payload table keyed by
+account and playlist. Summary and detail are written in one transaction. Instrumentation
+constructs a real schema-5 database from the exported schema and verifies preservation,
+new detail storage and account isolation after Room opens it as schema 6.
+
+Migration release gate: native Supabase replay, pgTAP and schema lint in CI. Portable local
+PGlite replay with an Auth schema shim is supplementary only. Future collaboration,
+pagination and outbox migrations remain in 0.4.5–0.4.8; they are not part of this release.
+
 `recently_played` is device-local metadata keyed by `(user_id, track_id)`. Writes are accepted only for a track in the verified Room catalog, capped at the 20 most recent entries per listener, and intentionally survive catalog replacement without creating a destructive foreign-key path. Home resolves retained IDs back through the current verified catalog and omits tracks no longer available.
 
 Credentials belong only in local ignored files or GitHub encrypted secrets. Neither SQL migrations nor the Android build may contain privileged keys.

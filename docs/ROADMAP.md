@@ -57,12 +57,18 @@ Rakyzu Music translates public Spotify product and engineering ideas into its ow
 - [x] `0.3.7` — freshness, validated-connectivity recovery, and retry hardening.
 - [x] `0.3.8` — adaptive layouts, large-text behavior, and complete TalkBack contracts.
 - [x] `0.3.9` — privacy-safe Library diagnostics and performance hardening.
-- [x] `0.3.10` — final Library regression, accessibility, resilience, runtime, and performance gate before Playlists.
+- [x] `0.3.10` — final Library regression, accessibility contracts, resilience, instrumentation compilation, and performance gate before Playlists. Device/runtime execution was not evidenced in that release.
 - [x] `0.4.0` — account-scoped playlist create/list foundation, Room source of truth, Supabase forced RLS, and revision-based concurrency contract.
-- [ ] `0.4.1` — playlist detail, ordered items, and deterministic queue playback.
-- [ ] `0.4.2` — add/remove song entry points, duplicate prevention, and catalog validation.
-- [ ] `0.4.3` — optimistic reorder with revision checks, stale-snapshot rejection, and conflict refresh.
-- [ ] `0.4.4` — playlist metadata editing and authenticated artwork lifecycle.
+- [x] `0.4.1` — playlist detail, ordered items, and deterministic queue playback.
+- [x] `0.4.2` — add/remove song entry points, duplicate prevention, and catalog validation.
+- [x] `0.4.3` — optimistic reorder with revision checks, stale-snapshot rejection, and conflict refresh.
+- [x] `0.4.4` — playlist metadata editing and authenticated artwork lifecycle.
+
+The 0.4.1–0.4.4 batch uses one cumulative 0.4.4 artifact, versionCode 44, commit/release
+train and final validation cycle. Scope and local validation are complete; publication
+evidence is recorded separately after CI/CD. See [work session](WORK_SESSION.md) for gate evidence.
+Playlist/Room Android 35 runtime execution is now an explicit CI release requirement.
+
 - [ ] `0.4.5` — collaboration invites, owner/editor roles, and revocation.
 - [ ] `0.4.6` — private/public visibility, safe sharing, following, and abuse-resistant boundaries.
 - [ ] `0.4.7` — offline mutation outbox, idempotency, and conflict recovery.

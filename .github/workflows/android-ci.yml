@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   verify:
-    name: Test, lint, and build 0.4.0
+    name: Test, lint, build, and runtime gate 0.4.4
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
@@ -50,37 +50,38 @@ jobs:
       - name: Install Android SDK 37.0
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
 
-      - name: Validate Home milestone
-        run: >-
-          ./gradlew :feature:home:testDebugUnitTest :feature:home:lintDebug
-          :feature:home:assembleDebugAndroidTest --stacktrace
-
-      - name: Validate Search milestone
-        run: >-
-          ./gradlew :feature:search:testDebugUnitTest :feature:search:lintDebug
-          :feature:search:assembleDebugAndroidTest --stacktrace
-
-      - name: Validate Library milestone
-        run: >-
-          ./gradlew :core:data:testDebugUnitTest :feature:library:testDebugUnitTest
-          :feature:library:lintDebug :feature:library:assembleDebugAndroidTest
-          :core:database:assembleDebugAndroidTest --stacktrace
-
-      - name: Validate Playlist milestone
-        run: >-
-          ./gradlew :core:data:testDebugUnitTest :feature:playlist:testDebugUnitTest
-          :feature:playlist:lintDebug :feature:playlist:assembleDebugAndroidTest
-          --stacktrace
-
-      - name: Validate Android project
+      - name: Validate cumulative Android batch once
         run: >-
           ./gradlew testDebugUnitTest lintDebug assembleDebug
           assembleDebugAndroidTest assembleRelease --stacktrace
 
+      - name: Enable KVM for Android runtime tests
+        run: sudo chmod 666 /dev/kvm
+
+      - name: Execute Playlist and Room tests on Android 35
+        uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          working-directory: apps/android
+          disable-animations: true
+          script: ./gradlew :feature:playlist:connectedDebugAndroidTest :core:database:connectedDebugAndroidTest --stacktrace
+
+      - name: Preserve Rakyzu Music verification reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Rakyzu-Music-0.4.4-verification
+          path: |
+            apps/android/**/build/reports/
+            apps/android/**/build/outputs/androidTest-results/
+          retention-days: 14
+
       - name: Upload Rakyzu Music debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: Rakyzu-Music-0.4.0-debug
-          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.0-debug.apk
+          name: Rakyzu-Music-0.4.4-debug
+          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.4-debug.apk
           if-no-files-found: error
           retention-days: 14

@@ -6,6 +6,10 @@ import my.id.rakyzumusic.core.model.PlaylistSnapshot
 import my.id.rakyzumusic.core.model.PlaylistSummary
 
 interface PlaylistLocalDataSource {
+    fun observeDetailPayload(userId: String, playlistId: String): Flow<String?>
+
+    suspend fun storeDetailPayload(userId: String, playlist: PlaylistSummary, payload: String)
+
     fun observePlaylists(userId: String): Flow<PlaylistSnapshot>
 
     suspend fun replacePlaylists(
@@ -21,6 +25,14 @@ internal class RoomPlaylistLocalDataSource(
     private val database: RakyzuDatabase,
 ) : PlaylistLocalDataSource {
     private val dao = database.catalogDao()
+
+    override fun observeDetailPayload(userId: String, playlistId: String) =
+        dao.observePlaylistDetail(userId, playlistId)
+
+    override suspend fun storeDetailPayload(userId: String, playlist: PlaylistSummary, payload: String) {
+        require(userId.isNotBlank())
+        dao.storePlaylistDetail(PlaylistDetailEntity(userId, playlist.id, payload), playlist.toEntity(userId))
+    }
 
     override fun observePlaylists(userId: String): Flow<PlaylistSnapshot> =
         database.invalidationTracker

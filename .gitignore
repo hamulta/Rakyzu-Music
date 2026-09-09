@@ -15,6 +15,8 @@ keystore.properties
 **/.kotlin/
 **/build/
 captures/
+# Machine-local post-publication evidence, also attached to the matching GitHub Release.
+/docs/Rakyzu-Music-*-audit.local.md
 .externalNativeBuild/
 .cxx/
 *.apk

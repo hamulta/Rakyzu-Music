@@ -3,12 +3,14 @@ import { readBearerToken, UnauthorizedRequest, verifyListener } from "./auth";
 import { parseRange } from "./range";
 import { errorResponse, jsonResponse, responseHeaders } from "./responses";
 import type { RakyzuApiEnv, RequestDependencies } from "./types";
+import { ownsPlaylist, playlistArtwork } from "./playlist-artwork";
 
-const API_VERSION = "0.0.8";
+const API_VERSION = "0.4.4";
+const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
 const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const ARTWORK_CACHE_CONTROL = "private, max-age=86400";
-const dependencies: RequestDependencies = { verifyListener, canStreamTrack, canAccessAlbumArtwork };
+const dependencies: RequestDependencies = { verifyListener, canStreamTrack, canAccessAlbumArtwork, ownsPlaylist };
 
 export function createWorker(
   requestDependencies: RequestDependencies = dependencies,
@@ -38,24 +40,27 @@ export function createWorker(
 
         const trackRoute = url.pathname.match(TRACK_ROUTE);
         const artworkRoute = url.pathname.match(ALBUM_ARTWORK_ROUTE);
-        if (!trackRoute?.[1] && !artworkRoute?.[1]) {
+        const playlistRoute = url.pathname.match(PLAYLIST_ARTWORK_ROUTE);
+        if (!trackRoute?.[1] && !artworkRoute?.[1] && !playlistRoute?.[1]) {
           return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
         }
-        if (request.method !== "GET" && request.method !== "HEAD") {
+        if (request.method !== "GET" && request.method !== "HEAD" &&
+          !(playlistRoute && (request.method === "PUT" || request.method === "DELETE"))) {
           return errorResponse(
             "method_not_allowed",
             "Method not allowed.",
             405,
             requestId,
             origin,
-            { allow: "GET, HEAD, OPTIONS" },
+            { allow: playlistRoute ? "GET, HEAD, PUT, DELETE, OPTIONS" : "GET, HEAD, OPTIONS" },
           );
         }
 
         let token: string;
+        let userId: string;
         try {
           token = readBearerToken(request);
-          await requestDependencies.verifyListener(token, env);
+          userId = (await requestDependencies.verifyListener(token, env)).userId;
         } catch (error) {
           if (!(error instanceof UnauthorizedRequest)) throw error;
           return errorResponse(
@@ -66,6 +71,18 @@ export function createWorker(
             origin,
             { "www-authenticate": 'Bearer realm="Rakyzu Music"' },
           );
+        }
+
+        if (playlistRoute?.[1]) {
+          const id = playlistRoute[1].toLowerCase();
+          try {
+            if (!(await requestDependencies.ownsPlaylist(id, userId, token, env))) {
+              return errorResponse("playlist_not_found", "Playlist unavailable.", 404, requestId, origin);
+            }
+          } catch {
+            return errorResponse("playlist_unavailable", "Playlist authorization unavailable.", 503, requestId, origin);
+          }
+          return await playlistArtwork(request, env, id, userId, requestId, origin);
         }
 
         if (trackRoute?.[1]) {
@@ -232,7 +249,7 @@ function allowedOrigin(request: Request, env: RakyzuApiEnv): string | null {
 function preflightResponse(requestId: string, origin: string | null): Response {
   const headers = responseHeaders(requestId, origin);
   headers.set("access-control-allow-headers", "Authorization, Content-Type, Range");
-  headers.set("access-control-allow-methods", "GET, HEAD, OPTIONS");
+  headers.set("access-control-allow-methods", "GET, HEAD, PUT, DELETE, OPTIONS");
   headers.set("access-control-max-age", "86400");
   headers.set("cache-control", "no-store");
   return new Response(null, { status: 204, headers });

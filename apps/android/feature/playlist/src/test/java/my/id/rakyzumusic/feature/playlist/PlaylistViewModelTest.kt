@@ -61,6 +61,12 @@ class PlaylistViewModelTest {
     }
 
     private class FakeRepository : PlaylistRepository {
+        override fun observeDetail(userId: String, playlistId: String) = kotlinx.coroutines.flow.flowOf<my.id.rakyzumusic.core.model.PlaylistDetail?>(null)
+        override suspend fun refreshDetail(userId: String, playlistId: String) = PlaylistActionResult.Success()
+        override suspend fun mutate(userId: String, playlistId: String, revision: Long,
+            mutation: my.id.rakyzumusic.core.data.playlist.PlaylistMutation) = PlaylistActionResult.Success()
+        override suspend fun artwork(userId: String, playlistId: String) = my.id.rakyzumusic.core.data.playlist.PlaylistArtworkResult.Absent
+        override suspend fun updateArtwork(userId: String, playlistId: String, png: ByteArray?) = my.id.rakyzumusic.core.data.playlist.PlaylistArtworkResult.Updated
         private val snapshot = MutableStateFlow(PlaylistSnapshot(listOf(PLAYLIST), 1_000L))
         var refreshCalls = 0
         var createdName: String? = null
