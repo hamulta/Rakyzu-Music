@@ -18,18 +18,30 @@ const trackOne = 'a3000000-0000-4000-8000-000000000001';
 const trackTwo = 'a3000000-0000-4000-8000-000000000002';
 
 async function request(url, { method = 'GET', token, key = publicKey, body, raw = false, expected = 200 } = {}) {
-  const response = await fetch(url, {
-    method, redirect: 'error', signal: AbortSignal.timeout(20000),
-    headers: { ...(key ? { apikey: key } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...(body ? { 'content-type': raw ? 'image/png' : 'application/json' } : {}) },
-    body: body ? (raw ? body : JSON.stringify(body)) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method, redirect: 'error', signal: AbortSignal.timeout(20000),
+      headers: { ...(key ? { apikey: key } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(body ? { 'content-type': raw ? 'image/png' : 'application/json' } : {}) },
+      body: body ? (raw ? body : JSON.stringify(body)) : undefined,
+    });
+  } catch (error) {
+    const kind = error instanceof Error ? error.name : 'transport error';
+    throw new Error(`${method} ${new URL(url).pathname} failed (${kind})`);
+  }
   // Never log response bodies, request headers or upstream error details.
   assert.equal(response.status, expected, `${method} ${new URL(url).pathname} returned unexpected status`);
   return response;
 }
 async function rpc(name, body, token = ownerToken, expected = 200) {
-  return (await request(`${base}/rest/v1/rpc/${name}`, { method: 'POST', token, body, expected })).json();
+  try {
+    return (await request(`${base}/rest/v1/rpc/${name}`, { method: 'POST', token, body, expected })).json();
+  } catch (error) {
+    const action = typeof body.action === 'string' ? body.action : 'none';
+    const revision = Number.isInteger(body.expected_revision) ? body.expected_revision : 'none';
+    throw new Error(`${error instanceof Error ? error.message : 'RPC failed'}; rpc=${name}; action=${action}; revision=${revision}`);
+  }
 }
 async function user() {
   const email = `rakyzu-smoke-${randomUUID()}@example.invalid`;
@@ -67,14 +79,14 @@ try {
   assert.equal(detail.playlist.trackCount, 2);
   detail = await rpc('mutate_playlist', { playlist_id: playlistId, expected_revision: 3, action: 'reorder', ordered_ids: [trackTwo, trackOne] });
   assert.deepEqual(detail.items.map(item => item.trackId), [trackTwo, trackOne]);
-  const conflict = await rpc('mutate_playlist', { playlist_id: playlistId, expected_revision: 3, action: 'remove', track_id: trackOne }, ownerToken, 500);
-  assert.equal(conflict.code, '40001');
+  const conflict = await rpc('mutate_playlist', { playlist_id: playlistId, expected_revision: 3, action: 'remove', track_id: trackOne }, ownerToken, 409);
+  assert.equal(conflict.code, 'PT409');
   detail = await rpc('mutate_playlist', { playlist_id: playlistId, expected_revision: 4, action: 'metadata', playlist_name: 'Updated release smoke', playlist_description: 'Temporary verification only' });
   assert.equal(detail.playlist.name, 'Updated release smoke');
   await rpc('get_playlist_detail', { playlist_id: playlistId }, otherToken, 403);
   console.log('PASS: authenticated detail, add, duplicate, reorder, stale conflict, metadata and owner isolation');
 
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGasAAAAASUVORK5CYII=', 'base64');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
   const coverUrl = `${api}/v1/playlists/${playlistId}/artwork`;
   await request(coverUrl, { method: 'PUT', token: otherToken, body: png, raw: true, expected: 404 });
   await request(coverUrl, { method: 'PUT', token: ownerToken, body: png, raw: true, expected: 204 });
@@ -91,7 +103,8 @@ try {
   assert.equal(detail.playlist.trackCount, 1);
   console.log('PASS: private R2 upload/read/delete, byte equality, no-store and unauthorized denial');
 } catch (error) {
-  console.error('FAIL:', error instanceof assert.AssertionError ? error.message : 'Smoke request failed (details redacted)');
+  // Errors contain only static assertion labels or method/path/status; bodies and headers stay redacted.
+  console.error('FAIL:', error instanceof Error ? error.message : 'Smoke request failed (details redacted)');
   process.exitCode = 1;
 } finally {
   if (coverCreated && ownerToken) {

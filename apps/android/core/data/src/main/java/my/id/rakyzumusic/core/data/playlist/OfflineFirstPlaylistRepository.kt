@@ -170,7 +170,7 @@ private fun Throwable.toPlaylistFailure(): PlaylistFailure = when (this) {
     is HttpRequestException,
     -> PlaylistFailure.NetworkUnavailable
     is PostgrestRestException -> when (code) {
-        "40001" -> PlaylistFailure.Conflict
+        "PT409", "40001" -> PlaylistFailure.Conflict
         "22023" -> PlaylistFailure.InvalidRequest
         else -> PlaylistFailure.ServiceUnavailable
     }

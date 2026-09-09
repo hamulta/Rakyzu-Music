@@ -53,6 +53,9 @@ locks the caller's own playlist, compares `expected_revision`, validates action-
 parameters/publication/exact permutations, and atomically updates membership, count and
 revision. It returns the same ordered JSON contract as `get_playlist_detail`. Both definer
 functions have an empty search path, explicit `auth.uid()` checks, and no anonymous grants.
+Forward correction `20260909151000_playlist_conflict_http_status.sql` represents a stale
+revision as PostgREST `PT409`/HTTP 409, avoiding retry behavior reserved for genuine
+PostgreSQL serialization failures.
 Unpublished tracks keep a removable membership placeholder; their metadata is not returned.
 No catalog/auth data is deleted by a playlist mutation. No existing migration is rewritten.
 

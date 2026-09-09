@@ -82,3 +82,6 @@ commit/CI cycle solely to record identifiers that only exist after publication.
   37, signed with APK Signature Scheme v2. It installs and launches MainActivity foreground
   on the connected device with no fatal exception in the post-launch log window.
 - No commit/push/release occurred before all of the above local failures were corrected.
+- The first live deployment smoke exposed that SQLSTATE `40001` can be retried as a genuine
+  serialization failure and time out. A forward migration changes intentional stale-revision
+  errors to PostgREST `PT409`/HTTP 409; the Android mapper accepts both codes during rollout.
