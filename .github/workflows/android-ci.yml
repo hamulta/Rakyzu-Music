@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Test, lint, build, and runtime gate 0.4.4
+    name: Test, lint, and build 0.4.4
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -55,28 +55,12 @@ jobs:
           ./gradlew testDebugUnitTest lintDebug assembleDebug
           assembleDebugAndroidTest assembleRelease --stacktrace
 
-      - name: Enable KVM for Android runtime tests
-        run: sudo chmod 666 /dev/kvm
-
-      - name: Execute Playlist and Room tests on Android 35
-        uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: aosp_atd
-          disk-size: 2048M
-          working-directory: apps/android
-          disable-animations: true
-          script: ./gradlew :feature:playlist:connectedDebugAndroidTest :core:database:connectedDebugAndroidTest --stacktrace
-
       - name: Preserve Rakyzu Music verification reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Rakyzu-Music-0.4.4-verification
-          path: |
-            apps/android/**/build/reports/
-            apps/android/**/build/outputs/androidTest-results/
+          path: apps/android/**/build/reports/
           retention-days: 14
 
       - name: Upload Rakyzu Music debug APK

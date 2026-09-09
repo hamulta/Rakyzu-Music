@@ -56,7 +56,7 @@ commit/CI cycle solely to record identifiers that only exist after publication.
   incompatibility was corrected using the variant device-test assets API.
 - The CEO connected an Infinix X6887 (Android API 36) during implementation. Dedicated
   instrumentation APKs and the final debug APK were installed without clearing app data.
-  CI also includes Android 35 Playlist/Room execution, with reports retained.
+  CI compiles all instrumentation APKs; focused runtime execution uses this physical device.
 - First device run exposed a migration fixture assumption about omitted empty `indices`
   arrays, then a teardown race caused by closing Room with an invalidation Flow still active.
   The fixture now accepts omitted arrays and the migration test uses deterministic DAO reads;
@@ -85,9 +85,7 @@ commit/CI cycle solely to record identifiers that only exist after publication.
 - The first live deployment smoke exposed that SQLSTATE `40001` can be retried as a genuine
   serialization failure and time out. A forward migration changes intentional stale-revision
   errors to PostgREST `PT409`/HTTP 409; the Android mapper accepts both codes during rollout.
-- The first Android 35 CI emulator attempt could not create its default 7.37 GB userdata
-  partition after the build left 5.40 GB free. The pinned runner's documented `disk-size`
-  input now caps the disposable AVD at 2048 MB; no application test failed in that attempt.
-- Emulator v37 still enforced the `google_apis` image's 7.37 GB minimum despite that AVD
-  setting. Runtime CI now uses the smaller Android 35 `aosp_atd` image; these tests do not
-  depend on Google APIs or Play Services.
+- An unnecessary CI emulator gate was introduced and produced infrastructure-only boot
+  failures before any application test ran. The CEO clarified that emulator execution is
+  not required; the gate and KVM setup were removed. Physical-device ADB evidence above is
+  the runtime gate, matching the established project workflow.

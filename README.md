@@ -76,7 +76,7 @@ Create lists the 100 most recently updated playlists. Open a playlist to play it
 
 Playlist cover GET/HEAD/PUT/DELETE requests go through the authenticated Worker, which verifies ownership against Supabase RLS before accessing private R2. Android uses the system photo picker, bounds input/decoded dimensions, and re-encodes a PNG thumbnail without EXIF/location metadata. Worker accepts only PNG, at most 1 MiB and 1024×1024 pixels, and returns `private, no-store`. Covers use a separate last-successful-write-wins lifecycle, not the item revision. No privileged credentials are embedded in Android.
 
-The cumulative CI gate builds all variants once, runs unit tests/lint, then executes Playlist UI and Room migration tests on an Android 35 emulator (no Appetize). See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.4.4.md) for actual gate status and limitations.
+The cumulative CI gate builds all variants once and runs unit tests/lint. Playlist UI and Room migration runtime tests execute on the CEO-connected physical Android device; no emulator or Appetize is used. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.4.4.md) for actual gate status and limitations.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

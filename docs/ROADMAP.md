@@ -67,7 +67,8 @@ Rakyzu Music translates public Spotify product and engineering ideas into its ow
 The 0.4.1–0.4.4 batch uses one cumulative 0.4.4 artifact, versionCode 44, commit/release
 train and final validation cycle. Scope and local validation are complete; publication
 evidence is recorded separately after CI/CD. See [work session](WORK_SESSION.md) for gate evidence.
-Playlist/Room Android 35 runtime execution is now an explicit CI release requirement.
+Playlist/Room instrumentation APK compilation remains a CI release requirement; focused
+runtime evidence is captured on the CEO-connected physical Android device.
 
 - [ ] `0.4.5` — collaboration invites, owner/editor roles, and revocation.
 - [ ] `0.4.6` — private/public visibility, safe sharing, following, and abuse-resistant boundaries.
