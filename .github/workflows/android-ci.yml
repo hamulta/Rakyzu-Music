@@ -64,6 +64,7 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
+          disk-size: 2048M
           working-directory: apps/android
           disable-animations: true
           script: ./gradlew :feature:playlist:connectedDebugAndroidTest :core:database:connectedDebugAndroidTest --stacktrace

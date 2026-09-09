@@ -85,3 +85,6 @@ commit/CI cycle solely to record identifiers that only exist after publication.
 - The first live deployment smoke exposed that SQLSTATE `40001` can be retried as a genuine
   serialization failure and time out. A forward migration changes intentional stale-revision
   errors to PostgREST `PT409`/HTTP 409; the Android mapper accepts both codes during rollout.
+- The first Android 35 CI emulator attempt could not create its default 7.37 GB userdata
+  partition after the build left 5.40 GB free. The pinned runner's documented `disk-size`
+  input now caps the disposable AVD at 2048 MB; no application test failed in that attempt.
