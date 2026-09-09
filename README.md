@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.3.9**
+Current version: **0.4.0**
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.9-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -71,6 +71,8 @@ Track rows in Search, artist detail, and album detail expose an accessible conte
 Library is an account-scoped offline-first surface backed by Room schema 4. It resolves liked tracks, saved albums, and followed artists against the last verified catalog and preserves their saved timestamps for deterministic ordering. Saved albums display authenticated artwork, while album and artist rows retain typed detail navigation. Like, Save, and Follow intents update Room immediately and persist in a listener-scoped outbox. The latest intent for one item wins, transient failures remain queued, and later refreshes retry safely. Initial server state uses 50-row keyset pages; subsequent refreshes consume an RLS-isolated change cursor including deletion tombstones without replacing the whole Library.
 
 Library now reports freshness from its last verified synchronization, retries transient refresh failures twice, and waits for validated Android connectivity before recovering offline refreshes or queued changes once. Its adaptive layout expands rows and text at 1.3x font scale and reduces padding below 360dp, with explicit TalkBack actions and 48dp controls throughout. Visible content is derived once per immutable render input, and process-local diagnostics expose only coarse counts and fixed lifecycle buckets—never listener/content identifiers, titles, queries, URLs, tokens, payloads, or raw exceptions.
+
+Playlists begin as an account-scoped offline-first collection. The Create destination validates and restores bounded drafts, creates playlist metadata through an authenticated security-invoker Supabase RPC, and immediately persists the verified response in Room schema 5. Forced RLS isolates every playlist by owner. A monotonic revision starts at one and forms the explicit concurrency boundary for ordered items and collaboration in later `0.4.x` milestones; the Android client contains no privileged credential.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

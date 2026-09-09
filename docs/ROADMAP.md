@@ -2,6 +2,14 @@
 
 The release train follows the CEO-defined cadence. Each line may contain up to ten validated patches before advancing. Scope can move between patch releases when quality requires it, but version order does not skip.
 
+## Public Spotify reference principles
+
+Rakyzu Music translates public Spotify product and engineering ideas into its own implementation and brand; it does not copy proprietary code, assets, catalog content, trademarks, or private infrastructure.
+
+- Spotify's public [playlist concepts](https://developer.spotify.com/documentation/web-api/concepts/playlists) model a playlist as metadata plus ordered items and use a snapshot identifier for concurrent changes. Rakyzu uses a monotonic `revision` with account-scoped metadata first, then ordered items and conflict-safe mutations.
+- Spotify's public [mobile Create controls](https://newsroom.spotify.com/2025-05-07/experience-a-new-dimension-of-music-discovery-with-more-controls-and-enhanced-tools/) place creation alongside the stable Library destination. Rakyzu adds a dedicated adaptive Create destination while retaining Your Library.
+- Spotify Engineering's public [client architecture](https://engineering.atspotify.com/2020/5/spotify-modernizes-client-side-architecture-to-accelerate-service-on-all-devices) emphasizes batching metadata, on-device storage, and precomputed ordering for slow networks and older devices. Rakyzu applies bounded RPCs, Room as source of truth, deterministic ordering, and staged feature boundaries.
+
 ## Foundation — 0.0.x
 
 - [x] `0.0.1` — repository, Android modular scaffold, Rakyzu design baseline, test/lint/build CI.
@@ -49,8 +57,18 @@ The release train follows the CEO-defined cadence. Each line may contain up to t
 - [x] `0.3.7` — freshness, validated-connectivity recovery, and retry hardening.
 - [x] `0.3.8` — adaptive layouts, large-text behavior, and complete TalkBack contracts.
 - [x] `0.3.9` — privacy-safe Library diagnostics and performance hardening.
-- [ ] `0.3.10` — final Library regression, accessibility, resilience, runtime, and performance gate before Playlists.
-- `0.4.x`: Playlist create/edit/order/share and concurrency handling.
+- [x] `0.3.10` — final Library regression, accessibility, resilience, runtime, and performance gate before Playlists.
+- [x] `0.4.0` — account-scoped playlist create/list foundation, Room source of truth, Supabase forced RLS, and revision-based concurrency contract.
+- [ ] `0.4.1` — playlist detail, ordered items, and deterministic queue playback.
+- [ ] `0.4.2` — add/remove song entry points, duplicate prevention, and catalog validation.
+- [ ] `0.4.3` — optimistic reorder with revision checks, stale-snapshot rejection, and conflict refresh.
+- [ ] `0.4.4` — playlist metadata editing and authenticated artwork lifecycle.
+- [ ] `0.4.5` — collaboration invites, owner/editor roles, and revocation.
+- [ ] `0.4.6` — private/public visibility, safe sharing, following, and abuse-resistant boundaries.
+- [ ] `0.4.7` — offline mutation outbox, idempotency, and conflict recovery.
+- [ ] `0.4.8` — bounded pagination and large-playlist performance hardening.
+- [ ] `0.4.9` — privacy-safe Playlist diagnostics, adaptive UI, and complete TalkBack contracts.
+- [ ] `0.4.10` — final Playlist regression, accessibility, resilience, runtime, security, and performance gate before Queue.
 - `0.5.x`: Queue, playback recovery, devices, audio quality controls.
 - `0.6.x`: Offline downloads, storage controls, resilient sync.
 - `0.7.x`: Lyrics, credits, social sharing, notifications.

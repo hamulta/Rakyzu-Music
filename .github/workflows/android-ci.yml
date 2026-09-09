@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Test, lint, and build 0.3.9
+    name: Test, lint, and build 0.4.0
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -66,6 +66,12 @@ jobs:
           :feature:library:lintDebug :feature:library:assembleDebugAndroidTest
           :core:database:assembleDebugAndroidTest --stacktrace
 
+      - name: Validate Playlist milestone
+        run: >-
+          ./gradlew :core:data:testDebugUnitTest :feature:playlist:testDebugUnitTest
+          :feature:playlist:lintDebug :feature:playlist:assembleDebugAndroidTest
+          --stacktrace
+
       - name: Validate Android project
         run: >-
           ./gradlew testDebugUnitTest lintDebug assembleDebug
@@ -74,7 +80,7 @@ jobs:
       - name: Upload Rakyzu Music debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: Rakyzu-Music-0.3.9-debug
-          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.3.9-debug.apk
+          name: Rakyzu-Music-0.4.0-debug
+          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.0-debug.apk
           if-no-files-found: error
           retention-days: 14

@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
                     profileRepository = rakyzuApplication.profileRepository,
                     catalogRepository = rakyzuApplication.catalogRepository,
                     libraryRepository = rakyzuApplication.libraryRepository,
+                    playlistRepository = rakyzuApplication.playlistRepository,
                     mediaDeliveryRepository = rakyzuApplication.mediaDeliveryRepository,
                     connectivityMonitor = rakyzuApplication.connectivityMonitor,
                     recentSearchRepository = rakyzuApplication.recentSearchRepository,

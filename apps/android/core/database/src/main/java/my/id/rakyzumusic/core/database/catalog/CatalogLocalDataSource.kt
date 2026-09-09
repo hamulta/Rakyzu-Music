@@ -23,6 +23,7 @@ interface CatalogLocalDataSource {
 data class RakyzuLocalDataSources(
     val catalog: CatalogLocalDataSource,
     val library: LibraryLocalDataSource,
+    val playlist: PlaylistLocalDataSource,
 )
 
 fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
@@ -30,6 +31,7 @@ fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
     return RakyzuLocalDataSources(
         catalog = RoomCatalogLocalDataSource(database),
         library = RoomLibraryLocalDataSource(database),
+        playlist = RoomPlaylistLocalDataSource(database),
     )
 }
 

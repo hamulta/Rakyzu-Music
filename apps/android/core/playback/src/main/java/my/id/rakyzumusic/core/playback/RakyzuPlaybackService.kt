@@ -78,6 +78,6 @@ class RakyzuPlaybackService : MediaSessionService() {
 
     private companion object {
         const val SESSION_ACTIVITY_REQUEST_CODE = 800
-        const val USER_AGENT = "Rakyzu Music Android/0.3.9"
+        const val USER_AGENT = "Rakyzu Music Android/0.4.0"
     }
 }

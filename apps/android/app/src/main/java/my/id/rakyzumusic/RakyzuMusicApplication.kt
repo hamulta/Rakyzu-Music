@@ -22,6 +22,7 @@ import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
 import my.id.rakyzumusic.core.data.media.MediaStreamRequestFailure
 import my.id.rakyzumusic.core.data.media.MediaStreamRequestResult
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
+import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.playback.PlaybackDependencies
@@ -62,6 +63,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
 
     val libraryRepository: LibraryRepository
         get() = repositories.libraryRepository
+
+    val playlistRepository: PlaylistRepository
+        get() = repositories.playlistRepository
 
     val mediaDeliveryRepository: MediaDeliveryRepository
         get() = repositories.mediaDeliveryRepository

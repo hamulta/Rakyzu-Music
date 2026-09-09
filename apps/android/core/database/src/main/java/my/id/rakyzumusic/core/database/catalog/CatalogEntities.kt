@@ -159,3 +159,19 @@ internal data class LibraryMutationOutboxEntity(
     @ColumnInfo(name = "queued_at_epoch_ms") val queuedAtEpochMillis: Long,
     @ColumnInfo(name = "attempt_count") val attemptCount: Int,
 )
+
+@Entity(
+    tableName = "playlists",
+    primaryKeys = ["user_id", "playlist_id"],
+    indices = [Index(value = ["user_id", "updated_at_epoch_ms", "playlist_id"])],
+)
+internal data class PlaylistEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "playlist_id") val playlistId: String,
+    val name: String,
+    val description: String,
+    @ColumnInfo(name = "track_count") val trackCount: Int,
+    val revision: Long,
+    @ColumnInfo(name = "created_at_epoch_ms") val createdAtEpochMillis: Long,
+    @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
+)

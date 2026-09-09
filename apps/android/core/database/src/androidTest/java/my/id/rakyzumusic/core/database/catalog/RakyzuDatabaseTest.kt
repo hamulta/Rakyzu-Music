@@ -12,6 +12,7 @@ import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.LibraryItemKind
+import my.id.rakyzumusic.core.model.PlaylistSummary
 import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,6 +26,7 @@ class RakyzuDatabaseTest {
     private lateinit var database: RakyzuDatabase
     private lateinit var dataSource: CatalogLocalDataSource
     private lateinit var libraryDataSource: LibraryLocalDataSource
+    private lateinit var playlistDataSource: PlaylistLocalDataSource
 
     @Before
     fun setUp() {
@@ -36,6 +38,7 @@ class RakyzuDatabaseTest {
             .build()
         dataSource = RoomCatalogLocalDataSource(database)
         libraryDataSource = RoomLibraryLocalDataSource(database)
+        playlistDataSource = RoomPlaylistLocalDataSource(database)
     }
 
     @After
@@ -144,6 +147,29 @@ class RakyzuDatabaseTest {
         }
         assertEquals(true, synchronized.isEmpty)
         assertEquals(9L, libraryDataSource.getLibraryChangeCursor("listener-1"))
+    }
+
+    @Test
+    fun playlistCacheIsTransactionalAndIsolatedByListener() = runTest {
+        val playlist = PlaylistSummary(
+            id = "90000000-0000-4000-8000-000000000001",
+            name = "Road Trip",
+            description = "Coast",
+            trackCount = 0,
+            revision = 1,
+            createdAtEpochMillis = 1_000L,
+            updatedAtEpochMillis = 1_000L,
+        )
+
+        playlistDataSource.replacePlaylists("listener-1", listOf(playlist), 2_000L)
+
+        val listenerOne = playlistDataSource.observePlaylists("listener-1").first {
+            it.lastSyncedAtEpochMillis == 2_000L
+        }
+        val listenerTwo = playlistDataSource.observePlaylists("listener-2").first()
+        assertEquals(listOf(playlist), listenerOne.playlists)
+        assertEquals(emptyList<PlaylistSummary>(), listenerTwo.playlists)
+        assertEquals(null, listenerTwo.lastSyncedAtEpochMillis)
     }
 
     private companion object {

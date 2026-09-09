@@ -21,6 +21,9 @@ sealed interface RakyzuRoute : NavKey {
     data object Library : RakyzuRoute
 
     @Serializable
+    data object Create : RakyzuRoute
+
+    @Serializable
     data object NowPlaying : RakyzuRoute
 }
 

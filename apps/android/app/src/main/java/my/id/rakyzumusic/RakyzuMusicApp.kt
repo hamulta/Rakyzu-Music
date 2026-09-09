@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
@@ -71,6 +72,7 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
+import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
@@ -86,6 +88,8 @@ import my.id.rakyzumusic.feature.home.HomeRoute
 import my.id.rakyzumusic.feature.library.LibraryRoute
 import my.id.rakyzumusic.feature.library.LibraryViewModel
 import my.id.rakyzumusic.feature.player.NowPlayingScreen
+import my.id.rakyzumusic.feature.playlist.PlaylistRoute
+import my.id.rakyzumusic.feature.playlist.PlaylistViewModel
 import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
@@ -116,6 +120,7 @@ private val topLevelDestinations = listOf(
     TopLevelDestination(RakyzuRoute.Home, "Home", Icons.Rounded.Home),
     TopLevelDestination(RakyzuRoute.Search, "Search", Icons.Rounded.Search),
     TopLevelDestination(RakyzuRoute.Library, "Your Library", Icons.Rounded.LibraryMusic),
+    TopLevelDestination(RakyzuRoute.Create, "Create", Icons.Rounded.AddCircle),
 )
 
 @Composable
@@ -125,6 +130,7 @@ fun RakyzuMusicApp(
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
     libraryRepository: LibraryRepository,
+    playlistRepository: PlaylistRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
@@ -163,6 +169,7 @@ fun RakyzuMusicApp(
             profileRepository = profileRepository,
             catalogRepository = catalogRepository,
             libraryRepository = libraryRepository,
+            playlistRepository = playlistRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
@@ -181,6 +188,7 @@ private fun ProfileGatedRakyzuMusicApp(
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
     libraryRepository: LibraryRepository,
+    playlistRepository: PlaylistRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
@@ -222,6 +230,7 @@ private fun ProfileGatedRakyzuMusicApp(
             authRepository = authRepository,
             catalogRepository = catalogRepository,
             libraryRepository = libraryRepository,
+            playlistRepository = playlistRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
@@ -248,6 +257,7 @@ private fun AuthenticatedRakyzuMusicApp(
     authRepository: AuthRepository,
     catalogRepository: CatalogRepository,
     libraryRepository: LibraryRepository,
+    playlistRepository: PlaylistRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
@@ -273,6 +283,10 @@ private fun AuthenticatedRakyzuMusicApp(
             repository = libraryRepository,
             connectivityMonitor = connectivityMonitor,
         ),
+    )
+    val playlistViewModel: PlaylistViewModel = viewModel(
+        key = "playlists-$userId",
+        factory = PlaylistViewModel.factory(userId, playlistRepository),
     )
     val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
@@ -494,6 +508,9 @@ private fun AuthenticatedRakyzuMusicApp(
                                 selectTopLevelRoute(backStack, RakyzuRoute.Search)
                             },
                         )
+                    }
+                    entry<RakyzuRoute.Create> {
+                        PlaylistRoute(viewModel = playlistViewModel)
                     }
                     entry<RakyzuRoute.NowPlaying> {
                         NowPlayingScreen(

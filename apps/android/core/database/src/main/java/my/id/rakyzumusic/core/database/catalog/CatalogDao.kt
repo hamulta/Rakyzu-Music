@@ -89,6 +89,12 @@ internal interface CatalogDao {
     suspend fun countPendingLibraryMutations(userId: String): Int
 
     @Query(
+        "SELECT * FROM playlists WHERE user_id = :userId " +
+            "ORDER BY updated_at_epoch_ms DESC, playlist_id",
+    )
+    suspend fun getPlaylists(userId: String): List<PlaylistEntity>
+
+    @Query(
         "SELECT EXISTS(SELECT 1 FROM library_mutation_outbox " +
             "WHERE user_id = :userId AND item_kind = :itemKind AND item_id = :itemId)",
     )
@@ -140,6 +146,12 @@ internal interface CatalogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLibraryMutation(item: LibraryMutationOutboxEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylists(items: List<PlaylistEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylist(item: PlaylistEntity)
+
     @Query("DELETE FROM library_liked_tracks WHERE user_id = :userId")
     suspend fun deleteLikedTracks(userId: String)
 
@@ -148,6 +160,9 @@ internal interface CatalogDao {
 
     @Query("DELETE FROM library_followed_artists WHERE user_id = :userId")
     suspend fun deleteFollowedArtists(userId: String)
+
+    @Query("DELETE FROM playlists WHERE user_id = :userId")
+    suspend fun deletePlaylists(userId: String)
 
     @Query("DELETE FROM library_liked_tracks WHERE user_id = :userId AND track_id = :itemId")
     suspend fun deleteLikedTrack(userId: String, itemId: String)
@@ -301,6 +316,22 @@ internal interface CatalogDao {
     }
 
     @Transaction
+    suspend fun replacePlaylists(
+        userId: String,
+        playlists: List<PlaylistEntity>,
+        syncedAtEpochMillis: Long,
+    ) {
+        deletePlaylists(userId)
+        insertPlaylists(playlists)
+        insertSyncMetadata(
+            SyncMetadataEntity(
+                key = playlistSyncKey(userId),
+                lastSuccessfulSyncEpochMs = syncedAtEpochMillis,
+            ),
+        )
+    }
+
+    @Transaction
     suspend fun enqueueLibraryMutation(
         mutation: LibraryMutationOutboxEntity,
     ) {
@@ -365,5 +396,6 @@ internal interface CatalogDao {
         const val CATALOG_SYNC_KEY = "catalog"
         fun librarySyncKey(userId: String) = "library:$userId"
         fun libraryChangeCursorKey(userId: String) = "library-change-cursor:$userId"
+        fun playlistSyncKey(userId: String) = "playlists:$userId"
     }
 }

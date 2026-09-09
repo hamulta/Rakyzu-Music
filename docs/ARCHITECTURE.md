@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: baseline for `0.3.9`.
+Status: baseline for `0.4.0`.
 
 ## Goals
 
@@ -19,8 +19,8 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 ## Android modules
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
-- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog and Library synchronization, session state mapping, and encrypted Android persistence.
-- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, Library selections and mutation outbox, transactional replacement DAOs, schema history, and observable local data sources.
+- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog, Library, and Playlist synchronization, session state mapping, and encrypted Android persistence.
+- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, Library selections and mutation outbox, playlist metadata, transactional replacement DAOs, schema history, and observable local data sources.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
@@ -30,6 +30,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
 - `feature:search`: offline-first catalog discovery, deterministic local relevance, browse states, detail navigation, and Library mutation entry points.
 - `feature:library`: liked songs, saved albums, followed artists, account-scoped cached state, collection playback, and navigation back into catalog detail.
+- `feature:playlist`: account-scoped playlist creation, cached collection state, accessible feedback, and the starting revision boundary for ordered playlist work.
 
 A planned boundary remains `core:network`.
 
@@ -61,7 +62,7 @@ Media3 item transitions are the listening-history event source, so manual select
 
 ## Reliability
 
-- Room is the single source of truth for cached Home/catalog data, device-local recently played, and the current listener's resolved Library selections.
+- Room is the single source of truth for cached Home/catalog data, device-local recently played, and the current listener's resolved Library and Playlist collections.
 - Catalog synchronization currently uses a validated full snapshot. Pagination and incremental cursors are introduced when catalog scale requires them.
 - Playback uses a Media3 `MediaSessionService` so audio survives UI lifecycle changes; ExoPlayer owns audio focus and pauses for noisy-output events.
 - Queue order, current index, transport availability, and playback progress come from the Media3 timeline; UI-local slider state exists only during a seek gesture.
@@ -94,6 +95,9 @@ Media3 item transitions are the listening-history event source, so manual select
 - Library freshness derives only from Room's persisted successful-sync timestamp. A 24-hour threshold distinguishes stale saved data, refresh coalescing prevents duplicate work, two transient retries use bounded 1- and 3-second delays, and loss of validated connectivity stops backoff. Offline failures and queued mutations wait for exactly one recovery refresh when Android validates the default network again.
 - Library resolves one width/font-scale layout policy. Screens below 360dp reduce horizontal padding; text at 1.3x and above expands collection rows and artwork, while compact or large-text layouts allow two title and metadata lines. Headings, status live regions, filters, sort controls, refresh state, pending mutations, playback, and detail navigation expose explicit TalkBack contracts with at least 48dp interactive targets.
 - Library derives the visible filtered/sorted projection once per immutable snapshot and control tuple in Compose, normalizing the bounded query once per derivation. Process-local diagnostics use only coarse content buckets, fixed refresh/mutation enums, booleans, retry ordinals, and monotonic duration buckets; they exclude account/content identifiers, titles, queries, URLs, tokens, payloads, and raw exceptions. The isolated FIFO retains 32 events under a hard ceiling of 64 and caps rendered lines at 240 characters.
+- The final Library gate reruns its unit, lint, Compose instrumentation-compilation, Room schema, resilience, accessibility, diagnostic privacy, and 5,000-item deterministic projection contracts before any Playlist code is released.
+- Playlist metadata is owned by Supabase and protected by forced owner-only RLS. Security-invoker list/create RPCs normalize bounded metadata, deny anonymous callers, and start every playlist at revision one. Android validates UUIDs, timestamps, counts, revisions, collection size, and duplicate IDs before a transactional Room schema 5 replacement; a failed refresh preserves the last verified account-scoped cache.
+- `feature:playlist` keeps bounded name and description drafts in `SavedStateHandle`, exposes explicit loading/empty/error/success states, and writes only a server-verified create response into the local source of truth. Ordered entries, reorder mutations, share visibility, and collaboration are intentionally staged across later `0.4.x` versions against the existing monotonic revision contract.
 - Playback queue metadata retains canonical track, album, and artist IDs without credentials or private media locations. Now Playing uses those IDs for direct Like, Save, and Follow controls, and disables unavailable or pending actions without inventing metadata from display labels.
 
 ## Release topology

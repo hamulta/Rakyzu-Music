@@ -30,6 +30,11 @@ import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
 import my.id.rakyzumusic.core.data.media.UnavailableMediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.network.createConnectivityMonitor
+import my.id.rakyzumusic.core.data.playlist.OfflineFirstPlaylistRepository
+import my.id.rakyzumusic.core.data.playlist.PlaylistActionResult
+import my.id.rakyzumusic.core.data.playlist.PlaylistFailure
+import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
+import my.id.rakyzumusic.core.data.playlist.SupabasePlaylistRemoteDataSource
 import my.id.rakyzumusic.core.data.profile.ProfileFailure
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
@@ -41,6 +46,7 @@ import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.LibrarySnapshot
+import my.id.rakyzumusic.core.model.PlaylistSnapshot
 
 data class SupabasePublicConfiguration(
     val url: String,
@@ -77,6 +83,7 @@ object RakyzuAuthFactory {
             catalogRepository = UnavailableCatalogRepository,
             mediaDeliveryRepository = UnavailableMediaDeliveryRepository,
             libraryRepository = UnavailableLibraryRepository,
+            playlistRepository = UnavailablePlaylistRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
         )
@@ -120,6 +127,10 @@ object RakyzuAuthFactory {
                 localDataSource = localDataSources.library,
                 remoteDataSource = SupabaseLibraryRemoteDataSource(client.postgrest),
             ),
+            playlistRepository = OfflineFirstPlaylistRepository(
+                localDataSource = localDataSources.playlist,
+                remoteDataSource = SupabasePlaylistRemoteDataSource(client.postgrest),
+            ),
             mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
                 UnavailableMediaDeliveryRepository
             } else {
@@ -139,10 +150,23 @@ data class RakyzuRepositories(
     val profileRepository: ProfileRepository,
     val catalogRepository: CatalogRepository,
     val libraryRepository: LibraryRepository,
+    val playlistRepository: PlaylistRepository,
     val mediaDeliveryRepository: MediaDeliveryRepository,
     val connectivityMonitor: ConnectivityMonitor,
     val recentSearchRepository: RecentSearchRepository,
 )
+
+private data object UnavailablePlaylistRepository : PlaylistRepository {
+    override fun observePlaylists(userId: String) = flowOf(
+        PlaylistSnapshot(playlists = emptyList(), lastSyncedAtEpochMillis = null),
+    )
+
+    override suspend fun refresh(userId: String) =
+        PlaylistActionResult.Failure(PlaylistFailure.ServiceUnavailable)
+
+    override suspend fun create(userId: String, name: String, description: String) =
+        PlaylistActionResult.Failure(PlaylistFailure.ServiceUnavailable)
+}
 
 private data object UnavailableLibraryRepository : LibraryRepository {
     private val empty = LibrarySnapshot(

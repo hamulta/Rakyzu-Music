@@ -24,6 +24,16 @@ class RakyzuRouteTest {
     }
 
     @Test
+    fun createIsAnIndependentTopLevelDestination() {
+        val backStack = mutableListOf<NavKey>(RakyzuRoute.Library)
+
+        selectTopLevelRoute(backStack, RakyzuRoute.Create)
+        selectTopLevelRoute(backStack, RakyzuRoute.Create)
+
+        assertEquals(listOf(RakyzuRoute.Create), backStack)
+    }
+
+    @Test
     fun nowPlayingIsAddedOnceAndDismissedToPreviousDestination() {
         val backStack = mutableListOf<NavKey>(RakyzuRoute.Home)
 
