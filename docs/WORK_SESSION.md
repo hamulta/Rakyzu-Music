@@ -1,4 +1,55 @@
-# Rakyzu Music — cumulative 0.4.1–0.4.4 work session
+# Rakyzu Music — engineering work sessions
+
+## Active cumulative 0.4.5–0.4.10 batch — 2026-09-09
+
+Initial audit found that the screenshot supplied by the CEO came from an unconfigured
+local APK: the application correctly failed closed, but the previous ADB smoke only
+checked process launch and never exercised authentication. The published 0.4.4 CI APK
+does contain the Supabase public URL/key. This batch adds an explicit configured-build
+gate and requires signup, login, onboarding, and Home runtime evidence.
+
+- [x] Inspect the supplied screenshot and reproduce its configuration failure boundary.
+- [x] Audit Git/release state, Android configuration injection, credential names, and
+  the existing Playlist/Room/Supabase/Worker contracts.
+- [x] Re-read official Spotify collaboration, privacy/access, and paginated Playlist
+  product/API references; use concepts only, not Spotify code/assets/catalog data.
+- [x] `0.4.5`: expiring collaboration invites, owner/editor/viewer roles, member list,
+  acceptance, revocation, and leave controls.
+- [x] `0.4.6`: private/public visibility, access-aware reads, safe sharing, following,
+  and bounded abuse-resistant limits.
+- [x] `0.4.7`: durable account-scoped mutation outbox, operation idempotency, explicit
+  retry, and stale-revision reconciliation.
+- [x] `0.4.8`: cursor playlist listing, bounded detail paging, incremental loading, and
+  large-list validation/performance tests.
+- [x] `0.4.9`: privacy-safe local diagnostics, adaptive layouts, complete TalkBack
+  roles/states/actions, and 48dp interaction targets.
+- [x] `0.4.10`: configured-build enforcement, cumulative regression/security/performance
+  gates, version/docs synchronization, and release artifact audit.
+- [x] Run the cumulative Android/Room/Supabase/Worker validation once after all six
+  versions are implemented; then inspect the complete diff and scan for secrets.
+- [x] Build the configured v0.4.10 debug APK, upload it directly to Appetize, and prove
+  signup, clean-session login, onboarding, and Home with a real email account.
+- [ ] Download the final CI artifact and install it on the connected ADB device as the
+  last runtime gate; do not use a local Android emulator.
+- [ ] Explicitly stage the validated batch, create one Conventional Commit, push main,
+  verify CI/CD, deploy forward migrations/Worker, and run live smoke tests.
+- [ ] Publish one cumulative `v0.4.10` tag/release, download the public APK again, and
+  audit manifest, configuration presence, signature, checksum, branches and worktrees.
+
+The CEO supplied a dedicated Appetize API token after the initial audit. It is stored only
+in ignored local `credential.env` with the other CLI credentials and will be used directly
+for the final acceptance session; it is never copied into Android, source, logs, artifacts,
+GitHub, or an alternate proxy.
+
+The cumulative local gate passed Android unit tests, the configured debug APK build,
+full lint, release R8/packaging (472 tasks), Worker typecheck/tests/Wrangler dry-run
+(33 tests), all 11 Supabase migrations with 161 pgTAP assertions, linked migration
+dry-run, release manifest/configuration checks, distributable debug APK v2-signature
+verification, diff validation, and the tracked secret scan. Appetize displayed v0.4.10
+and completed signup through Home; the temporary
+Supabase email auto-confirm setting was restored immediately afterward.
+
+## Previous cumulative 0.4.1–0.4.4 work session
 
 ## Initial audit — 2026-09-09
 

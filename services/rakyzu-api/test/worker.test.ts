@@ -13,7 +13,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.4.4" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.4.10" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -152,7 +152,12 @@ interface ExecuteOptions {
 async function execute(path: string, options: ExecuteOptions = {}): Promise<Response> {
   const media = new FakeR2Bucket(AUDIO);
   const dependencies: RequestDependencies = {
-    async ownsPlaylist() { return options.published ?? true; },
+    async playlistAccess() {
+      return options.published === false ? null : {
+        ownerId: "b1000000-0000-4000-8000-000000000001",
+        canEdit: true,
+      };
+    },
     async verifyListener() {
       return { userId: "b1000000-0000-4000-8000-000000000001" };
     },

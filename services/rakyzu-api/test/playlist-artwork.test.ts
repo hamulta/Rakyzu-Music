@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createWorker } from "../src/worker";
-import { MAX_ARTWORK_BYTES, ownsPlaylist, validArtwork } from "../src/playlist-artwork";
+import { MAX_ARTWORK_BYTES, playlistAccess, validArtwork } from "../src/playlist-artwork";
 import type { RakyzuApiEnv, RequestDependencies } from "../src/types";
 
 const id = "90000000-0000-4000-8000-000000000001";
@@ -11,13 +11,14 @@ const env = { ALLOWED_ORIGINS: "https://rakyzu.my.id", SUPABASE_URL: "https://ex
 
 afterEach(() => vi.unstubAllGlobals());
 
-function fixture(allowed = true) {
+function fixture(allowed = true, canEdit = true) {
   let bytes: Uint8Array | null = null;
   const put = vi.fn(async (_key: string, data: Uint8Array) => { bytes = data; });
   const remove = vi.fn(async () => { bytes = null; });
   const get = vi.fn(async () => bytes && ({ body: bytes, size: bytes.length, httpEtag: '"cover"', httpMetadata: { contentType: "image/png" } }));
   const dependencies: RequestDependencies = {
-    verifyListener: async () => ({ userId }), ownsPlaylist: async () => allowed,
+    verifyListener: async () => ({ userId }),
+    playlistAccess: async () => allowed ? { ownerId: userId, canEdit } : null,
     canStreamTrack: async () => false, canAccessAlbumArtwork: async () => false,
   };
   const worker = createWorker(dependencies);
@@ -51,6 +52,12 @@ describe("private playlist artwork", () => {
     expect((await f.call("PUT", png, { authorization: "" })).status).toBe(401);
     expect(f.put).not.toHaveBeenCalled();
   });
+  it("allows collaborator reads but keeps cover writes owner-only", async () => {
+    const f = fixture(true, false);
+    expect((await f.call("GET")).status).toBe(404);
+    expect((await f.call("PUT", png)).status).toBe(403);
+    expect(f.put).not.toHaveBeenCalled();
+  });
   it("rejects active content, oversized input and forged lengths", async () => {
     const f = fixture();
     expect((await f.call("PUT", png, { "content-type": "image/svg+xml" })).status).toBe(415);
@@ -71,13 +78,17 @@ describe("private playlist artwork", () => {
     expect(validArtwork(headerAndEndOnly)).toBe(false);
     expect(validArtwork(png.slice(0, -1))).toBe(false);
   });
-  it("checks both owner identity and RLS result and fails closed", async () => {
-    const upstream = vi.fn().mockResolvedValue(Response.json([{ id, owner_id: "someone-else" }]));
+  it("validates the access RPC payload and fails closed", async () => {
+    const upstream = vi.fn().mockResolvedValue(Response.json({
+      ownerId: userId, canRead: true, canEdit: false,
+    }));
     vi.stubGlobal("fetch", upstream);
-    expect(await ownsPlaylist(id, userId, "session", env)).toBe(false);
+    await expect(playlistAccess(id, "session", env)).resolves.toEqual({
+      ownerId: userId, canEdit: false,
+    });
     const url = upstream.mock.calls[0]?.[0] as URL;
-    expect(url.searchParams.get("owner_id")).toBe(`eq.${userId}`);
+    expect(url.pathname).toBe("/rest/v1/rpc/get_playlist_artwork_access");
     upstream.mockResolvedValue(new Response(null, { status: 503 }));
-    await expect(ownsPlaylist(id, userId, "session", env)).rejects.toThrow();
+    await expect(playlistAccess(id, "session", env)).rejects.toThrow();
   });
 });

@@ -15,7 +15,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.model.PlaylistDetail
 import my.id.rakyzumusic.core.model.PlaylistItem
+import my.id.rakyzumusic.core.model.PlaylistRole
 import my.id.rakyzumusic.core.model.PlaylistSummary
+import my.id.rakyzumusic.core.model.PlaylistVisibility
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -50,6 +52,36 @@ class PlaylistDetailAccessibilityTest {
         composeRule.onNodeWithContentDescription("Move Song down").assertIsNotEnabled()
         composeRule.onNodeWithContentDescription("Remove Song from playlist").performClick()
         composeRule.runOnIdle { assertEquals(TRACK.id, removed) }
+    }
+
+    @Test fun viewerCannotEditTracksMetadataOrArtwork() {
+        val viewerDetail = DETAIL.copy(
+            playlist = DETAIL.playlist.copy(
+                visibility = PlaylistVisibility.Private,
+                accessRole = PlaylistRole.Viewer,
+            ),
+        )
+        composeRule.setContent {
+            RakyzuMusicTheme(darkTheme = true) {
+                PlaylistDetailScreen(
+                    state = PlaylistDetailUiState(detail = viewerDetail, verified = true),
+                    onBack = {}, onPlay = { _, _ -> }, onRefresh = {}, onAdd = {},
+                    onRemove = {}, onMove = { _, _ -> }, onEdit = {}, onCancelEdit = {},
+                    onName = {}, onDescription = {}, onSave = {}, onChooseArtwork = {},
+                    onRemoveArtwork = {}, onRetryArtwork = {},
+                )
+            }
+        }
+
+        val list = composeRule.onNodeWithTag("playlist-detail")
+        list.performScrollToNode(hasText("Choose cover"))
+        composeRule.onNodeWithText("Choose cover").assertIsNotEnabled().assertHeightIsAtLeast(48.dp)
+        list.performScrollToNode(hasText("Edit playlist details"))
+        composeRule.onNodeWithText("Edit playlist details").assertIsNotEnabled()
+        list.performScrollToNode(hasText("Leave playlist"))
+        composeRule.onNodeWithText("Leave playlist").assertHeightIsAtLeast(48.dp)
+        list.performScrollToNode(hasText("Add songs"))
+        composeRule.onNodeWithText("Add songs").assertIsNotEnabled().assertHeightIsAtLeast(48.dp)
     }
 
     companion object {

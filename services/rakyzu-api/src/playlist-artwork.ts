@@ -57,28 +57,39 @@ export function validArtwork(bytes: Uint8Array): boolean {
   return false;
 }
 
-export async function ownsPlaylist(id: string, userId: string, token: string, env: RakyzuApiEnv): Promise<boolean> {
-  const url = new URL("/rest/v1/playlists", env.SUPABASE_URL);
-  url.searchParams.set("select", "id,owner_id");
-  url.searchParams.set("id", `eq.${id}`);
-  url.searchParams.set("owner_id", `eq.${userId}`);
-  url.searchParams.set("limit", "1");
+export async function playlistAccess(
+  id: string,
+  token: string,
+  env: RakyzuApiEnv,
+): Promise<{ ownerId: string; canEdit: boolean } | null> {
+  const url = new URL("/rest/v1/rpc/get_playlist_artwork_access", env.SUPABASE_URL);
   const response = await fetch(url, {
-    headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, authorization: `Bearer ${token}` },
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_PUBLISHABLE_KEY,
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ playlist_id: id }),
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw new Error("Playlist authorization unavailable");
-  const rows: unknown = await response.json();
-  if (!Array.isArray(rows)) throw new Error("Invalid authorization response");
-  return rows.some((row: unknown) => typeof row === "object" && row !== null &&
-    "id" in row && row.id === id && "owner_id" in row && row.owner_id === userId);
+  const value: unknown = await response.json();
+  if (typeof value !== "object" || value === null ||
+    !("ownerId" in value) || typeof value.ownerId !== "string" ||
+    !("canRead" in value) || value.canRead !== true ||
+    !("canEdit" in value) || typeof value.canEdit !== "boolean") {
+    throw new Error("Invalid authorization response");
+  }
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(value.ownerId) ? { ownerId: value.ownerId, canEdit: value.canEdit } : null;
 }
 
 export async function playlistArtwork(
-  request: Request, env: RakyzuApiEnv, id: string, userId: string,
+  request: Request, env: RakyzuApiEnv, id: string, ownerId: string,
   requestId: string, origin: string | null,
 ): Promise<Response> {
-  const key = `media/playlists/${userId}/${id}/artwork.png`;
+  const key = `media/playlists/${ownerId}/${id}/artwork.png`;
   const headers = responseHeaders(requestId, origin);
   // Authorization is checked on every read, including after account changes or deletion.
   headers.set("cache-control", "private, no-store");

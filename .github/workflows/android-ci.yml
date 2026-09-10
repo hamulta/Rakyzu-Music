@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Test, lint, and build 0.4.4
+    name: Test, lint, and build 0.4.10
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -50,23 +50,41 @@ jobs:
       - name: Install Android SDK 37.0
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
 
+      - name: Verify distributable public configuration
+        shell: bash
+        run: |
+          test "${SUPABASE_URL#https://}" != "$SUPABASE_URL"
+          test "${#SUPABASE_PUBLISHABLE_KEY}" -ge 20
+          test "$RAKYZU_API_BASE_URL" = "https://api.rakyzu.my.id"
+
       - name: Validate cumulative Android batch once
         run: >-
           ./gradlew testDebugUnitTest lintDebug assembleDebug
           assembleDebugAndroidTest assembleRelease --stacktrace
 
+      - name: Verify public configuration inside APK
+        shell: bash
+        run: |
+          payload="$RUNNER_TEMP/rakyzu-apk-strings.txt"
+          trap 'rm -f "$payload"' EXIT
+          unzip -p app/build/outputs/apk/debug/Rakyzu-Music-0.4.10-debug.apk 'classes*.dex' |
+            strings > "$payload"
+          grep -Fq "$SUPABASE_URL" "$payload"
+          grep -Fq "$SUPABASE_PUBLISHABLE_KEY" "$payload"
+          grep -Fq "$RAKYZU_API_BASE_URL" "$payload"
+
       - name: Preserve Rakyzu Music verification reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: Rakyzu-Music-0.4.4-verification
+          name: Rakyzu-Music-0.4.10-verification
           path: apps/android/**/build/reports/
           retention-days: 14
 
       - name: Upload Rakyzu Music debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: Rakyzu-Music-0.4.4-debug
-          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.4-debug.apk
+          name: Rakyzu-Music-0.4.10-debug
+          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.10-debug.apk
           if-no-files-found: error
           retention-days: 14

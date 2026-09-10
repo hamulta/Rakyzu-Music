@@ -10,7 +10,11 @@ export interface ListenerIdentity {
 }
 
 export interface RequestDependencies {
-  ownsPlaylist(id: string, userId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
+  playlistAccess(
+    id: string,
+    token: string,
+    env: RakyzuApiEnv,
+  ): Promise<{ ownerId: string; canEdit: boolean } | null>;
   verifyListener(token: string, env: RakyzuApiEnv): Promise<ListenerIdentity>;
   canStreamTrack(trackId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
   canAccessAlbumArtwork(albumId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;

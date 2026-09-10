@@ -53,6 +53,9 @@ fun PlaylistRoute(
         onDescriptionChange = viewModel::updateDescription,
         onCreate = viewModel::create,
         onRefresh = viewModel::refresh,
+        onInviteTokenChange = viewModel::updateInviteToken,
+        onAcceptInvite = viewModel::acceptInvite,
+        onLoadMore = viewModel::loadMore,
         modifier = modifier,
         onPlaylistClick = onPlaylistClick,
     )
@@ -65,6 +68,9 @@ internal fun PlaylistScreen(
     onDescriptionChange: (String) -> Unit,
     onCreate: () -> Unit,
     onRefresh: () -> Unit,
+    onInviteTokenChange: (String) -> Unit = {},
+    onAcceptInvite: () -> Unit = {},
+    onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier,
     onPlaylistClick: (PlaylistSummary) -> Unit = {},
 ) {
@@ -144,6 +150,36 @@ internal fun PlaylistScreen(
                 }
             }
         }
+        item {
+            Surface(color = RakyzuSurface, shape = MaterialTheme.shapes.large) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Join a shared playlist", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Paste the Rakyzu Music invite link. Invitations expire after 7 days.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedTextField(
+                        value = state.inviteToken,
+                        onValueChange = onInviteTokenChange,
+                        enabled = !state.isAcceptingInvite,
+                        label = { Text("Invite link or code") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = onAcceptInvite,
+                        enabled = state.inviteToken.length == 36 && !state.isAcceptingInvite,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Text(if (state.isAcceptingInvite) "Joining…" else "Join playlist")
+                    }
+                }
+            }
+        }
         state.message?.let { message ->
             item {
                 Text(
@@ -174,6 +210,17 @@ internal fun PlaylistScreen(
                 PlaylistRow(playlist, onClick = { onPlaylistClick(playlist) })
             }
         }
+        if (state.hasMore) {
+            item {
+                Button(
+                    onClick = onLoadMore,
+                    enabled = !state.isLoadingMore,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text(if (state.isLoadingMore) "Loading more…" else "Load more playlists")
+                }
+            }
+        }
     }
 }
 
@@ -201,7 +248,8 @@ private fun PlaylistRow(playlist: PlaylistSummary, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${playlist.trackCount} songs",
+                    text = "${playlist.trackCount} songs · ${playlist.accessRole.name} · " +
+                        playlist.visibility.name,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )

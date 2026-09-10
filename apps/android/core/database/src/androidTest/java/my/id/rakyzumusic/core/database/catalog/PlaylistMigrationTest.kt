@@ -49,6 +49,12 @@ class PlaylistMigrationTest {
             assertEquals(null, dao.getPlaylistDetail("other", "playlist"))
             assertEquals("Updated", dao.getPlaylists("owner").single().name)
             assertEquals(2L, dao.getPlaylists("owner").single().revision)
+            assertEquals("Private", dao.getPlaylists("owner").single().visibility)
+            local.enqueueMutation(
+                "owner", "playlist", "operation", 2, "payload", 3_000,
+            )
+            assertEquals(1, local.pendingMutationCount("owner", "playlist"))
+            assertEquals("operation", local.pendingMutations("owner", "playlist", 20).single().operationId)
         } finally {
             database.close()
             context.deleteDatabase(name)

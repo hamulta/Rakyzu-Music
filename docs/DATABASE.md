@@ -65,8 +65,26 @@ constructs a real schema-5 database from the exported schema and verifies preser
 new detail storage and account isolation after Room opens it as schema 6.
 
 Migration release gate: native Supabase replay, pgTAP and schema lint in CI. Portable local
-PGlite replay with an Auth schema shim is supplementary only. Future collaboration,
-pagination and outbox migrations remain in 0.4.5–0.4.8; they are not part of this release.
+PGlite replay with an Auth schema shim is supplementary only.
+
+### Playlist collaboration and resilience — 0.4.5–0.4.10
+
+Forward migration `20260909203000_playlist_collaboration_resilience.sql` adds private/public
+visibility, forced-RLS member/invite/follow/operation-receipt tables, and fixed owner/editor/
+viewer capability checks. Invites are single-use and expire within seven days. Per-playlist
+member, active-invite and follower ceilings are enforced in transactional RPCs. Making a
+playlist private removes public follows without removing invited collaborators.
+
+`get_accessible_playlists` uses a deterministic updated-at/UUID cursor with a 50-row ceiling;
+`get_playlist_detail_page` returns at most 100 ordered entries plus total/next-offset metadata.
+`mutate_playlist_v2` serializes by playlist, checks the expected revision, and records one
+response per account/playlist/operation UUID so a retried offline action cannot apply twice.
+Direct authenticated writes to collaboration tables remain revoked.
+
+Room schema 7 extends playlist summaries with owner, visibility, role and following state,
+and adds a listener-scoped serialized mutation outbox. Verified page appends and outbox
+changes are transactional. Account mismatch, malformed page bounds, duplicate items, unknown
+roles, and stale revisions cannot overwrite an existing verified snapshot.
 
 `recently_played` is device-local metadata keyed by `(user_id, track_id)`. Writes are accepted only for a track in the verified Room catalog, capped at the 20 most recent entries per listener, and intentionally survive catalog replacement without creating a destructive foreign-key path. Home resolves retained IDs back through the current verified catalog and omits tracks no longer available.
 

@@ -174,6 +174,10 @@ internal data class PlaylistEntity(
     val revision: Long,
     @ColumnInfo(name = "created_at_epoch_ms") val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
+    @ColumnInfo(name = "owner_id", defaultValue = "''") val ownerId: String = "",
+    @ColumnInfo(defaultValue = "'Private'") val visibility: String = "Private",
+    @ColumnInfo(name = "access_role", defaultValue = "'Owner'") val accessRole: String = "Owner",
+    @ColumnInfo(name = "is_following", defaultValue = "0") val isFollowing: Boolean = false,
 )
 
 /** Versioned, atomic detail snapshot; independent of the bounded Home catalog cache. */
@@ -182,4 +186,19 @@ internal data class PlaylistDetailEntity(
     @ColumnInfo(name = "user_id") val userId: String,
     @ColumnInfo(name = "playlist_id") val playlistId: String,
     val payload: String,
+)
+
+@Entity(
+    tableName = "playlist_mutation_outbox",
+    primaryKeys = ["user_id", "operation_id"],
+    indices = [Index(value = ["user_id", "playlist_id", "queued_at_epoch_ms"])],
+)
+internal data class PlaylistMutationOutboxEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "operation_id") val operationId: String,
+    @ColumnInfo(name = "playlist_id") val playlistId: String,
+    @ColumnInfo(name = "expected_revision") val expectedRevision: Long,
+    @ColumnInfo(name = "mutation_payload") val mutationPayload: String,
+    @ColumnInfo(name = "queued_at_epoch_ms") val queuedAtEpochMillis: Long,
+    @ColumnInfo(name = "attempt_count") val attemptCount: Int,
 )

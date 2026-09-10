@@ -28,6 +28,37 @@ internal interface CatalogDao {
     @Query("SELECT payload FROM playlist_details WHERE user_id = :userId AND playlist_id = :playlistId")
     suspend fun getPlaylistDetail(userId: String, playlistId: String): String?
 
+    @Query(
+        "SELECT * FROM playlist_mutation_outbox WHERE user_id = :userId " +
+            "AND playlist_id = :playlistId ORDER BY queued_at_epoch_ms, operation_id LIMIT :limit",
+    )
+    suspend fun getPendingPlaylistMutations(
+        userId: String,
+        playlistId: String,
+        limit: Int,
+    ): List<PlaylistMutationOutboxEntity>
+
+    @Query(
+        "SELECT COUNT(*) FROM playlist_mutation_outbox " +
+            "WHERE user_id = :userId AND playlist_id = :playlistId",
+    )
+    suspend fun countPendingPlaylistMutations(userId: String, playlistId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylistMutation(item: PlaylistMutationOutboxEntity)
+
+    @Query(
+        "DELETE FROM playlist_mutation_outbox WHERE user_id = :userId " +
+            "AND operation_id = :operationId",
+    )
+    suspend fun acknowledgePlaylistMutation(userId: String, operationId: String): Int
+
+    @Query(
+        "UPDATE playlist_mutation_outbox SET attempt_count = attempt_count + 1 " +
+            "WHERE user_id = :userId AND operation_id = :operationId",
+    )
+    suspend fun recordPlaylistMutationAttempt(userId: String, operationId: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlaylistDetail(detail: PlaylistDetailEntity)
 

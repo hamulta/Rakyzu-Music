@@ -23,6 +23,10 @@ data class PlaylistUiState(
     val description: String = "",
     val isRefreshing: Boolean = false,
     val isCreating: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = false,
+    val inviteToken: String = "",
+    val isAcceptingInvite: Boolean = false,
     val message: String? = null,
     val messageIsError: Boolean = false,
 ) {
@@ -42,6 +46,7 @@ class PlaylistViewModel internal constructor(
                 .take(MAX_PLAYLIST_NAME_LENGTH),
             description = savedStateHandle.get<String>(SAVED_DESCRIPTION_KEY).orEmpty()
                 .take(MAX_PLAYLIST_DESCRIPTION_LENGTH),
+            inviteToken = savedStateHandle.get<String>(SAVED_INVITE_KEY).orEmpty().take(36),
         ),
     )
     val uiState: StateFlow<PlaylistUiState> = mutableUiState.asStateFlow()
@@ -53,6 +58,7 @@ class PlaylistViewModel internal constructor(
                     it.copy(
                         hasObservedPlaylists = true,
                         playlists = snapshot.playlists,
+                        hasMore = snapshot.hasMore,
                     )
                 }
             }
@@ -82,6 +88,11 @@ class PlaylistViewModel internal constructor(
             mutableUiState.update {
                 when (result) {
                     is PlaylistActionResult.Success -> it.copy(isRefreshing = false)
+                    is PlaylistActionResult.Queued -> it.copy(
+                        isRefreshing = false,
+                        message = "Playlist change saved for retry.",
+                        messageIsError = false,
+                    )
                     is PlaylistActionResult.Failure -> it.copy(
                         isRefreshing = false,
                         message = result.reason.toMessage(hasSavedContent = it.playlists.isNotEmpty()),
@@ -111,9 +122,73 @@ class PlaylistViewModel internal constructor(
                             messageIsError = false,
                         )
                     }
+                    is PlaylistActionResult.Queued -> it.copy(
+                        isCreating = false,
+                        message = "Playlist creation is waiting for a connection.",
+                        messageIsError = false,
+                    )
                     is PlaylistActionResult.Failure -> it.copy(
                         isCreating = false,
                         message = result.reason.toMessage(hasSavedContent = false),
+                        messageIsError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadMore() {
+        val state = mutableUiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+        mutableUiState.update { it.copy(isLoadingMore = true, message = null) }
+        viewModelScope.launch {
+            val result = repository.loadMore(userId)
+            mutableUiState.update {
+                when (result) {
+                    is PlaylistActionResult.Failure -> it.copy(
+                        isLoadingMore = false,
+                        message = result.reason.toMessage(it.playlists.isNotEmpty()),
+                        messageIsError = true,
+                    )
+                    else -> it.copy(isLoadingMore = false)
+                }
+            }
+        }
+    }
+
+    fun updateInviteToken(value: String) {
+        if (mutableUiState.value.isAcceptingInvite) return
+        val normalized = value.trim().substringAfterLast('/').take(36)
+        savedStateHandle[SAVED_INVITE_KEY] = normalized
+        mutableUiState.update { it.copy(inviteToken = normalized, message = null) }
+    }
+
+    fun acceptInvite() {
+        val token = mutableUiState.value.inviteToken
+        if (token.length != 36 || mutableUiState.value.isAcceptingInvite) return
+        mutableUiState.update { it.copy(isAcceptingInvite = true, message = null) }
+        viewModelScope.launch {
+            val result = repository.acceptInvite(userId, token)
+            if (result is PlaylistActionResult.Success) {
+                repository.refresh(userId)
+                savedStateHandle[SAVED_INVITE_KEY] = ""
+            }
+            mutableUiState.update {
+                when (result) {
+                    is PlaylistActionResult.Success -> it.copy(
+                        inviteToken = "",
+                        isAcceptingInvite = false,
+                        message = "Playlist joined.",
+                        messageIsError = false,
+                    )
+                    is PlaylistActionResult.Queued -> it.copy(
+                        isAcceptingInvite = false,
+                        message = "Invite acceptance requires a connection.",
+                        messageIsError = true,
+                    )
+                    is PlaylistActionResult.Failure -> it.copy(
+                        isAcceptingInvite = false,
+                        message = result.reason.toMessage(false),
                         messageIsError = true,
                     )
                 }
@@ -147,3 +222,4 @@ internal const val MAX_PLAYLIST_NAME_LENGTH = 100
 internal const val MAX_PLAYLIST_DESCRIPTION_LENGTH = 300
 private const val SAVED_NAME_KEY = "playlist-name"
 private const val SAVED_DESCRIPTION_KEY = "playlist-description"
+private const val SAVED_INVITE_KEY = "playlist-invite"

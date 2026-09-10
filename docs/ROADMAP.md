@@ -70,13 +70,29 @@ evidence is recorded separately after CI/CD. See [work session](WORK_SESSION.md)
 Playlist/Room instrumentation APK compilation remains a CI release requirement; focused
 runtime evidence is captured on the CEO-connected physical Android device.
 
-- [ ] `0.4.5` — collaboration invites, owner/editor roles, and revocation.
-- [ ] `0.4.6` — private/public visibility, safe sharing, following, and abuse-resistant boundaries.
-- [ ] `0.4.7` — offline mutation outbox, idempotency, and conflict recovery.
-- [ ] `0.4.8` — bounded pagination and large-playlist performance hardening.
-- [ ] `0.4.9` — privacy-safe Playlist diagnostics, adaptive UI, and complete TalkBack contracts.
-- [ ] `0.4.10` — final Playlist regression, accessibility, resilience, runtime, security, and performance gate before Queue.
-- `0.5.x`: Queue, playback recovery, devices, audio quality controls.
+- [x] `0.4.5` — collaboration invites, owner/editor/viewer roles, revocation, and leave controls.
+- [x] `0.4.6` — private/public visibility, safe sharing, following, and abuse-resistant boundaries.
+- [x] `0.4.7` — offline mutation outbox, idempotency, and conflict recovery.
+- [x] `0.4.8` — bounded cursor/detail pagination and large-playlist performance hardening.
+- [x] `0.4.9` — privacy-safe Playlist diagnostics, adaptive UI, and complete TalkBack contracts.
+- [x] `0.4.10` — final Playlist regression, accessibility, resilience, runtime, security, and performance gate before Queue.
+
+The 0.4.5–0.4.10 batch ships as one cumulative 0.4.10 artifact/versionCode 45 and one
+validation/publication cycle. The design follows public Spotify collaboration concepts—
+expiring invites, explicit access roles, public/private reach, bounded pages, and
+snapshot-like revision safety—through original Rakyzu Music code and infrastructure.
+
+- [ ] `0.5.0` — account-scoped queue foundation, deterministic editing, Room persistence, and Media3 synchronization.
+- [ ] `0.5.1` — add-next/add-to-queue entry points and duplicate-safe ordering.
+- [ ] `0.5.2` — drag/reorder/remove queue controls with complete TalkBack actions.
+- [ ] `0.5.3` — process-death playback and queue restoration with stale-media handling.
+- [ ] `0.5.4` — autoplay boundary and explicit listener controls.
+- [ ] `0.5.5` — playback-device state foundation without remote-control claims.
+- [ ] `0.5.6` — audio-quality and data-usage preferences enforced at the media source.
+- [ ] `0.5.7` — offline/degraded queue reconciliation and recovery.
+- [ ] `0.5.8` — adaptive queue layout, large-text behavior, and TalkBack regression.
+- [ ] `0.5.9` — privacy-safe playback diagnostics and performance hardening.
+- [ ] `0.5.10` — final Queue/playback regression, runtime, accessibility, resilience, and security gate.
 - `0.6.x`: Offline downloads, storage controls, resilient sync.
 - `0.7.x`: Lyrics, credits, social sharing, notifications.
 - `0.8.x`: Personalization, radio, mixes, history, recommendations.

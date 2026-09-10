@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.4.4** (cumulative 0.4.1–0.4.4, versionCode 44)
+Current version: **0.4.10** (cumulative 0.4.5–0.4.10, versionCode 45)
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.4-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.10-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -72,11 +72,11 @@ Library is an account-scoped offline-first surface backed by Room schema 4. It r
 
 Library now reports freshness from its last verified synchronization, retries transient refresh failures twice, and waits for validated Android connectivity before recovering offline refreshes or queued changes once. Its adaptive layout expands rows and text at 1.3x font scale and reduces padding below 360dp, with explicit TalkBack actions and 48dp controls throughout. Visible content is derived once per immutable render input, and process-local diagnostics expose only coarse counts and fixed lifecycle buckets—never listener/content identifiers, titles, queries, URLs, tokens, payloads, or raw exceptions.
 
-Create lists the 100 most recently updated playlists. Open a playlist to play its ordered songs, add from the cached catalog, remove songs, move songs up/down, edit metadata, and choose/remove its private cover. Detail snapshots are account-scoped and persisted atomically in Room schema 6. The server validates published catalog membership, rejects duplicates and stale revisions, and caps playlists at 500 items until the pagination milestone. Unavailable songs retain their position but are excluded from playback. Reorder is optimistic; failures restore the verified order and require reconciliation before another edit. Metadata drafts retain their starting revision to prevent overwriting concurrent edits.
+Create lists accessible playlists in bounded cursor pages and incrementally loads detail pages. Owners can keep a playlist private or publish it, invite editors/viewers with single-use seven-day links, revoke members, and share through Android's system Sharesheet. Editors can change ordered songs; viewers are read-only; followers can retain public playlists without gaining write access. Abuse-resistant membership, invite, follow, and 500-item limits are enforced in PostgreSQL, not trusted to the UI.
 
-Playlist cover GET/HEAD/PUT/DELETE requests go through the authenticated Worker, which verifies ownership against Supabase RLS before accessing private R2. Android uses the system photo picker, bounds input/decoded dimensions, and re-encodes a PNG thumbnail without EXIF/location metadata. Worker accepts only PNG, at most 1 MiB and 1024×1024 pixels, and returns `private, no-store`. Covers use a separate last-successful-write-wins lifecycle, not the item revision. No privileged credentials are embedded in Android.
+Room schema 7 keeps validated account-scoped list/detail pages and a durable mutation outbox. A UUID operation receipt makes retries idempotent; stale revisions refresh the verified server snapshot before another action. Playlist cover GET/HEAD requests resolve the canonical owner through Supabase so authorized collaborators can read the private R2 object, while only the owner may PUT/DELETE. Android strips image metadata and bounds payloads; Worker validates PNG structure, size and dimensions and returns `private, no-store`.
 
-The cumulative CI gate builds all variants once and runs unit tests/lint. Playlist UI and Room migration runtime tests execute on the CEO-connected physical Android device; no emulator or Appetize is used. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.4.4.md) for actual gate status and limitations.
+The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Playlist UI and Room migration runtime tests execute on the CEO-connected physical Android device. Appetize is used only for this release's final signup/login/onboarding/Home acceptance pass. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.4.10.md) for actual gate status and limitations.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

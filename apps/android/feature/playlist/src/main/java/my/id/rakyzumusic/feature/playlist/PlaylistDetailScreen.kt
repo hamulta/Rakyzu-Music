@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.feature.playlist
 
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,21 +42,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.model.Track
+import my.id.rakyzumusic.core.model.PlaylistRole
+import my.id.rakyzumusic.core.model.PlaylistVisibility
 
 @Composable
 fun PlaylistDetailRoute(viewModel: PlaylistDetailViewModel, onBack: () -> Unit,
     onPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val resolver = LocalContext.current.contentResolver
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var preparingArtwork by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -72,6 +78,22 @@ fun PlaylistDetailRoute(viewModel: PlaylistDetailViewModel, onBack: () -> Unit,
     PlaylistDetailScreen(state, onBack, onPlay, viewModel::refresh, viewModel::add, viewModel::remove,
         viewModel::move, viewModel::edit, viewModel::cancelEdit, viewModel::updateName,
         viewModel::updateDescription, viewModel::saveMetadata,
+        onLoadMore = viewModel::loadMore, onRetryPending = viewModel::retryPending,
+        onInviteRole = viewModel::selectInviteRole, onCreateInvite = viewModel::createInvite,
+        onShareInvite = { link ->
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, link)
+                    },
+                    "Share Rakyzu Music invite",
+                ),
+            )
+        },
+        onRemoveMember = viewModel::removeMember, onLeave = viewModel::leave,
+        onVisibility = viewModel::setVisibility, onFollowing = viewModel::setFollowing,
+        onToggleDiagnostics = viewModel::toggleDiagnostics,
         onChooseArtwork = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
         onRemoveArtwork = { viewModel.updateArtwork(null) }, onRetryArtwork = viewModel::loadArtwork,
         preparingArtwork = preparingArtwork, modifier = modifier)
@@ -83,6 +105,11 @@ internal fun PlaylistDetailScreen(
     onRefresh: () -> Unit, onAdd: (Track) -> Unit, onRemove: (String) -> Unit,
     onMove: (String, Int) -> Unit, onEdit: () -> Unit, onCancelEdit: () -> Unit,
     onName: (String) -> Unit, onDescription: (String) -> Unit, onSave: () -> Unit,
+    onLoadMore: () -> Unit = {}, onRetryPending: () -> Unit = {},
+    onInviteRole: (PlaylistRole) -> Unit = {}, onCreateInvite: () -> Unit = {},
+    onShareInvite: (String) -> Unit = {}, onRemoveMember: (String) -> Unit = {},
+    onLeave: () -> Unit = {}, onVisibility: (PlaylistVisibility) -> Unit = {},
+    onFollowing: (Boolean) -> Unit = {}, onToggleDiagnostics: () -> Unit = {},
     onChooseArtwork: () -> Unit, onRemoveArtwork: () -> Unit, onRetryArtwork: () -> Unit,
     preparingArtwork: Boolean = false, modifier: Modifier = Modifier,
 ) {
@@ -95,7 +122,10 @@ internal fun PlaylistDetailScreen(
         state.catalogTracks.filter { it.id !in existing &&
             (it.title.contains(query, true) || it.artist.contains(query, true)) }.take(50)
     }
-    LazyColumn(modifier.fillMaxSize().testTag("playlist-detail"), contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 112.dp),
+    val configuration = LocalConfiguration.current
+    val adaptivePadding = if (configuration.screenWidthDp >= 600) 40.dp else 20.dp
+    val coverSize = if (configuration.screenWidthDp >= 600) 200.dp else 160.dp
+    LazyColumn(modifier.fillMaxSize().testTag("playlist-detail"), contentPadding = PaddingValues(adaptivePadding, 20.dp, adaptivePadding, 112.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -110,6 +140,14 @@ internal fun PlaylistDetailScreen(
             }
             if (state.busy) CircularProgressIndicator(Modifier.size(24.dp))
             if (!state.verified && state.detail != null) Text("Saved on this device. Refresh before editing.")
+            if (state.pendingMutationCount > 0) {
+                Button(
+                    onClick = onRetryPending,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .semantics { stateDescription = "${state.pendingMutationCount} changes waiting" },
+                ) { Text("Retry ${state.pendingMutationCount} saved change") }
+            }
         }
         state.message?.let { message -> item {
             Text(message, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -118,15 +156,18 @@ internal fun PlaylistDetailScreen(
         state.detail?.let { detail ->
             item {
                 Text(detail.playlist.description)
-                Text("${items.size} songs · revision ${detail.playlist.revision}")
+                Text(
+                    "${detail.playlist.accessRole.name} · ${detail.playlist.visibility.name} · " +
+                        "${items.size} of ${detail.totalItems} songs",
+                )
                 val bitmap = remember(state.artwork) { state.artwork?.let(::decodePlaylistArtwork)?.asImageBitmap() }
-                if (bitmap != null) Image(bitmap, "Playlist cover", Modifier.size(160.dp))
+                if (bitmap != null) Image(bitmap, "Playlist cover", Modifier.size(coverSize))
                 Column {
                     TextButton(onClick = onChooseArtwork,
-                        enabled = state.canMutate && !state.artworkBusy && !preparingArtwork,
+                        enabled = state.canEditMetadata && !state.artworkBusy && !preparingArtwork,
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Choose cover") }
                     TextButton(onClick = onRemoveArtwork,
-                        enabled = state.canMutate && !state.artworkBusy && !preparingArtwork && state.artwork != null,
+                        enabled = state.canEditMetadata && !state.artworkBusy && !preparingArtwork && state.artwork != null,
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Remove cover") }
                     TextButton(onClick = onRetryArtwork, enabled = !state.artworkBusy,
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Retry cover") }
@@ -135,8 +176,91 @@ internal fun PlaylistDetailScreen(
                 }
                 Button(onClick = { onPlay(queue, 0) }, enabled = queue.isNotEmpty() && state.pendingOrder == null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Play playlist") }
-                TextButton(onClick = onEdit, enabled = state.canMutate,
+                TextButton(onClick = onEdit, enabled = state.canEditMetadata,
                     modifier = Modifier.heightIn(min = 48.dp)) { Text("Edit playlist details") }
+            }
+            item {
+                Surface(shape = MaterialTheme.shapes.large, tonalElevation = 2.dp) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Access", style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.semantics { heading() })
+                        if (detail.playlist.accessRole == PlaylistRole.Owner) {
+                            Text("Only you can manage visibility, invites, and members.")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(
+                                    onClick = { onVisibility(PlaylistVisibility.Private) },
+                                    enabled = !state.accessBusy &&
+                                        detail.playlist.visibility != PlaylistVisibility.Private,
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                ) { Text("Make private") }
+                                TextButton(
+                                    onClick = { onVisibility(PlaylistVisibility.Public) },
+                                    enabled = !state.accessBusy &&
+                                        detail.playlist.visibility != PlaylistVisibility.Public,
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                ) { Text("Make public") }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(
+                                    onClick = { onInviteRole(PlaylistRole.Editor) },
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                ) { Text(if (state.inviteRole == PlaylistRole.Editor) "Editor selected" else "Editor") }
+                                TextButton(
+                                    onClick = { onInviteRole(PlaylistRole.Viewer) },
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                ) { Text(if (state.inviteRole == PlaylistRole.Viewer) "Viewer selected" else "Viewer") }
+                            }
+                            Button(
+                                onClick = onCreateInvite,
+                                enabled = !state.accessBusy,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            ) { Text("Create 7-day invite") }
+                            state.inviteLink?.let { link ->
+                                Button(
+                                    onClick = { onShareInvite(link) },
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                ) { Text("Share invite securely") }
+                            }
+                        } else if (detail.playlist.accessRole == PlaylistRole.Follower) {
+                            Button(
+                                onClick = { onFollowing(!detail.playlist.isFollowing) },
+                                enabled = !state.accessBusy,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            ) { Text(if (detail.playlist.isFollowing) "Unfollow playlist" else "Follow playlist") }
+                        } else {
+                            Text("The owner controls membership and visibility.")
+                            TextButton(
+                                onClick = onLeave,
+                                enabled = !state.accessBusy,
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) { Text("Leave playlist") }
+                        }
+                        detail.members.forEach { member ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "${member.displayName} · ${member.role.name}" +
+                                        if (member.isCurrentUser) " · You" else "",
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (detail.playlist.accessRole == PlaylistRole.Owner &&
+                                    member.role != PlaylistRole.Owner
+                                ) {
+                                    TextButton(
+                                        onClick = { onRemoveMember(member.userId) },
+                                        enabled = !state.accessBusy,
+                                        modifier = Modifier.heightIn(min = 48.dp),
+                                    ) { Text("Remove ${member.displayName}") }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             if (state.editing) item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,7 +270,7 @@ internal fun PlaylistDetailScreen(
                     OutlinedTextField(state.description, onDescription, label = { Text("Playlist description") },
                         enabled = !state.busy, modifier = Modifier.fillMaxWidth(), maxLines = 4,
                         supportingText = { Text("${state.description.length}/300") })
-                    Button(onClick = onSave, enabled = state.canMutate && state.name.isNotBlank(),
+                    Button(onClick = onSave, enabled = state.canEditMetadata && state.name.isNotBlank(),
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Save details") }
                     TextButton(onClick = onCancelEdit, enabled = !state.busy,
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Cancel editing") }
@@ -197,6 +321,32 @@ internal fun PlaylistDetailScreen(
                             }
                         }
                     }
+                }
+            }
+            if (detail.nextOffset != null) {
+                item {
+                    Button(
+                        onClick = onLoadMore,
+                        enabled = !state.loadingMore,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(if (state.loadingMore) "Loading more songs…" else "Load more songs") }
+                }
+            }
+            item {
+                TextButton(
+                    onClick = onToggleDiagnostics,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(if (state.diagnosticsExpanded) "Hide sync details" else "Show sync details") }
+                if (state.diagnosticsExpanded) {
+                    Text(
+                        "Loaded ${items.size}/${detail.totalItems} · pending " +
+                            "${state.pendingMutationCount} · revision ${detail.playlist.revision}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        "Diagnostics stay on this device and contain no song, account, or invite identifiers.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }

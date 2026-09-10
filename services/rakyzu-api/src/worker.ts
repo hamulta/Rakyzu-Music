@@ -3,14 +3,19 @@ import { readBearerToken, UnauthorizedRequest, verifyListener } from "./auth";
 import { parseRange } from "./range";
 import { errorResponse, jsonResponse, responseHeaders } from "./responses";
 import type { RakyzuApiEnv, RequestDependencies } from "./types";
-import { ownsPlaylist, playlistArtwork } from "./playlist-artwork";
+import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 
-const API_VERSION = "0.4.4";
+const API_VERSION = "0.4.10";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
 const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const ARTWORK_CACHE_CONTROL = "private, max-age=86400";
-const dependencies: RequestDependencies = { verifyListener, canStreamTrack, canAccessAlbumArtwork, ownsPlaylist };
+const dependencies: RequestDependencies = {
+  verifyListener,
+  canStreamTrack,
+  canAccessAlbumArtwork,
+  playlistAccess,
+};
 
 export function createWorker(
   requestDependencies: RequestDependencies = dependencies,
@@ -57,10 +62,9 @@ export function createWorker(
         }
 
         let token: string;
-        let userId: string;
         try {
           token = readBearerToken(request);
-          userId = (await requestDependencies.verifyListener(token, env)).userId;
+          await requestDependencies.verifyListener(token, env);
         } catch (error) {
           if (!(error instanceof UnauthorizedRequest)) throw error;
           return errorResponse(
@@ -76,13 +80,17 @@ export function createWorker(
         if (playlistRoute?.[1]) {
           const id = playlistRoute[1].toLowerCase();
           try {
-            if (!(await requestDependencies.ownsPlaylist(id, userId, token, env))) {
+            const access = await requestDependencies.playlistAccess(id, token, env);
+            if (!access) {
               return errorResponse("playlist_not_found", "Playlist unavailable.", 404, requestId, origin);
             }
+            if (request.method !== "GET" && request.method !== "HEAD" && !access.canEdit) {
+              return errorResponse("forbidden", "Only the playlist owner can change its cover.", 403, requestId, origin);
+            }
+            return await playlistArtwork(request, env, id, access.ownerId, requestId, origin);
           } catch {
             return errorResponse("playlist_unavailable", "Playlist authorization unavailable.", 503, requestId, origin);
           }
-          return await playlistArtwork(request, env, id, userId, requestId, origin);
         }
 
         if (trackRoute?.[1]) {

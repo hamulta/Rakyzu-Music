@@ -13,10 +13,13 @@ import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.playlist.PlaylistActionResult
 import my.id.rakyzumusic.core.data.playlist.PlaylistArtworkResult
+import my.id.rakyzumusic.core.data.playlist.PlaylistInviteResult
 import my.id.rakyzumusic.core.data.playlist.PlaylistMutation
 import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.model.PlaylistDetail
 import my.id.rakyzumusic.core.model.PlaylistItem
+import my.id.rakyzumusic.core.model.PlaylistRole
+import my.id.rakyzumusic.core.model.PlaylistVisibility
 import my.id.rakyzumusic.core.model.Track
 
 data class PlaylistDetailUiState(
@@ -31,8 +34,16 @@ data class PlaylistDetailUiState(
     val description: String = "",
     val artwork: ByteArray? = null,
     val artworkBusy: Boolean = false,
+    val loadingMore: Boolean = false,
+    val pendingMutationCount: Int = 0,
+    val inviteRole: PlaylistRole = PlaylistRole.Editor,
+    val inviteLink: String? = null,
+    val accessBusy: Boolean = false,
+    val diagnosticsExpanded: Boolean = false,
 ) {
-    val canMutate: Boolean get() = detail != null && verified && !busy
+    val canMutate: Boolean get() = detail != null && verified && !busy && !accessBusy &&
+        detail.playlist.accessRole in setOf(PlaylistRole.Owner, PlaylistRole.Editor)
+    val canEditMetadata: Boolean get() = canMutate && detail?.playlist?.accessRole == PlaylistRole.Owner
     val orderedItems: List<PlaylistItem> get() {
         val items = detail?.items.orEmpty()
         val order = pendingOrder ?: return items
@@ -77,6 +88,21 @@ class PlaylistDetailViewModel internal constructor(
         }
     }
 
+    fun loadMore() {
+        val state = mutableState.value
+        if (state.loadingMore || state.detail?.nextOffset == null) return
+        mutableState.update { it.copy(loadingMore = true, message = null) }
+        viewModelScope.launch {
+            val result = repository.loadMoreDetail(userId, playlistId)
+            mutableState.update {
+                it.copy(
+                    loadingMore = false,
+                    message = (result as? PlaylistActionResult.Failure)?.reason?.toMessage(true),
+                )
+            }
+        }
+    }
+
     fun add(track: Track) {
         if (mutableState.value.detail?.items?.any { it.trackId == track.id } == true) return
         mutate(PlaylistMutation.Add(track.id))
@@ -97,7 +123,7 @@ class PlaylistDetailViewModel internal constructor(
 
     fun edit() {
         val detail = mutableState.value.detail ?: return
-        if (!mutableState.value.canMutate) return
+        if (!mutableState.value.canEditMetadata) return
         savedState["editing"] = true
         savedState["editing-revision"] = detail.playlist.revision
         updateName(detail.playlist.name)
@@ -141,12 +167,128 @@ class PlaylistDetailViewModel internal constructor(
             val result = repository.mutate(userId, playlistId, expectedRevision, mutation)
             val success = result is PlaylistActionResult.Success
             if (success && mutation is PlaylistMutation.Metadata) savedState["editing"] = false
-            mutableState.update { it.copy(busy = false, pendingOrder = null,
-                // A failed/ambiguous write must be reconciled before the next mutation.
-                verified = success,
-                editing = if (success && mutation is PlaylistMutation.Metadata) false else it.editing,
-                message = if (success) "Playlist updated." else
-                    (result as PlaylistActionResult.Failure).reason.toMessage(true)) }
+            mutableState.update {
+                when (result) {
+                    is PlaylistActionResult.Success -> it.copy(
+                        busy = false,
+                        pendingOrder = null,
+                        verified = true,
+                        editing = if (mutation is PlaylistMutation.Metadata) false else it.editing,
+                        message = "Playlist updated.",
+                    )
+                    is PlaylistActionResult.Queued -> it.copy(
+                        busy = false,
+                        pendingOrder = null,
+                        verified = false,
+                        pendingMutationCount = result.pendingCount,
+                        message = "Change saved on this device. Retry sync when connected.",
+                    )
+                    is PlaylistActionResult.Failure -> it.copy(
+                        busy = false,
+                        pendingOrder = null,
+                        verified = false,
+                        message = result.reason.toMessage(true),
+                    )
+                }
+            }
+        }
+    }
+
+    fun retryPending() {
+        if (mutableState.value.busy || mutableState.value.pendingMutationCount == 0) return
+        mutableState.update { it.copy(busy = true, message = null) }
+        viewModelScope.launch {
+            val result = repository.retryPending(userId, playlistId)
+            mutableState.update {
+                when (result) {
+                    is PlaylistActionResult.Success -> it.copy(
+                        busy = false,
+                        verified = true,
+                        pendingMutationCount = 0,
+                        message = "Saved changes synced.",
+                    )
+                    is PlaylistActionResult.Queued -> it.copy(
+                        busy = false,
+                        pendingMutationCount = result.pendingCount,
+                        message = "Still offline. Saved changes remain on this device.",
+                    )
+                    is PlaylistActionResult.Failure -> it.copy(
+                        busy = false,
+                        verified = false,
+                        message = result.reason.toMessage(true),
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectInviteRole(role: PlaylistRole) {
+        if (role in setOf(PlaylistRole.Editor, PlaylistRole.Viewer) && !mutableState.value.accessBusy) {
+            mutableState.update { it.copy(inviteRole = role) }
+        }
+    }
+
+    fun createInvite() {
+        val state = mutableState.value
+        if (!state.canEditMetadata || state.accessBusy) return
+        mutableState.update { it.copy(accessBusy = true, inviteLink = null, message = null) }
+        viewModelScope.launch {
+            when (val result = repository.createInvite(userId, playlistId, state.inviteRole)) {
+                is PlaylistInviteResult.Success -> mutableState.update {
+                    it.copy(
+                        accessBusy = false,
+                        inviteLink = result.invite.shareLink,
+                        message = "Invite link ready. It expires in 7 days.",
+                    )
+                }
+                is PlaylistInviteResult.Failure -> mutableState.update {
+                    it.copy(accessBusy = false, message = result.reason.toMessage(true))
+                }
+            }
+        }
+    }
+
+    fun removeMember(memberId: String) = runAccessAction {
+        repository.removeMember(userId, playlistId, memberId)
+    }
+
+    fun leave() = runAccessAction { repository.leave(userId, playlistId) }
+
+    fun setVisibility(visibility: PlaylistVisibility) {
+        val revision = mutableState.value.detail?.playlist?.revision ?: return
+        runAccessAction { repository.setVisibility(userId, playlistId, revision, visibility) }
+    }
+
+    fun setFollowing(following: Boolean) =
+        runAccessAction { repository.setFollowing(userId, playlistId, following) }
+
+    fun toggleDiagnostics() {
+        mutableState.update { it.copy(diagnosticsExpanded = !it.diagnosticsExpanded) }
+    }
+
+    private fun runAccessAction(action: suspend () -> PlaylistActionResult) {
+        if (mutableState.value.accessBusy) return
+        mutableState.update { it.copy(accessBusy = true, message = null) }
+        viewModelScope.launch {
+            val result = action()
+            mutableState.update {
+                when (result) {
+                    is PlaylistActionResult.Success -> it.copy(
+                        accessBusy = false,
+                        verified = true,
+                        message = "Playlist access updated.",
+                    )
+                    is PlaylistActionResult.Queued -> it.copy(
+                        accessBusy = false,
+                        message = "This access change requires a connection.",
+                    )
+                    is PlaylistActionResult.Failure -> it.copy(
+                        accessBusy = false,
+                        verified = result.reason != my.id.rakyzumusic.core.data.playlist.PlaylistFailure.Conflict,
+                        message = result.reason.toMessage(true),
+                    )
+                }
+            }
         }
     }
 
