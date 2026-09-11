@@ -62,7 +62,7 @@ async function user() {
 
 try {
   const health = await (await request(`${api}/v1/health`)).json();
-  assert.equal(health.version, '0.4.4', 'Deploy 0.4.4 before running smoke');
+  assert.equal(health.version, '0.5.0', 'Deploy 0.5.0 before running smoke');
   const keys = await (await request(`https://api.supabase.com/v1/projects/${ref}/api-keys?reveal=true`, {
     token: process.env.SUPABASE_ACCESS_TOKEN, key: null,
   })).json();

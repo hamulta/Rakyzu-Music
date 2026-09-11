@@ -1,5 +1,47 @@
 # Rakyzu Music — engineering work sessions
 
+## Queue foundation 0.5.0 and Auth prerequisite — 2026-09-10
+
+The CEO reproduced a recovery link that reopened sign-in without presenting the existing
+new-password panel. The callback recognized only PKCE query codes and marked recovery before
+importing a valid recovery session. During correction, the CEO enabled Confirm Email and
+provisioned Resend Custom SMTP for `rakyzu.my.id`; the live Auth configuration now reports both
+email confirmation and Custom SMTP active. The release milestone remains the original Queue
+foundation rather than being repurposed as an Auth-only hotfix.
+
+- [x] Audit live Auth delivery configuration, redirect allow-list, Android intent delivery,
+  callback validation, session state and reset-password UI routing.
+- [x] Supply the exact signup confirmation redirect and accept bounded PKCE/legacy implicit
+  confirmation and recovery callbacks while rejecting wrong origins, paths, types, duplicate
+  parameters and missing credentials.
+- [x] Import/exchange the callback session first, then route confirmation through the normal
+  authenticated Home gate or expose New Password only for recovery.
+- [x] Clear processed callback data from the Activity intent to prevent a duplicate PKCE exchange
+  after recreation and avoid retaining callback credentials.
+- [x] Preserve Confirm Email and verify Resend Custom SMTP without exposing its credentials.
+- [x] Add an account-scoped transactional Room Queue cache with deterministic order, bounded
+  input validation, active-index persistence, and listener isolation.
+- [x] Synchronize Media3 timeline edits and active-item transitions into the Queue repository while
+  keeping process-death restoration reserved for `0.5.3`.
+- [x] Run the full Android gate, compile Room instrumentation coverage, inspect the configured
+  APK and complete live service checks without Appetize or ADB.
+- [x] Publish commit/tag/release `v0.5.0`, verify CI and downloaded artifact, then restore the
+  release workspace.
+
+Email confirmation must remain enabled. Resend delivery, confirmation, and recovery acceptance
+must be rechecked before 1.0.0; no SMTP or privileged Supabase credential is stored in Android.
+The CEO explicitly removed Appetize and ADB from this final gate, so no physical link-tap runtime
+claim is made for `0.5.0`.
+
+The cumulative local gate completed 1,511 Gradle tasks and 203 unit tests with zero failures,
+compiled Room schema-8 instrumentation coverage, ran Android lint, and produced both debug and
+R8-shrunk unsigned release artifacts. The configured debug APK reports application ID
+`my.id.rakyzumusic`, versionName `0.5.0`, versionCode `46`, and a valid v2 signature; its DEX
+payload contains both exact Auth redirects and the New Password UI. Privileged-secret scans found
+zero matches in tracked files and the APK. Worker type checks, 33 tests, and Wrangler dry-run
+passed; all 11 local/remote Supabase migrations match and the linked push dry-run is empty. Live
+Auth reports Confirm Email, Custom SMTP, and both mobile redirect URLs enabled.
+
 ## Active cumulative 0.4.5–0.4.10 batch — 2026-09-09
 
 Initial audit found that the screenshot supplied by the CEO came from an unconfigured
@@ -29,11 +71,11 @@ gate and requires signup, login, onboarding, and Home runtime evidence.
   versions are implemented; then inspect the complete diff and scan for secrets.
 - [x] Build the configured v0.4.10 debug APK, upload it directly to Appetize, and prove
   signup, clean-session login, onboarding, and Home with a real email account.
-- [ ] Download the final CI artifact and install it on the connected ADB device as the
+- [x] Download the final CI artifact and install it on the connected ADB device as the
   last runtime gate; do not use a local Android emulator.
-- [ ] Explicitly stage the validated batch, create one Conventional Commit, push main,
+- [x] Explicitly stage the validated batch, create one Conventional Commit, push main,
   verify CI/CD, deploy forward migrations/Worker, and run live smoke tests.
-- [ ] Publish one cumulative `v0.4.10` tag/release, download the public APK again, and
+- [x] Publish one cumulative `v0.4.10` tag/release, download the public APK again, and
   audit manifest, configuration presence, signature, checksum, branches and worktrees.
 
 The CEO supplied a dedicated Appetize API token after the initial audit. It is stored only

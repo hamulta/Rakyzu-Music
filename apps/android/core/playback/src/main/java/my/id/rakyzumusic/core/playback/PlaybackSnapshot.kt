@@ -1,5 +1,7 @@
 package my.id.rakyzumusic.core.playback
 
+import my.id.rakyzumusic.core.model.PlaybackQueueItem
+
 data class PlaybackSnapshot(
     val mediaId: String? = null,
     val title: String? = null,
@@ -31,16 +33,6 @@ data class PlaybackSnapshot(
                 .toFloat()
         }
 }
-
-data class PlaybackQueueItem(
-    val mediaId: String,
-    val title: String,
-    val artist: String,
-    val albumTitle: String?,
-    val durationMs: Long,
-    val artistId: String = "",
-    val albumId: String = "",
-)
 
 enum class PlaybackStatus {
     Idle,

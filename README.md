@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.4.10** (cumulative 0.4.5–0.4.10, versionCode 45)
+Current version: **0.5.0** (account-scoped Queue foundation, versionCode 46)
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.4.10-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
 
 ## Configuration and security
 
@@ -44,9 +44,9 @@ Privileged CLI credentials may be kept in the ignored local `credential.env` fil
 
 Database migrations and pgTAP policy tests live under `supabase/`. The database workflow replays them against an isolated Postgres instance before deploying forward-only migrations to the linked Rakyzu Music Android project.
 
-Email/password authentication uses Supabase Auth with mandatory email confirmation and PKCE callbacks to `my.id.rakyzumusic://auth`. Access tokens, refresh tokens, and PKCE verifiers are encrypted at rest with an AES-GCM key generated inside Android Keystore. Local logout revokes and removes only the current device session.
+Email/password authentication uses Supabase Auth with mandatory email confirmation. Signup explicitly requests the branded PKCE callback `my.id.rakyzumusic://auth`; an allowlisted callback imports or exchanges the session before the authenticated profile gate opens Home (or the required first-account onboarding). Access tokens, refresh tokens, and PKCE verifiers are encrypted at rest with an AES-GCM key generated inside Android Keystore. Local logout revokes and removes only the current device session.
 
-Password recovery uses the exact callback `my.id.rakyzumusic://auth/recovery`, a persisted encrypted recovery requirement, and a non-enumerating email response. Incoming recovery callbacks are allowlisted by exact scheme, authority, path, query shape, and bounded authorization code before changing local state. Android explicitly rejects cleartext network traffic. Authenticated listener profiles are owner-scoped by RLS; the Android shell remains gated until required display-name onboarding completes.
+Password recovery uses the distinct callback `my.id.rakyzumusic://auth/recovery`, a persisted encrypted recovery requirement, and a non-enumerating email response. The shared Auth parser validates exact scheme, authority, purpose-specific path, query/fragment shape, callback type, and bounded credentials. It establishes the recovery session before exposing the existing New Password screen; confirmation and recovery types cannot be swapped between paths. Processed callback data is removed from the Activity intent to prevent duplicate exchange and token retention. Android explicitly rejects cleartext network traffic. Authenticated listener profiles are owner-scoped by RLS; the Android shell remains gated until required display-name onboarding completes.
 
 Published artist, album, track, and editorial-shelf metadata is read through authenticated Supabase RLS and synchronized into Room 3. The local database is the Home screen's observable source of truth, so the last verified feed remains available when refresh fails. Home presents ordered editorial shelves, recently played tracks isolated by listener account, new releases, and the complete catalog. It exposes relative feed freshness from persisted sync metadata and clearly warns when a failed refresh leaves a saved catalog at least 24 hours old. Screens narrower than 360dp or using font scale 1.3x and above switch to an adaptive shelf layout with a stacked hero, wider cards, and additional text lines. Structurally equal Room snapshots retain their canonical references, while featured and new-release sections are derived only when catalog content changes; status and listening-history updates therefore avoid rebuilding unrelated shelf content. Catalog refresh retries transient failures twice with bounded 1-second and 3-second backoffs, never retries an invalid payload, and waits for validated Android connectivity before an immediate recovery attempt. An empty successful refresh renders an explicit accessible state with a refresh action instead of inactive playback controls; loading and degraded status changes are announced as polite accessibility live regions. Shelf playback exposes track-specific TalkBack action labels and deterministic queue-order traversal, while every Home interaction maintains an explicit minimum 48dp target.
 
@@ -76,7 +76,7 @@ Create lists accessible playlists in bounded cursor pages and incrementally load
 
 Room schema 7 keeps validated account-scoped list/detail pages and a durable mutation outbox. A UUID operation receipt makes retries idempotent; stale revisions refresh the verified server snapshot before another action. Playlist cover GET/HEAD requests resolve the canonical owner through Supabase so authorized collaborators can read the private R2 object, while only the owner may PUT/DELETE. Android strips image metadata and bounds payloads; Worker validates PNG structure, size and dimensions and returns `private, no-store`.
 
-The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Playlist UI and Room migration runtime tests execute on the CEO-connected physical Android device. Appetize is used only for this release's final signup/login/onboarding/Home acceptance pass. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.4.10.md) for actual gate status and limitations.
+The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Queue order and the active item are synchronized from meaningful Media3 timeline edits and item transitions into an account-scoped, transactional Room cache; an initial empty controller connection cannot erase saved state. Auth callbacks support bounded PKCE query codes and legacy implicit fragments, route recovery to New Password, and route a confirmed authenticated session through the normal Home gate. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.0.md) for actual gate status and limitations.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

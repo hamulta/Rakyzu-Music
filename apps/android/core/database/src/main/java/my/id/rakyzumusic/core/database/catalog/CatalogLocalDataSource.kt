@@ -24,6 +24,7 @@ data class RakyzuLocalDataSources(
     val catalog: CatalogLocalDataSource,
     val library: LibraryLocalDataSource,
     val playlist: PlaylistLocalDataSource,
+    val playbackQueue: PlaybackQueueLocalDataSource,
 )
 
 fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
@@ -32,6 +33,7 @@ fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
         catalog = RoomCatalogLocalDataSource(database),
         library = RoomLibraryLocalDataSource(database),
         playlist = RoomPlaylistLocalDataSource(database),
+        playbackQueue = RoomPlaybackQueueLocalDataSource(database),
     )
 }
 

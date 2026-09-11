@@ -114,6 +114,23 @@ class AuthViewModelTest {
         assertEquals(0, repository.updatePasswordCalls)
         assertEquals("Passwords do not match.", viewModel.uiState.value.message)
     }
+
+    @Test
+    fun resetPasswordSubmitsTheNewCredential() = runTest(dispatcher) {
+        val repository = FakeAuthRepository()
+        val viewModel = AuthViewModel(repository)
+
+        viewModel.showPasswordReset()
+        viewModel.updatePassword("Secure-Password1")
+        viewModel.updatePasswordConfirmation("Secure-Password1")
+        viewModel.submit()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.updatePasswordCalls)
+        assertEquals("", viewModel.uiState.value.password)
+        assertEquals("", viewModel.uiState.value.passwordConfirmation)
+        assertFalse(viewModel.uiState.value.isSubmitting)
+    }
 }
 
 private class FakeAuthRepository(
@@ -152,5 +169,7 @@ private class FakeAuthRepository(
         return updatePasswordResult
     }
 
-    override fun markPasswordRecoveryCallback() = Unit
+    override fun handleAuthCallback(
+        callback: my.id.rakyzumusic.core.data.auth.AuthCallback,
+    ) = Unit
 }

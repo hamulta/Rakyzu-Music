@@ -9,6 +9,7 @@ Rakyzu Music translates public Spotify product and engineering ideas into its ow
 - Spotify's public [playlist concepts](https://developer.spotify.com/documentation/web-api/concepts/playlists) model a playlist as metadata plus ordered items and use a snapshot identifier for concurrent changes. Rakyzu uses a monotonic `revision` with account-scoped metadata first, then ordered items and conflict-safe mutations.
 - Spotify's public [mobile Create controls](https://newsroom.spotify.com/2025-05-07/experience-a-new-dimension-of-music-discovery-with-more-controls-and-enhanced-tools/) place creation alongside the stable Library destination. Rakyzu adds a dedicated adaptive Create destination while retaining Your Library.
 - Spotify Engineering's public [client architecture](https://engineering.atspotify.com/2020/5/spotify-modernizes-client-side-architecture-to-accelerate-service-on-all-devices) emphasizes batching metadata, on-device storage, and precomputed ordering for slow networks and older devices. Rakyzu applies bounded RPCs, Room as source of truth, deterministic ordering, and staged feature boundaries.
+- Spotify's public [Play Queue](https://support.spotify.com/article/play-queue/) exposes what plays next and supports explicit add, reorder, remove, and clear actions. Rakyzu follows that product vocabulary with original account-scoped state, deterministic Media3 edits, and Room persistence; it does not call Spotify playback APIs or use Spotify content.
 
 ## Foundation — 0.0.x
 
@@ -82,7 +83,7 @@ validation/publication cycle. The design follows public Spotify collaboration co
 expiring invites, explicit access roles, public/private reach, bounded pages, and
 snapshot-like revision safety—through original Rakyzu Music code and infrastructure.
 
-- [ ] `0.5.0` — account-scoped queue foundation, deterministic editing, Room persistence, and Media3 synchronization.
+- [x] `0.5.0` — account-scoped queue foundation, deterministic editing, Room persistence, and Media3 synchronization.
 - [ ] `0.5.1` — add-next/add-to-queue entry points and duplicate-safe ordering.
 - [ ] `0.5.2` — drag/reorder/remove queue controls with complete TalkBack actions.
 - [ ] `0.5.3` — process-death playback and queue restoration with stale-media handling.

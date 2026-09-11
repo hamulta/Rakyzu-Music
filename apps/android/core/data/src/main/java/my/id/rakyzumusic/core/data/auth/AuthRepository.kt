@@ -15,7 +15,7 @@ interface AuthRepository {
 
     suspend fun signOut(): AuthActionResult
 
-    fun markPasswordRecoveryCallback()
+    fun handleAuthCallback(callback: AuthCallback)
 }
 
 sealed interface AuthSessionState {

@@ -23,6 +23,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:model"))
     implementation(project(":core:playback"))
 
     val composeBom = platform("androidx.compose:compose-bom:2026.08.00")

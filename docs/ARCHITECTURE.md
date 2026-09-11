@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: cumulative implementation for `0.4.10`; release evidence in `WORK_SESSION.md`.
+Status: Queue foundation `0.5.0`; release evidence in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -40,9 +40,9 @@ The Android app never connects to R2 using S3 credentials. Catalog metadata and 
 
 Supabase schema changes are committed as ordered forward migrations. Client-facing tables start with RLS enabled and forced, explicit role grants, and pgTAP coverage for both allowed and denied access. The initial `profiles` boundary is private to its authenticated owner; privileged lifecycle operations remain server-controlled.
 
-The app observes Supabase `sessionStatus` as the sole authentication navigation source. Email confirmation callbacks use PKCE through the branded Android deep link. The SDK's session and verifier stores are replaced by AES-GCM persistence whose non-exportable key is generated in Android Keystore; corrupt or invalidated encrypted state is discarded and requires a new sign-in. Auth failures are mapped to bounded product errors so raw backend responses and tokens never reach the UI or logs.
+The app observes Supabase `sessionStatus` as the sole authentication navigation source. Signup explicitly supplies the branded `my.id.rakyzumusic://auth` PKCE redirect. A valid confirmation callback exchanges or imports the session before navigation can pass through the profile gate to Home. The SDK's session and verifier stores are replaced by AES-GCM persistence whose non-exportable key is generated in Android Keystore; corrupt or invalidated encrypted state is discarded and requires a new sign-in. Auth failures are mapped to bounded product errors so raw backend responses and tokens never reach the UI or logs.
 
-Password recovery uses a separate exact deep-link path and only marks recovery after receiving one bounded PKCE authorization code. An application-owned parser rejects any callback whose scheme, raw authority, path, query shape, or fragment differs from the allowlist. `MainActivity` uses `singleTop` and applies the same parser to cold-start and `onNewIntent` callbacks. The recovery requirement is encrypted with the session state, survives process death, and is cleared only after a successful password update or local sign-out. Recovery-email responses do not reveal whether an account exists. The Android network security policy independently rejects cleartext traffic.
+Password recovery uses the separate exact `my.id.rakyzumusic://auth/recovery` path. One application-owned parser distinguishes confirmation from recovery, accepts only one bounded PKCE code or a complete bounded legacy implicit session whose type matches its path, and rejects every other origin, path, parameter set, fragment, duplicate, or malformed credential. `MainActivity` uses `singleTop`, applies the same parser to cold-start and `onNewIntent`, and clears processed callback data from the launch intent. The repository establishes a valid recovery session before marking the encrypted recovery requirement, which survives process death and is cleared only after a successful password update or local sign-out. Recovery-email responses do not reveal whether an account exists. The Android network security policy independently rejects cleartext traffic.
 
 The authenticated shell loads the current user's `profiles` row through Postgrest using the same short-lived Auth JWT. Both the explicit `id` filter and database RLS enforce ownership. New and existing incomplete profiles remain behind a profile gate until the listener saves a valid display name; profile network failures degrade to a retry surface rather than bypassing onboarding or crashing navigation.
 

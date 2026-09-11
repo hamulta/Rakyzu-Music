@@ -22,6 +22,27 @@ internal data class CatalogEntitySnapshot(
 
 @Dao
 internal interface CatalogDao {
+    @Query(
+        "SELECT * FROM playback_queue_entries WHERE user_id = :userId " +
+            "ORDER BY position ASC",
+    )
+    suspend fun getPlaybackQueueEntries(userId: String): List<PlaybackQueueEntryEntity>
+
+    @Query("SELECT * FROM playback_queue_states WHERE user_id = :userId")
+    suspend fun getPlaybackQueueState(userId: String): PlaybackQueueStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaybackQueueEntries(entries: List<PlaybackQueueEntryEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaybackQueueState(state: PlaybackQueueStateEntity)
+
+    @Query("DELETE FROM playback_queue_entries WHERE user_id = :userId")
+    suspend fun deletePlaybackQueueEntries(userId: String)
+
+    @Query("DELETE FROM playback_queue_states WHERE user_id = :userId")
+    suspend fun deletePlaybackQueueState(userId: String)
+
     @Query("SELECT payload FROM playlist_details WHERE user_id = :userId AND playlist_id = :playlistId")
     fun observePlaylistDetail(userId: String, playlistId: String): kotlinx.coroutines.flow.Flow<String?>
 
@@ -436,6 +457,18 @@ internal interface CatalogDao {
             }
             else -> error("Unsupported Library item kind")
         }
+    }
+
+    @Transaction
+    suspend fun replacePlaybackQueue(
+        userId: String,
+        entries: List<PlaybackQueueEntryEntity>,
+        state: PlaybackQueueStateEntity?,
+    ) {
+        deletePlaybackQueueEntries(userId)
+        deletePlaybackQueueState(userId)
+        if (entries.isNotEmpty()) insertPlaybackQueueEntries(entries)
+        if (state != null) insertPlaybackQueueState(state)
     }
 
     companion object {

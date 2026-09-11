@@ -13,6 +13,8 @@ import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.PlaylistSummary
+import my.id.rakyzumusic.core.model.PersistedPlaybackQueue
+import my.id.rakyzumusic.core.model.PlaybackQueueItem
 import my.id.rakyzumusic.core.model.Track
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -27,6 +29,7 @@ class RakyzuDatabaseTest {
     private lateinit var dataSource: CatalogLocalDataSource
     private lateinit var libraryDataSource: LibraryLocalDataSource
     private lateinit var playlistDataSource: PlaylistLocalDataSource
+    private lateinit var playbackQueueDataSource: PlaybackQueueLocalDataSource
 
     @Before
     fun setUp() {
@@ -39,6 +42,7 @@ class RakyzuDatabaseTest {
         dataSource = RoomCatalogLocalDataSource(database)
         libraryDataSource = RoomLibraryLocalDataSource(database)
         playlistDataSource = RoomPlaylistLocalDataSource(database)
+        playbackQueueDataSource = RoomPlaybackQueueLocalDataSource(database)
     }
 
     @After
@@ -148,6 +152,38 @@ class RakyzuDatabaseTest {
         assertEquals(true, synchronized.isEmpty)
         assertEquals(9L, libraryDataSource.getLibraryChangeCursor("listener-1"))
     }
+
+    @Test
+    fun playbackQueueReplacementIsOrderedAtomicAndAccountScoped() = runTest {
+        val initial = PersistedPlaybackQueue(
+            items = listOf(queueItem("one"), queueItem("two")),
+            currentIndex = 1,
+            updatedAtEpochMillis = 100L,
+        )
+        playbackQueueDataSource.replace("listener-1", initial)
+
+        assertEquals(initial, playbackQueueDataSource.read("listener-1"))
+        assertEquals(PersistedPlaybackQueue(), playbackQueueDataSource.read("listener-2"))
+
+        val replacement = PersistedPlaybackQueue(
+            items = listOf(queueItem("three")),
+            currentIndex = 0,
+            updatedAtEpochMillis = 200L,
+        )
+        playbackQueueDataSource.replace("listener-1", replacement)
+
+        assertEquals(replacement, playbackQueueDataSource.read("listener-1"))
+    }
+
+    private fun queueItem(id: String) = PlaybackQueueItem(
+        mediaId = id,
+        title = "Title $id",
+        artist = "Rakyzu Artist",
+        albumTitle = "Rakyzu Album",
+        durationMs = 180_000L,
+        artistId = "artist-1",
+        albumId = "album-1",
+    )
 
     @Test
     fun playlistCacheIsTransactionalAndIsolatedByListener() = runTest {

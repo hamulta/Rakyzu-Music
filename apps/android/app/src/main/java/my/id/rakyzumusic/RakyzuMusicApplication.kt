@@ -24,6 +24,7 @@ import my.id.rakyzumusic.core.data.media.MediaStreamRequestResult
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
+import my.id.rakyzumusic.core.data.queue.PlaybackQueueRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.playback.PlaybackDependencies
 import my.id.rakyzumusic.core.playback.PlaybackNetworkRequest
@@ -34,11 +35,25 @@ import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import okio.Path.Companion.toOkioPath
 
 class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonImageLoader.Factory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val queueStateUpdates = Channel<AccountQueueState>(Channel.CONFLATED)
+
+    init {
+        applicationScope.launch {
+            for (update in queueStateUpdates) {
+                playbackQueueRepository.replace(
+                    userId = update.userId,
+                    items = update.snapshot.queue,
+                    currentIndex = update.snapshot.currentIndex,
+                )
+            }
+        }
+    }
 
     private val repositories: RakyzuRepositories by lazy {
         RakyzuAuthFactory.createRepositories(
@@ -67,6 +82,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
     val playlistRepository: PlaylistRepository
         get() = repositories.playlistRepository
 
+    val playbackQueueRepository: PlaybackQueueRepository
+        get() = repositories.playbackQueueRepository
+
     val mediaDeliveryRepository: MediaDeliveryRepository
         get() = repositories.mediaDeliveryRepository
 
@@ -83,14 +101,23 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
     }
 
     val playbackController: RakyzuPlaybackController by lazy {
-        RakyzuPlaybackController(this) { trackId ->
-            val signedIn = authRepository.sessionState.value as? AuthSessionState.SignedIn
-            if (signedIn != null) {
-                applicationScope.launch {
-                    catalogRepository.recordRecentlyPlayed(signedIn.userId, trackId)
+        RakyzuPlaybackController(
+            context = this,
+            onMediaItemTransition = { trackId ->
+                val signedIn = authRepository.sessionState.value as? AuthSessionState.SignedIn
+                if (signedIn != null) {
+                    applicationScope.launch {
+                        catalogRepository.recordRecentlyPlayed(signedIn.userId, trackId)
+                    }
                 }
-            }
-        }
+            },
+            onQueueStateChanged = { snapshot ->
+                val signedIn = authRepository.sessionState.value as? AuthSessionState.SignedIn
+                if (signedIn != null) {
+                    queueStateUpdates.trySend(AccountQueueState(signedIn.userId, snapshot))
+                }
+            },
+        )
     }
 
     @OptIn(ExperimentalCoilApi::class)
@@ -122,6 +149,11 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
         const val ARTWORK_CACHE_DIRECTORY = "rakyzu_music_artwork"
     }
 }
+
+private data class AccountQueueState(
+    val userId: String,
+    val snapshot: my.id.rakyzumusic.core.playback.PlaybackSnapshot,
+)
 
 private fun MediaStreamRequestResult.toPlaybackRequestResult(): PlaybackStreamRequestResult =
     when (this) {

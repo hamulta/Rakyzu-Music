@@ -202,3 +202,27 @@ internal data class PlaylistMutationOutboxEntity(
     @ColumnInfo(name = "queued_at_epoch_ms") val queuedAtEpochMillis: Long,
     @ColumnInfo(name = "attempt_count") val attemptCount: Int,
 )
+
+@Entity(
+    tableName = "playback_queue_entries",
+    primaryKeys = ["user_id", "position"],
+    indices = [Index(value = ["user_id", "media_id"])],
+)
+internal data class PlaybackQueueEntryEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    val position: Int,
+    @ColumnInfo(name = "media_id") val mediaId: String,
+    val title: String,
+    val artist: String,
+    @ColumnInfo(name = "album_title") val albumTitle: String?,
+    @ColumnInfo(name = "duration_ms") val durationMs: Long,
+    @ColumnInfo(name = "artist_id") val artistId: String,
+    @ColumnInfo(name = "album_id") val albumId: String,
+)
+
+@Entity(tableName = "playback_queue_states")
+internal data class PlaybackQueueStateEntity(
+    @PrimaryKey @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "current_index") val currentIndex: Int,
+    @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
+)

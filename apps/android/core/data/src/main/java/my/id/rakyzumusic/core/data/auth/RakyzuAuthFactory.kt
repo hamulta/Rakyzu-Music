@@ -39,6 +39,8 @@ import my.id.rakyzumusic.core.data.profile.ProfileFailure
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
 import my.id.rakyzumusic.core.data.profile.SupabaseProfileRepository
+import my.id.rakyzumusic.core.data.queue.OfflineFirstPlaybackQueueRepository
+import my.id.rakyzumusic.core.data.queue.PlaybackQueueRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.data.search.createRecentSearchRepository
 import my.id.rakyzumusic.core.database.catalog.createRakyzuLocalDataSources
@@ -84,6 +86,7 @@ object RakyzuAuthFactory {
             mediaDeliveryRepository = UnavailableMediaDeliveryRepository,
             libraryRepository = UnavailableLibraryRepository,
             playlistRepository = UnavailablePlaylistRepository,
+            playbackQueueRepository = UnavailablePlaybackQueueRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
         )
@@ -135,6 +138,9 @@ object RakyzuAuthFactory {
                     apiConfiguration, AccessTokenProvider(client.auth::currentAccessTokenOrNull),
                 ),
             ),
+            playbackQueueRepository = OfflineFirstPlaybackQueueRepository(
+                localDataSource = localDataSources.playbackQueue,
+            ),
             mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
                 UnavailableMediaDeliveryRepository
             } else {
@@ -155,10 +161,22 @@ data class RakyzuRepositories(
     val catalogRepository: CatalogRepository,
     val libraryRepository: LibraryRepository,
     val playlistRepository: PlaylistRepository,
+    val playbackQueueRepository: PlaybackQueueRepository,
     val mediaDeliveryRepository: MediaDeliveryRepository,
     val connectivityMonitor: ConnectivityMonitor,
     val recentSearchRepository: RecentSearchRepository,
 )
+
+private data object UnavailablePlaybackQueueRepository : PlaybackQueueRepository {
+    override suspend fun read(userId: String) =
+        my.id.rakyzumusic.core.model.PersistedPlaybackQueue()
+
+    override suspend fun replace(
+        userId: String,
+        items: List<my.id.rakyzumusic.core.model.PlaybackQueueItem>,
+        currentIndex: Int,
+    ) = false
+}
 
 private data object UnavailablePlaylistRepository : PlaylistRepository {
     override suspend fun artwork(userId: String, playlistId: String) =
@@ -219,7 +237,7 @@ private data object UnavailableAuthRepository : AuthRepository {
 
     override suspend fun signOut(): AuthActionResult = unavailable()
 
-    override fun markPasswordRecoveryCallback() = Unit
+    override fun handleAuthCallback(callback: AuthCallback) = Unit
 
     private fun unavailable() = AuthActionResult.Failure(AuthFailure.InvalidConfiguration)
 }

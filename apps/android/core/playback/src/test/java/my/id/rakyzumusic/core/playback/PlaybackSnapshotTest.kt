@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.core.playback
 
+import my.id.rakyzumusic.core.model.PlaybackQueueItem
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -84,6 +85,39 @@ class PlaybackSnapshotTest {
         }
 
         assertEquals(2, rebuilt.size)
+    }
+
+    @Test
+    fun queueEditingIndicesAreDeterministicAndBounded() {
+        assertEquals(2, nextQueueInsertionIndex(currentIndex = 1, itemCount = 4))
+        assertEquals(4, nextQueueInsertionIndex(currentIndex = -1, itemCount = 4))
+        assertEquals(0, nextQueueInsertionIndex(currentIndex = -1, itemCount = 0))
+
+        assertEquals(true, validQueueMove(fromIndex = 0, toIndex = 2, itemCount = 3))
+        assertEquals(false, validQueueMove(fromIndex = 0, toIndex = 0, itemCount = 3))
+        assertEquals(false, validQueueMove(fromIndex = -1, toIndex = 1, itemCount = 3))
+        assertEquals(false, validQueueMove(fromIndex = 1, toIndex = 3, itemCount = 3))
+    }
+
+    @Test
+    fun queuePersistenceTracksTimelineAndActiveItemOnly() {
+        val first = PlaybackSnapshot(
+            status = PlaybackStatus.Paused,
+            currentIndex = 0,
+        )
+        val second = PlaybackSnapshot(currentIndex = 1)
+
+        assertEquals(true, shouldPersistQueueState(first, first, timelineChanged = true))
+        assertEquals(true, shouldPersistQueueState(first, second, timelineChanged = false))
+        assertEquals(false, shouldPersistQueueState(first, first, timelineChanged = false))
+        assertEquals(
+            false,
+            shouldPersistQueueState(
+                previous = PlaybackSnapshot(status = PlaybackStatus.Connecting),
+                current = PlaybackSnapshot(status = PlaybackStatus.Idle),
+                timelineChanged = true,
+            ),
+        )
     }
 
     @Test

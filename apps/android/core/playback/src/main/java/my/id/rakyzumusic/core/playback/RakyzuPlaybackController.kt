@@ -15,11 +15,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import my.id.rakyzumusic.core.model.PlaybackQueueItem
 import my.id.rakyzumusic.core.model.Track
 
 class RakyzuPlaybackController(
     context: Context,
     private val onMediaItemTransition: (String) -> Unit = {},
+    private val onQueueStateChanged: (PlaybackSnapshot) -> Unit = {},
 ) {
     private val appContext = context.applicationContext
     private val mainExecutor = ContextCompat.getMainExecutor(appContext)
@@ -57,7 +59,7 @@ class RakyzuPlaybackController(
     fun play(track: Track) = playQueue(listOf(track), startIndex = 0)
 
     fun playQueue(tracks: List<Track>, startIndex: Int) {
-        if (tracks.isEmpty() || startIndex !in tracks.indices) {
+        if (tracks.isEmpty() || tracks.size > MAXIMUM_QUEUE_SIZE || startIndex !in tracks.indices) {
             mutableSnapshot.value = mutableSnapshot.value.copy(
                 error = PlaybackError("INVALID_QUEUE"),
             )
@@ -65,7 +67,7 @@ class RakyzuPlaybackController(
         }
         playerError = null
         val selectedTrack = tracks[startIndex]
-        mutableSnapshot.value = PlaybackSnapshot(
+        val pendingSnapshot = PlaybackSnapshot(
             mediaId = selectedTrack.id,
             title = selectedTrack.title,
             artist = selectedTrack.artist,
@@ -76,6 +78,7 @@ class RakyzuPlaybackController(
             canSkipPrevious = true,
             canSkipNext = startIndex < tracks.lastIndex,
         )
+        mutableSnapshot.value = pendingSnapshot
         withController { controller ->
             controller.setMediaItems(
                 tracks.map(Track::toPlaybackMediaItem),
@@ -84,6 +87,38 @@ class RakyzuPlaybackController(
             )
             controller.prepare()
             controller.play()
+        }
+    }
+
+    fun playNext(track: Track) {
+        withController { controller ->
+            if (controller.mediaItemCount >= MAXIMUM_QUEUE_SIZE) return@withController
+            controller.addMediaItem(
+                nextQueueInsertionIndex(controller.currentMediaItemIndex, controller.mediaItemCount),
+                track.toPlaybackMediaItem(),
+            )
+        }
+    }
+
+    fun addToQueue(track: Track) {
+        withController { controller ->
+            if (controller.mediaItemCount < MAXIMUM_QUEUE_SIZE) {
+                controller.addMediaItem(track.toPlaybackMediaItem())
+            }
+        }
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        withController { controller ->
+            if (validQueueMove(fromIndex, toIndex, controller.mediaItemCount)) {
+                controller.moveMediaItem(fromIndex, toIndex)
+            }
+        }
+    }
+
+    fun removeQueueItem(index: Int) {
+        withController { controller ->
+            if (index in 0 until controller.mediaItemCount) controller.removeMediaItem(index)
         }
     }
 
@@ -163,6 +198,7 @@ class RakyzuPlaybackController(
         error: PlaybackException? = null,
         timelineChanged: Boolean = false,
     ) {
+        val previousSnapshot = mutableSnapshot.value
         val mediaItem = player.currentMediaItem
         val metadata = mediaItem?.mediaMetadata
         val durationMs = player.duration
@@ -187,7 +223,7 @@ class RakyzuPlaybackController(
             player.isPlaying -> PlaybackStatus.Playing
             else -> PlaybackStatus.Paused
         }
-        mutableSnapshot.value = PlaybackSnapshot(
+        val snapshot = PlaybackSnapshot(
             mediaId = mediaItem?.mediaId,
             title = metadata?.title?.toString(),
             artist = metadata?.artist?.toString(),
@@ -202,6 +238,10 @@ class RakyzuPlaybackController(
             canSkipNext = player.hasNextMediaItem(),
             error = (error ?: playerError)?.let { PlaybackError(it.errorCodeName) },
         )
+        mutableSnapshot.value = snapshot
+        if (shouldPersistQueueState(previousSnapshot, snapshot, timelineChanged)) {
+            onQueueStateChanged(snapshot)
+        }
     }
 
     private fun synchronizeProgressUpdates(controller: MediaController) {
@@ -242,7 +282,25 @@ class RakyzuPlaybackController(
 
     private companion object {
         const val PROGRESS_UPDATE_INTERVAL_MS = 500L
+        const val MAXIMUM_QUEUE_SIZE = 1_000
     }
+}
+
+internal fun nextQueueInsertionIndex(currentIndex: Int, itemCount: Int): Int =
+    if (currentIndex in 0 until itemCount) currentIndex + 1 else itemCount
+
+internal fun validQueueMove(fromIndex: Int, toIndex: Int, itemCount: Int): Boolean =
+    fromIndex in 0 until itemCount && toIndex in 0 until itemCount && fromIndex != toIndex
+
+internal fun shouldPersistQueueState(
+    previous: PlaybackSnapshot,
+    current: PlaybackSnapshot,
+    timelineChanged: Boolean,
+): Boolean {
+    val isInitialEmptyControllerSnapshot =
+        previous.status == PlaybackStatus.Connecting && current.queue.isEmpty()
+    return !isInitialEmptyControllerSnapshot &&
+        (timelineChanged || previous.currentIndex != current.currentIndex)
 }
 
 internal fun Track.toPlaybackQueueItem(): PlaybackQueueItem = PlaybackQueueItem(

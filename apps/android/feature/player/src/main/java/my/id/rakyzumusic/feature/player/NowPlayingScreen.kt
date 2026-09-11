@@ -64,7 +64,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
-import my.id.rakyzumusic.core.playback.PlaybackQueueItem
+import my.id.rakyzumusic.core.model.PlaybackQueueItem
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.core.playback.toPlaybackTimeLabel

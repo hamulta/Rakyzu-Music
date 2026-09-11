@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import my.id.rakyzumusic.core.data.auth.parseAuthCallback
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 
 class MainActivity : ComponentActivity() {
@@ -41,8 +42,8 @@ class MainActivity : ComponentActivity() {
         intent: Intent?,
         application: RakyzuMusicApplication,
     ) {
-        if (isPasswordRecoveryCallback(intent?.dataString)) {
-            application.authRepository.markPasswordRecoveryCallback()
-        }
+        val callback = parseAuthCallback(intent?.dataString) ?: return
+        intent?.data = null
+        application.authRepository.handleAuthCallback(callback)
     }
 }
