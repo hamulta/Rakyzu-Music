@@ -15,6 +15,8 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,6 +55,8 @@ fun TrackContextSheet(
     track: Track,
     onDismiss: () -> Unit,
     onPlay: (() -> Unit)? = null,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null,
     onViewArtist: (() -> Unit)? = null,
     onViewAlbum: (() -> Unit)? = null,
     isLiked: Boolean = false,
@@ -118,6 +122,22 @@ fun TrackContextSheet(
                     icon = Icons.Rounded.PlayArrow,
                     label = "Play track",
                     onClickLabel = "Play ${track.title.trim()}",
+                    onClick = action,
+                )
+            }
+            onPlayNext?.let { action ->
+                TrackContextAction(
+                    icon = Icons.Rounded.QueueMusic,
+                    label = "Play next",
+                    onClickLabel = "Play ${track.title.trim()} next",
+                    onClick = action,
+                )
+            }
+            onAddToQueue?.let { action ->
+                TrackContextAction(
+                    icon = Icons.Rounded.PlaylistAdd,
+                    label = "Add to queue",
+                    onClickLabel = "Add ${track.title.trim()} to queue",
                     onClick = action,
                 )
             }

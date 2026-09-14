@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import my.id.rakyzumusic.core.model.PlaybackQueueItem
+import my.id.rakyzumusic.core.model.PersistedPlaybackQueue
 import my.id.rakyzumusic.core.model.Track
 
 class RakyzuPlaybackController(
@@ -92,17 +93,28 @@ class RakyzuPlaybackController(
 
     fun playNext(track: Track) {
         withController { controller ->
-            if (controller.mediaItemCount >= MAXIMUM_QUEUE_SIZE) return@withController
-            controller.addMediaItem(
-                nextQueueInsertionIndex(controller.currentMediaItemIndex, controller.mediaItemCount),
-                track.toPlaybackMediaItem(),
-            )
+            val existingIndex = controller.indexOfMediaId(track.id)
+            if (existingIndex >= 0) {
+                playNextMoveDestination(
+                    currentIndex = controller.currentMediaItemIndex,
+                    itemCount = controller.mediaItemCount,
+                    existingIndex = existingIndex,
+                )?.let { controller.moveMediaItem(existingIndex, it) }
+            } else if (controller.mediaItemCount < MAXIMUM_QUEUE_SIZE) {
+                controller.addMediaItem(
+                    nextQueueInsertionIndex(controller.currentMediaItemIndex, controller.mediaItemCount),
+                    track.toPlaybackMediaItem(),
+                )
+            }
         }
     }
 
     fun addToQueue(track: Track) {
         withController { controller ->
-            if (controller.mediaItemCount < MAXIMUM_QUEUE_SIZE) {
+            if (
+                controller.mediaItemCount < MAXIMUM_QUEUE_SIZE &&
+                controller.indexOfMediaId(track.id) < 0
+            ) {
                 controller.addMediaItem(track.toPlaybackMediaItem())
             }
         }
@@ -178,6 +190,39 @@ class RakyzuPlaybackController(
         }
     }
 
+    /** An explicit listener action; Rakyzu never clears an account queue on its own. */
+    fun clearQueue() = stopAndClear()
+
+    /** Restores an account-scoped Room queue without resuming playback after process death. */
+    fun restoreQueue(queue: PersistedPlaybackQueue) {
+        val restoration = sanitizeQueueForRestore(queue)
+        if (restoration.items.isEmpty()) return
+        playerError = null
+        val selected = restoration.items[restoration.currentIndex]
+        mutableSnapshot.value = PlaybackSnapshot(
+            mediaId = selected.mediaId,
+            title = selected.title,
+            artist = selected.artist,
+            albumTitle = selected.albumTitle,
+            status = PlaybackStatus.Paused,
+            currentIndex = restoration.currentIndex,
+            queue = restoration.items,
+            canSkipPrevious = restoration.currentIndex > 0,
+            canSkipNext = restoration.currentIndex < restoration.items.lastIndex,
+        )
+        withController { controller ->
+            // Do not overwrite a queue that a listener has already started in this process.
+            if (controller.mediaItemCount != 0) return@withController
+            controller.setMediaItems(
+                restoration.items.map(PlaybackQueueItem::toPlaybackMediaItem),
+                restoration.currentIndex,
+                0L,
+            )
+            controller.prepare()
+            controller.pause()
+        }
+    }
+
     private fun withController(action: (MediaController) -> Unit) {
         controllerFuture.addListener(
             {
@@ -192,6 +237,9 @@ class RakyzuPlaybackController(
             mainExecutor,
         )
     }
+
+    private fun MediaController.indexOfMediaId(mediaId: String): Int =
+        (0 until mediaItemCount).firstOrNull { getMediaItemAt(it).mediaId == mediaId } ?: -1
 
     private fun publishSnapshot(
         player: Player,
@@ -291,6 +339,69 @@ internal fun nextQueueInsertionIndex(currentIndex: Int, itemCount: Int): Int =
 
 internal fun validQueueMove(fromIndex: Int, toIndex: Int, itemCount: Int): Boolean =
     fromIndex in 0 until itemCount && toIndex in 0 until itemCount && fromIndex != toIndex
+
+/**
+ * A duplicate requested as "play next" is moved immediately after the active item instead of
+ * being inserted twice. A request for the active item itself is already satisfied.
+ */
+internal fun playNextMoveDestination(
+    currentIndex: Int,
+    itemCount: Int,
+    existingIndex: Int,
+): Int? {
+    if (currentIndex !in 0 until itemCount || existingIndex !in 0 until itemCount) return null
+    if (existingIndex == currentIndex || existingIndex == currentIndex + 1) return null
+    return if (existingIndex < currentIndex) currentIndex else currentIndex + 1
+}
+
+internal data class QueueRestorePlan(
+    val items: List<PlaybackQueueItem>,
+    val currentIndex: Int,
+    val droppedItemCount: Int,
+)
+
+/** Drops malformed or duplicate legacy entries before they reach Media3 after process death. */
+internal fun sanitizeQueueForRestore(queue: PersistedPlaybackQueue): QueueRestorePlan {
+    val activeMediaId = queue.items.getOrNull(queue.currentIndex)?.mediaId
+    val knownMediaIds = mutableSetOf<String>()
+    val items = queue.items.filter { item ->
+        item.isRestorableQueueItem() && knownMediaIds.add(item.mediaId)
+    }
+    val restoredIndex = activeMediaId
+        ?.let { mediaId -> items.indexOfFirst { it.mediaId == mediaId } }
+        ?.takeIf { it >= 0 }
+        ?: items.indices.firstOrNull()
+        ?: PersistedPlaybackQueue.NO_ACTIVE_ITEM
+    return QueueRestorePlan(
+        items = items,
+        currentIndex = restoredIndex,
+        droppedItemCount = queue.items.size - items.size,
+    )
+}
+
+private fun PlaybackQueueItem.isRestorableQueueItem(): Boolean =
+    mediaId.isNotBlank() && mediaId.length <= MAXIMUM_QUEUE_IDENTIFIER_LENGTH &&
+        title.isNotBlank() && title.length <= MAXIMUM_QUEUE_LABEL_LENGTH &&
+        artist.isNotBlank() && artist.length <= MAXIMUM_QUEUE_LABEL_LENGTH &&
+        albumTitle.orEmpty().length <= MAXIMUM_QUEUE_LABEL_LENGTH &&
+        durationMs in 0L..MAXIMUM_QUEUE_DURATION_MILLIS &&
+        listOf(mediaId, title, artist, albumTitle.orEmpty(), artistId, albumId).none {
+            it.any(Char::isISOControl)
+        }
+
+private fun PlaybackQueueItem.toPlaybackMediaItem(): MediaItem = Track(
+    id = mediaId,
+    title = title,
+    artist = artist,
+    durationMs = durationMs,
+    artistId = artistId,
+    albumId = albumId,
+    albumTitle = albumTitle.orEmpty(),
+).toPlaybackMediaItem()
+
+private const val MAXIMUM_QUEUE_IDENTIFIER_LENGTH = 256
+private const val MAXIMUM_QUEUE_LABEL_LENGTH = 512
+private const val MAXIMUM_QUEUE_DURATION_MILLIS = 24L * 60L * 60L * 1_000L
 
 internal fun shouldPersistQueueState(
     previous: PlaybackSnapshot,

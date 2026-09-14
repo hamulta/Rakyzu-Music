@@ -84,11 +84,16 @@ expiring invites, explicit access roles, public/private reach, bounded pages, an
 snapshot-like revision safety—through original Rakyzu Music code and infrastructure.
 
 - [x] `0.5.0` — account-scoped queue foundation, deterministic editing, Room persistence, and Media3 synchronization.
-- [ ] `0.5.1` — add-next/add-to-queue entry points and duplicate-safe ordering.
-- [ ] `0.5.2` — drag/reorder/remove queue controls with complete TalkBack actions.
-- [ ] `0.5.3` — process-death playback and queue restoration with stale-media handling.
-- [ ] `0.5.4` — autoplay boundary and explicit listener controls.
-- [ ] `0.5.5` — playback-device state foundation without remote-control claims.
+- [x] `0.5.1` — add-next/add-to-queue entry points and duplicate-safe ordering.
+- [x] `0.5.2` — reorder/remove queue controls with complete TalkBack actions.
+- [x] `0.5.3` — process-death playback and queue restoration with stale-media handling.
+- [x] `0.5.4` — autoplay boundary and explicit listener controls.
+- [x] `0.5.5` — playback-device state foundation without remote-control claims.
+
+The 0.5.1–0.5.5 batch ships as one cumulative 0.5.5 artifact, versionCode 51, and one
+validation/publication cycle. Queue editing remains listener-directed: duplicate requests are
+deterministic, recommendations are never appended implicitly, restoration is paused, and only
+the local playback device is represented.
 - [ ] `0.5.6` — audio-quality and data-usage preferences enforced at the media source.
 - [ ] `0.5.7` — offline/degraded queue reconciliation and recovery.
 - [ ] `0.5.8` — adaptive queue layout, large-text behavior, and TalkBack regression.

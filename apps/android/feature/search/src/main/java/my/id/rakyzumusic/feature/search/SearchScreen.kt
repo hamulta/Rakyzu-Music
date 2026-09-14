@@ -90,6 +90,8 @@ fun SearchRoute(
     viewModel: SearchViewModel,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
+    onTrackPlayNext: ((Track) -> Unit)? = null,
+    onTrackAddToQueue: ((Track) -> Unit)? = null,
     onArtistClick: ((Artist) -> Unit)? = null,
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
@@ -112,6 +114,8 @@ fun SearchRoute(
         onRecentSearchesEnabledChange = viewModel::setRecentSearchesEnabled,
         onClearRecentSearches = viewModel::clearRecentSearches,
         onTrackPlay = onTrackPlay,
+        onTrackPlayNext = onTrackPlayNext,
+        onTrackAddToQueue = onTrackAddToQueue,
         onArtistClick = onArtistClick,
         onAlbumClick = onAlbumClick,
         onTrackArtistClick = onTrackArtistClick,
@@ -139,6 +143,8 @@ fun SearchScreen(
     onRecentSearchClick: (String) -> Unit = {},
     onRecentSearchesEnabledChange: (Boolean) -> Unit = {},
     onClearRecentSearches: () -> Unit = {},
+    onTrackPlayNext: ((Track) -> Unit)? = null,
+    onTrackAddToQueue: ((Track) -> Unit)? = null,
     onArtistClick: ((Artist) -> Unit)? = null,
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
@@ -164,6 +170,12 @@ fun SearchScreen(
                 }
             } else {
                 null
+            },
+            onPlayNext = onTrackPlayNext?.let { callback ->
+                { contextualTrack = null; callback(track) }
+            },
+            onAddToQueue = onTrackAddToQueue?.let { callback ->
+                { contextualTrack = null; callback(track) }
             },
             onViewArtist = onTrackArtistClick?.let { callback ->
                 {

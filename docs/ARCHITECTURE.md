@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: Queue foundation `0.5.0`; release evidence in `WORK_SESSION.md`.
+Status: Listener-controlled Queue continuity `0.5.5`; release evidence in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -56,7 +56,7 @@ Album artwork uses the deterministic private key `media/albums/{uuid}/artwork.we
 
 Media3 owns playback inside `RakyzuPlaybackService`, independently of Compose and activity lifecycles. Catalog selections become internal `rakyzu://tracks/{uuid}` media items containing only public display metadata. A resolving data source validates that URI, asks the application data boundary for the current in-memory bearer session at request-open time, and accepts only an authenticated HTTPS response contract. Tokens are not embedded in the MediaItem, notification, queue metadata, or persisted state. Untrusted external media controllers are rejected; system-trusted controllers retain lock-screen, headset, Bluetooth, and notification interoperability.
 
-The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackController` maps its current item, queue metadata, transport availability, errors, and bounded position/buffer/duration values into one immutable `PlaybackSnapshot`. Media3 callbacks publish structural changes; queue metadata is rebuilt only for a changed timeline or item count. A lifecycle-aware coroutine sampler starts only while playback is active, cannot create duplicate jobs, and is cancelled immediately for static playback or session clearing. Compose consumes that snapshot in both the compact player and `feature:player`; seeking and queue selection return through controller commands rather than mutating UI-local playback state.
+The Media3 timeline is the playback queue source of truth. `RakyzuPlaybackController` maps its current item, queue metadata, transport availability, explicit-queue autoplay policy, local device state, errors, and bounded position/buffer/duration values into one immutable `PlaybackSnapshot`. Media3 callbacks publish structural changes; queue metadata is rebuilt only for a changed timeline or item count. A lifecycle-aware coroutine sampler starts only while playback is active, cannot create duplicate jobs, and is cancelled immediately for static playback or session clearing. Compose consumes that snapshot in both the compact player and `feature:player`; seeking, queue selection, reorder, removal, and clear actions return through controller commands rather than mutating UI-local playback state.
 
 Media3 item transitions are the listening-history event source, so manual selection, queue navigation, and automatic advance share one path. The application resolves the current authenticated listener at event time and writes only the track ID and timestamp to Room. History is capped at 20 entries per listener, survives catalog snapshot replacement, and is joined back to the current verified track graph before Home renders it.
 

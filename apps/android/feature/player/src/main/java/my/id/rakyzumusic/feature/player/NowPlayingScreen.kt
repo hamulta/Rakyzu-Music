@@ -24,7 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MusicNote
@@ -78,6 +81,9 @@ fun NowPlayingScreen(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
     onQueueItemClick: (Int) -> Unit,
+    onQueueItemMove: (Int, Int) -> Unit = { _, _ -> },
+    onQueueItemRemove: (Int) -> Unit = {},
+    onClearQueue: () -> Unit = {},
     modifier: Modifier = Modifier,
     isLiked: Boolean = false,
     isAlbumSaved: Boolean = false,
@@ -146,7 +152,7 @@ fun NowPlayingScreen(
             )
         }
         item {
-            QueueHeader(snapshot)
+            QueueHeader(snapshot, onClearQueue)
         }
         itemsIndexed(
             items = snapshot.queue,
@@ -157,6 +163,17 @@ fun NowPlayingScreen(
                 index = index,
                 isCurrent = index == snapshot.currentIndex,
                 onClick = { onQueueItemClick(index) },
+                onMoveUp = if (index > 0) {
+                    { onQueueItemMove(index, index - 1) }
+                } else {
+                    null
+                },
+                onMoveDown = if (index < snapshot.queue.lastIndex) {
+                    { onQueueItemMove(index, index + 1) }
+                } else {
+                    null
+                },
+                onRemove = { onQueueItemRemove(index) },
             )
         }
     }
@@ -347,6 +364,12 @@ private fun TrackDetails(snapshot: PlaybackSnapshot) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Text(
+            text = "Playing on ${snapshot.device.name}",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
@@ -479,7 +502,7 @@ private fun TransportControls(
 }
 
 @Composable
-private fun QueueHeader(snapshot: PlaybackSnapshot) {
+private fun QueueHeader(snapshot: PlaybackSnapshot, onClearQueue: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -510,8 +533,20 @@ private fun QueueHeader(snapshot: PlaybackSnapshot) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                 )
+                IconButton(onClick = onClearQueue) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = "Clear queue",
+                    )
+                }
             }
         }
+        Text(
+            text = "Autoplay recommendations are off. Playback ends after this queue.",
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -521,6 +556,9 @@ private fun QueueItem(
     index: Int,
     isCurrent: Boolean,
     onClick: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
+    onRemove: () -> Unit,
 ) {
     Surface(
         onClick = onClick,
@@ -562,6 +600,35 @@ private fun QueueItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
             )
+            IconButton(
+                onClick = { onMoveUp?.invoke() },
+                enabled = onMoveUp != null,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowUpward,
+                    contentDescription = "Move ${item.title} earlier in queue",
+                )
+            }
+            IconButton(
+                onClick = { onMoveDown?.invoke() },
+                enabled = onMoveDown != null,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowDownward,
+                    contentDescription = "Move ${item.title} later in queue",
+                )
+            }
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = "Remove ${item.title} from queue",
+                )
+            }
         }
     }
 }

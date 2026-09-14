@@ -400,6 +400,8 @@ private fun AuthenticatedRakyzuMusicApp(
                         SearchRoute(
                             viewModel = searchViewModel,
                             onTrackPlay = playbackController::playQueue,
+                            onTrackPlayNext = playbackController::playNext,
+                            onTrackAddToQueue = playbackController::addToQueue,
                             onArtistClick = { artist ->
                                 openArtistDetail(backStack, artist.id)
                             },
@@ -435,6 +437,8 @@ private fun AuthenticatedRakyzuMusicApp(
                             viewModel = artistViewModel,
                             onBack = { dismissArtistDetail(backStack) },
                             onTrackPlay = playbackController::playQueue,
+                            onTrackPlayNext = playbackController::playNext,
+                            onTrackAddToQueue = playbackController::addToQueue,
                             onAlbumClick = { album ->
                                 openAlbumDetail(backStack, album.id)
                             },
@@ -473,6 +477,8 @@ private fun AuthenticatedRakyzuMusicApp(
                             viewModel = albumViewModel,
                             onBack = { dismissAlbumDetail(backStack) },
                             onTrackPlay = playbackController::playQueue,
+                            onTrackPlayNext = playbackController::playNext,
+                            onTrackAddToQueue = playbackController::addToQueue,
                             onTrackArtistClick = { track ->
                                 openArtistDetail(backStack, track.artistId)
                             },
@@ -582,6 +588,9 @@ private fun AuthenticatedRakyzuMusicApp(
                             onNext = playbackController::skipToNext,
                             onSeek = playbackController::seekTo,
                             onQueueItemClick = playbackController::skipToQueueItem,
+                            onQueueItemMove = playbackController::moveQueueItem,
+                            onQueueItemRemove = playbackController::removeQueueItem,
+                            onClearQueue = playbackController::clearQueue,
                         )
                     }
                 },

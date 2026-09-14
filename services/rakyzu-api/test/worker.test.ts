@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { createWorker } from "../src/worker";
+import { playlistAccess } from "../src/playlist-artwork";
 import type { RakyzuApiEnv, RequestDependencies } from "../src/types";
 
 const TRACK_ID = "a3000000-0000-4000-8000-000000000001";
 const ALBUM_ID = "a2000000-0000-4000-8000-000000000001";
+const PLAYLIST_ID = "a4000000-0000-4000-8000-000000000001";
 const AUDIO = new TextEncoder().encode("rakyzu-audio");
 const ARTWORK = new Uint8Array([0x52, 0x41, 0x4b, 0x59, 0x5a, 0x55]);
 
@@ -13,7 +15,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.0" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.5" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -98,6 +100,16 @@ describe("Rakyzu Music API", () => {
     await expect(response.json()).resolves.toMatchObject({ error: { code: "artwork_not_found" } });
   });
 
+  it("treats a private-playlist access denial as absent", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(null, { status: 403 });
+    try {
+      await expect(playlistAccess(PLAYLIST_ID, "listener-token", testEnv())).resolves.toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("serves authorized album artwork with bounded private caching", async () => {
     const response = await execute(`/v1/albums/${ALBUM_ID}/artwork`, {
       headers: { authorization: "Bearer listener-token" },
@@ -171,12 +183,7 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
     },
   };
   const worker = createWorker(dependencies);
-  const env = {
-    MEDIA: media as unknown as R2Bucket,
-    ALLOWED_ORIGINS: "https://rakyzu.my.id",
-    SUPABASE_URL: "https://example.supabase.co",
-    SUPABASE_PUBLISHABLE_KEY: "public-test-key",
-  } satisfies RakyzuApiEnv;
+  const env = { ...testEnv(), MEDIA: media as unknown as R2Bucket } satisfies RakyzuApiEnv;
   return worker.fetch!(
     new Request(`https://api.rakyzu.my.id${path}`, {
       headers: options.headers,
@@ -185,6 +192,15 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
     env,
     {} as ExecutionContext,
   );
+}
+
+function testEnv(): RakyzuApiEnv {
+  return {
+    MEDIA: {} as R2Bucket,
+    ALLOWED_ORIGINS: "https://rakyzu.my.id",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY: "public-test-key",
+  };
 }
 
 class FakeR2Bucket {

@@ -15,6 +15,8 @@ data class PlaybackSnapshot(
     val queue: List<PlaybackQueueItem> = emptyList(),
     val canSkipPrevious: Boolean = false,
     val canSkipNext: Boolean = false,
+    val autoplayPolicy: AutoplayPolicy = AutoplayPolicy.ExplicitQueueOnly,
+    val device: PlaybackDeviceState = PlaybackDeviceState(),
     val error: PlaybackError? = null,
 ) {
     val progressFraction: Float
@@ -32,6 +34,29 @@ data class PlaybackSnapshot(
                 .coerceIn(progressFraction.toDouble(), 1.0)
                 .toFloat()
         }
+}
+
+/**
+ * Rakyzu never appends recommendation media to a listener's queue implicitly.
+ * The current queue can still advance through items deliberately selected by the listener.
+ */
+enum class AutoplayPolicy {
+    ExplicitQueueOnly,
+}
+
+/**
+ * Foundation for the device picker. 0.5.5 only represents the local player and intentionally
+ * makes no remote-control or device-transfer claim.
+ */
+data class PlaybackDeviceState(
+    val id: String = LOCAL_DEVICE_ID,
+    val name: String = "This device",
+    val isActive: Boolean = true,
+    val supportsRemoteControl: Boolean = false,
+) {
+    companion object {
+        const val LOCAL_DEVICE_ID = "rakyzu-local-device"
+    }
 }
 
 enum class PlaybackStatus {

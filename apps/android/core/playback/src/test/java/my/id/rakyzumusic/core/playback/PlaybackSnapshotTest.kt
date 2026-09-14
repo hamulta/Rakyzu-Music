@@ -1,6 +1,7 @@
 package my.id.rakyzumusic.core.playback
 
 import my.id.rakyzumusic.core.model.PlaybackQueueItem
+import my.id.rakyzumusic.core.model.PersistedPlaybackQueue
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -97,6 +98,50 @@ class PlaybackSnapshotTest {
         assertEquals(false, validQueueMove(fromIndex = 0, toIndex = 0, itemCount = 3))
         assertEquals(false, validQueueMove(fromIndex = -1, toIndex = 1, itemCount = 3))
         assertEquals(false, validQueueMove(fromIndex = 1, toIndex = 3, itemCount = 3))
+
+        assertEquals(
+            1,
+            playNextMoveDestination(currentIndex = 1, itemCount = 4, existingIndex = 0),
+        )
+        assertEquals(
+            2,
+            playNextMoveDestination(currentIndex = 1, itemCount = 4, existingIndex = 3),
+        )
+        assertEquals(
+            null,
+            playNextMoveDestination(currentIndex = 1, itemCount = 4, existingIndex = 1),
+        )
+    }
+
+    @Test
+    fun queueRestoreDropsMalformedAndDuplicateItemsWhilePreservingTheActiveTrack() {
+        val queue = PersistedPlaybackQueue(
+            items = listOf(
+                queueItem("valid-first"),
+                queueItem("active"),
+                queueItem("active"),
+                queueItem(" "),
+            ),
+            currentIndex = 1,
+        )
+
+        val plan = sanitizeQueueForRestore(queue)
+
+        assertEquals(listOf("valid-first", "active"), plan.items.map { it.mediaId })
+        assertEquals(1, plan.currentIndex)
+        assertEquals(2, plan.droppedItemCount)
+    }
+
+    @Test
+    fun emptyRestoredQueueHasNoActiveItemAndDeviceFoundationIsLocalOnly() {
+        val plan = sanitizeQueueForRestore(PersistedPlaybackQueue())
+        val device = PlaybackSnapshot().device
+
+        assertEquals(PersistedPlaybackQueue.NO_ACTIVE_ITEM, plan.currentIndex)
+        assertEquals(PlaybackDeviceState.LOCAL_DEVICE_ID, device.id)
+        assertEquals("This device", device.name)
+        assertEquals(false, device.supportsRemoteControl)
+        assertEquals(AutoplayPolicy.ExplicitQueueOnly, PlaybackSnapshot().autoplayPolicy)
     }
 
     @Test

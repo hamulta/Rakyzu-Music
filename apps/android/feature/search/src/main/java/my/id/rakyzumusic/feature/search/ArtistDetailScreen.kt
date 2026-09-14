@@ -69,6 +69,8 @@ fun ArtistDetailRoute(
     viewModel: ArtistDetailViewModel,
     onBack: () -> Unit,
     onTrackPlay: (List<Track>, Int) -> Unit,
+    onTrackPlayNext: ((Track) -> Unit)? = null,
+    onTrackAddToQueue: ((Track) -> Unit)? = null,
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
@@ -85,6 +87,8 @@ fun ArtistDetailRoute(
         state = state,
         onBack = onBack,
         onTrackPlay = onTrackPlay,
+        onTrackPlayNext = onTrackPlayNext,
+        onTrackAddToQueue = onTrackAddToQueue,
         onAlbumClick = onAlbumClick,
         onTrackArtistClick = onTrackArtistClick,
         onTrackAlbumClick = onTrackAlbumClick,
@@ -103,6 +107,8 @@ fun ArtistDetailScreen(
     state: ArtistDetailUiState,
     onBack: () -> Unit,
     onTrackPlay: (List<Track>, Int) -> Unit,
+    onTrackPlayNext: ((Track) -> Unit)? = null,
+    onTrackAddToQueue: ((Track) -> Unit)? = null,
     onAlbumClick: ((Album) -> Unit)? = null,
     onTrackArtistClick: ((Track) -> Unit)? = null,
     onTrackAlbumClick: ((Track) -> Unit)? = null,
@@ -129,6 +135,12 @@ fun ArtistDetailScreen(
                 }
             } else {
                 null
+            },
+            onPlayNext = onTrackPlayNext?.let { callback ->
+                { contextualTrack = null; callback(track) }
+            },
+            onAddToQueue = onTrackAddToQueue?.let { callback ->
+                { contextualTrack = null; callback(track) }
             },
             onViewArtist = onTrackArtistClick?.let { callback ->
                 {

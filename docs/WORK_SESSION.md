@@ -1,5 +1,43 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.5.1–0.5.5 batch — 2026-09-14
+
+Initial recovery audit found the repository clean at `v0.5.0`, but the moved-device environment
+was missing a usable JDK/Android SDK and retained a stale ignored SDK path. A local JDK 17,
+Android SDK 37, arm64-compatible build adapters, and corrected ignored SDK path were restored
+without changing product source or storing credentials in the repository.
+
+- [x] Audit Git baseline, ignored local configuration, credential boundaries, Java, Android SDK,
+  Gradle, Worker dependencies, and linked-service tooling.
+- [x] `0.5.1`: add explicit Play next/Add to queue actions to the shared track context sheet and
+  make duplicate ordering deterministic.
+- [x] `0.5.2`: expose queue movement, removal, and clear actions with track-specific TalkBack
+  labels routed through Media3 rather than UI-local state.
+- [x] `0.5.3`: restore only the signed-in account queue after process death, filter malformed or
+  duplicate entries, preserve the active item when available, and pause restoration.
+- [x] `0.5.4`: establish the explicit-queue autoplay boundary; no recommendation or unrelated
+  media can be inserted implicitly.
+- [x] `0.5.5`: represent only the active local playback device and make no remote-control claim.
+- [x] Run the complete cumulative validation and live infrastructure checks.
+- [x] Inspect artifacts/diff/secrets, publish one conventional commit/tag/release `v0.5.5`, push
+  `main`, verify CI/CD, and record final evidence below.
+
+Local Android validation passed after the moved-device audit: the complete `testDebugUnitTest`
+task completed successfully, and affected playback/search/player/app lint completed successfully.
+The signed debug artifact identifies as `my.id.rakyzumusic`, versionName `0.5.5`, versionCode
+`51`, with one v2 signer. Android-test APK compilation completed; no Appetize, emulator, or ADB
+runtime claim is made for this batch. The unsigned release variant will be built and attested by
+the protected CI release gate.
+
+Worker validation passed with 34 tests, TypeScript/runtime-binding checks, and a no-write Wrangler
+deployment check. The first live smoke exposed an incorrect `503` mapping when Supabase denied a
+non-member access to private playlist artwork; the Worker now converts expected authorization
+denials into a non-disclosing `404`. After redeployment, authenticated playlist mutations and
+private R2 upload/read/delete passed end to end, and both temporary accounts were removed. The
+linked Supabase migration dry-run reports no pending migration, seed, or role change. These checks
+source ignored local credentials only; no credential is printed or included in the Android
+artifact.
+
 ## Queue foundation 0.5.0 and Auth prerequisite — 2026-09-10
 
 The CEO reproduced a recovery link that reopened sign-in without presenting the existing

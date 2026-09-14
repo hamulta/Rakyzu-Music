@@ -73,6 +73,10 @@ export async function playlistAccess(
     body: JSON.stringify({ playlist_id: id }),
     signal: AbortSignal.timeout(10_000),
   });
+  // A non-member is deliberately denied access to a private playlist. This is an expected
+  // authorization result, not an upstream outage, and must remain indistinguishable from a
+  // missing playlist at the Worker boundary.
+  if (response.status === 401 || response.status === 403 || response.status === 404) return null;
   if (!response.ok) throw new Error("Playlist authorization unavailable");
   const value: unknown = await response.json();
   if (typeof value !== "object" || value === null ||

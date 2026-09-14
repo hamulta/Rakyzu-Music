@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.5.0** (account-scoped Queue foundation, versionCode 46)
+Current version: **0.5.5** (listener-controlled queue continuity, versionCode 51)
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.0-debug.apk`. The unsigned release variant is built only as an R8/resource-shrinking quality gate until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.5-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
 
 ## Configuration and security
 
@@ -76,7 +76,7 @@ Create lists accessible playlists in bounded cursor pages and incrementally load
 
 Room schema 7 keeps validated account-scoped list/detail pages and a durable mutation outbox. A UUID operation receipt makes retries idempotent; stale revisions refresh the verified server snapshot before another action. Playlist cover GET/HEAD requests resolve the canonical owner through Supabase so authorized collaborators can read the private R2 object, while only the owner may PUT/DELETE. Android strips image metadata and bounds payloads; Worker validates PNG structure, size and dimensions and returns `private, no-store`.
 
-The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Queue order and the active item are synchronized from meaningful Media3 timeline edits and item transitions into an account-scoped, transactional Room cache; an initial empty controller connection cannot erase saved state. Auth callbacks support bounded PKCE query codes and legacy implicit fragments, route recovery to New Password, and route a confirmed authenticated session through the normal Home gate. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.0.md) for actual gate status and limitations.
+The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Queue order and the active item are synchronized from meaningful Media3 timeline edits and item transitions into an account-scoped, transactional Room cache; restoration is paused, removes malformed/duplicate legacy entries, and cannot append recommendation media. Listeners can play next, add to queue, reorder, or remove queue items with explicit TalkBack labels; playback reports only the local device and does not claim remote transfer/control. Auth callbacks support bounded PKCE query codes and legacy implicit fragments, route recovery to New Password, and route a confirmed authenticated session through the normal Home gate. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.5.md) for actual gate status and limitations.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs to private R2 keys, and streams full or single-range responses without buffering the object in memory. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

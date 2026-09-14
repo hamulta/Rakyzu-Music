@@ -36,12 +36,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import okio.Path.Companion.toOkioPath
 
 class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonImageLoader.Factory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val queueStateUpdates = Channel<AccountQueueState>(Channel.CONFLATED)
+    private var restoredQueueForUserId: String? = null
 
     init {
         applicationScope.launch {
@@ -51,6 +53,19 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
                     items = update.snapshot.queue,
                     currentIndex = update.snapshot.currentIndex,
                 )
+            }
+        }
+        applicationScope.launch {
+            authRepository.sessionState.collect { session ->
+                val userId = (session as? AuthSessionState.SignedIn)?.userId
+                if (userId == null) {
+                    restoredQueueForUserId = null
+                } else if (restoredQueueForUserId != userId) {
+                    // A restored queue is intentionally paused. The listener makes the next play
+                    // decision after returning to the app, rather than resuming unexpectedly.
+                    restoredQueueForUserId = userId
+                    playbackController.restoreQueue(playbackQueueRepository.read(userId))
+                }
             }
         }
     }
