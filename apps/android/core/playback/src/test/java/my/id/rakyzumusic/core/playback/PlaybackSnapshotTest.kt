@@ -142,6 +142,7 @@ class PlaybackSnapshotTest {
         assertEquals("This device", device.name)
         assertEquals(false, device.supportsRemoteControl)
         assertEquals(AutoplayPolicy.ExplicitQueueOnly, PlaybackSnapshot().autoplayPolicy)
+        assertEquals(false, PlaybackSnapshot().recovery.canRetry)
     }
 
     @Test

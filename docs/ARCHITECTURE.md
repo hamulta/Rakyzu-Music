@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: Listener-controlled Queue continuity `0.5.5`; release evidence in `WORK_SESSION.md`.
+Status: Resilient, quality-aware Queue/playback `0.5.10`; release evidence in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -103,6 +103,9 @@ Media3 item transitions are the listening-history event source, so manual select
 - Cover lifecycle is isolated in the Worker/R2 boundary: Supabase resolves the canonical owner and read/edit capability before R2 access. Authorized collaborators can read; only the owner can write/delete. Object paths use that verified owner plus playlist UUID, payload bytes/dimensions are bounded, and responses cannot enter a shared cache.
 - `feature:playlist` exposes role/visibility state, owner member management, the system Sharesheet, paging, durable retry status, adaptive spacing, 48dp targets, and privacy-safe local diagnostics. It writes only server-validated responses into Room and never logs identifiers, invite tokens, titles, URLs, payloads, or raw exceptions.
 - Playback queue metadata retains canonical track, album, and artist IDs without credentials or private media locations. Now Playing uses those IDs for direct Like, Save, and Follow controls, and disables unavailable or pending actions without inventing metadata from display labels.
+- Device-local playback preferences keep independent Wi-Fi/mobile quality selections and let Data Saver force Low only on Android-metered networks. The Media3 data-source resolves the effective selection at request time and sends a fixed quality value through the authenticated Worker boundary; Worker authorization still occurs before a strict mapping to the matching private R2 object, with no direct storage URL or credential in Android.
+- A retryable Media3 delivery failure retains the listener's existing explicit queue and exposes at most three attempts. A later validated-network transition can trigger the same bounded recovery path; it cannot append recommendations or reconstruct queue items from labels. Now Playing stacks Queue controls below metadata under 380dp or at 1.3x font scale, preserves 48dp actions, and announces current/queued state to TalkBack.
+- Playback diagnostics are process-local and privacy-safe by type: only fixed failure kinds, coarse queue-size buckets, booleans, and a clamped retry ordinal exist in events. The FIFO holds at most 32 events and log lines are capped at 160 characters; IDs, titles, artists, URLs, authorization material, payloads, and raw exceptions have no event field.
 
 ## Release topology
 

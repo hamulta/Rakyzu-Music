@@ -1,5 +1,49 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.5.6–0.5.10 batch — 2026-09-14
+
+Baseline audit found a clean `main` worktree at signed release tag `v0.5.5`; local `main`,
+`origin/main`, and the tagged commit all resolve to `94fecfd0b96b0bf727e866df267f9373d175e73b`.
+This batch remains Android-only and uses Spotify's public product behavior as a reference without
+copying source, assets, catalog content, trademarks, or private infrastructure.
+
+- [x] Audit repository, worktree, version/tag/release baseline, roadmap, local build tools, and
+  credential boundaries after the device move.
+- [x] Recheck the official Spotify audio-quality and Queue product/API references and bound the
+  Rakyzu implementation to capabilities its own catalog and infrastructure can support.
+- [x] `0.5.6`: persist separate Wi-Fi/mobile audio-quality choices and Data Saver locally, resolve
+  the effective quality from the active network, and enforce the selected R2 media variant.
+- [x] `0.5.7`: retain the explicit queue after retryable playback failures and provide bounded
+  manual/connectivity recovery without silently appending media.
+- [x] `0.5.8`: adapt Queue rows for compact widths and large text while preserving TalkBack state,
+  actions, ordering, and 48dp controls.
+- [x] `0.5.9`: add bounded, privacy-safe playback diagnostics without media IDs, labels, URLs,
+  account identifiers, or authorization material.
+- [x] `0.5.10`: synchronize versions/docs/automation, run the cumulative Android/Worker/security
+  regression gate, and record honest runtime and catalog limitations.
+- [ ] Inspect the complete diff and explicit staging set, then create one cumulative Conventional
+  Commit, push `main` once, verify CI/CD, deploy Worker, and run linked service checks.
+- [ ] Publish one signed `v0.5.10` tag/release, download and inspect the public APK, and complete
+  the final branch/worktree/artifact/secret audit.
+
+No milestone is marked complete until its implementation and focused tests exist. No Appetize,
+emulator, or ADB runtime claim is implied by this checklist.
+
+The cumulative local Android gate completed 1,021 Gradle tasks successfully: all debug unit tests,
+lint for every module, the configured debug APK, and every instrumentation APK compiled. Unit XML
+reports contain 210 tests with zero skips, failures, or errors. Dedicated Queue accessibility
+instrumentation covers the 1.3x layout, current-track state, retry action, and 48dp edit controls;
+it was compiled but not executed on a device. The debug artifact identifies as
+`my.id.rakyzumusic`, versionName `0.5.10`, versionCode `56`, and has one APK Signature Scheme v2
+signer. Its SHA-256 is `4dae7d114abc7c7e52f5f887fb4dc121fd34260f8cc165a356d6adba7c789462`.
+
+Worker type/binding checks, deployment dry-run, and all 37 tests passed. The linked Supabase CLI
+dry-run reports the remote database current with no pending migrations, seeds, or roles. Tracked
+source and the APK passed credential/pattern scans without exposing secret values. R2 contains no
+rights-cleared playback catalog yet, so only authenticated storage access and Worker contract
+tests can be claimed; an end-to-end audio runtime cannot honestly pass until the selected variant
+exists. No Appetize, emulator, or ADB session was used.
+
 ## Active cumulative 0.5.1–0.5.5 batch — 2026-09-14
 
 Initial recovery audit found the repository clean at `v0.5.0`, but the moved-device environment

@@ -2,6 +2,7 @@ package my.id.rakyzumusic
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
@@ -27,7 +28,9 @@ import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.queue.PlaybackQueueRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.playback.PlaybackDependencies
+import my.id.rakyzumusic.core.playback.BoundedPlaybackDiagnosticSink
 import my.id.rakyzumusic.core.playback.PlaybackNetworkRequest
+import my.id.rakyzumusic.core.playback.PlaybackQualityProvider
 import my.id.rakyzumusic.core.playback.PlaybackRequestFailure
 import my.id.rakyzumusic.core.playback.PlaybackStreamRequestProvider
 import my.id.rakyzumusic.core.playback.PlaybackStreamRequestResult
@@ -37,6 +40,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import okio.Path.Companion.toOkioPath
 
@@ -65,6 +70,13 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
                     // decision after returning to the app, rather than resuming unexpectedly.
                     restoredQueueForUserId = userId
                     playbackController.restoreQueue(playbackQueueRepository.read(userId))
+                }
+            }
+        }
+        applicationScope.launch {
+            connectivityMonitor.isOnline.drop(1).filter { it }.collect {
+                if (playbackController.snapshot.value.recovery.canRetry) {
+                    playbackController.retryPlayback()
                 }
             }
         }
@@ -109,10 +121,18 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
     val recentSearchRepository: RecentSearchRepository
         get() = repositories.recentSearchRepository
 
+    val playbackPreferences: AndroidPlaybackPreferences by lazy {
+        AndroidPlaybackPreferences(this)
+    }
+
     override val playbackStreamRequestProvider: PlaybackStreamRequestProvider by lazy {
         PlaybackStreamRequestProvider { trackId ->
             mediaDeliveryRepository.streamRequest(trackId).toPlaybackRequestResult()
         }
+    }
+
+    override val playbackQualityProvider: PlaybackQualityProvider by lazy {
+        PlaybackQualityProvider(playbackPreferences::effectiveQuality)
     }
 
     val playbackController: RakyzuPlaybackController by lazy {
@@ -131,6 +151,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
                 if (signedIn != null) {
                     queueStateUpdates.trySend(AccountQueueState(signedIn.userId, snapshot))
                 }
+            },
+            diagnosticSink = BoundedPlaybackDiagnosticSink { line ->
+                Log.d("RakyzuPlayback", line)
             },
         )
     }

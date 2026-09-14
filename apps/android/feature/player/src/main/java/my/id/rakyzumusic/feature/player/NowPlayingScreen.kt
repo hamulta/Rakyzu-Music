@@ -3,6 +3,7 @@ package my.id.rakyzumusic.feature.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,8 +57,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -84,6 +89,7 @@ fun NowPlayingScreen(
     onQueueItemMove: (Int, Int) -> Unit = { _, _ -> },
     onQueueItemRemove: (Int) -> Unit = {},
     onClearQueue: () -> Unit = {},
+    onRetryPlayback: () -> Unit = {},
     modifier: Modifier = Modifier,
     isLiked: Boolean = false,
     isAlbumSaved: Boolean = false,
@@ -99,6 +105,7 @@ fun NowPlayingScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .testTag("now-playing")
             .background(
                 Brush.verticalGradient(
                     listOf(Color(0xFF392065), RakyzuBlack, RakyzuBlack),
@@ -134,7 +141,7 @@ fun NowPlayingScreen(
         }
         if (snapshot.error != null) {
             item {
-                PlaybackErrorCard()
+                PlaybackErrorCard(snapshot, onRetryPlayback)
             }
         }
         item {
@@ -374,7 +381,7 @@ private fun TrackDetails(snapshot: PlaybackSnapshot) {
 }
 
 @Composable
-private fun PlaybackErrorCard() {
+private fun PlaybackErrorCard(snapshot: PlaybackSnapshot, onRetryPlayback: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -383,11 +390,28 @@ private fun PlaybackErrorCard() {
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = RoundedCornerShape(14.dp),
     ) {
-        Text(
-            text = "This track is unavailable. Choose another item from the queue.",
+        Column(
             modifier = Modifier.padding(14.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = if (snapshot.recovery.canRetry) {
+                    "Playback was interrupted. Your ${snapshot.recovery.retainedQueueSize}-track " +
+                        "queue is kept on this device."
+                } else {
+                    "This track is unavailable. Choose another item from the queue."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (snapshot.recovery.canRetry) {
+                Button(
+                    onClick = onRetryPlayback,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text("Retry playback")
+                }
+            }
+        }
     }
 }
 
@@ -564,74 +588,108 @@ private fun QueueItem(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .semantics {
+                stateDescription = if (isCurrent) "Current track" else "Queued track"
+            },
         color = if (isCurrent) RakyzuSurfaceRaised else Color.Transparent,
         shape = RoundedCornerShape(12.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = (index + 1).toString(),
-                modifier = Modifier.width(28.dp),
-                color = if (isCurrent) RakyzuAqua else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelLarge,
+        BoxWithConstraints {
+            val compact = shouldUseCompactQueueLayout(
+                availableWidthDp = maxWidth.value,
+                fontScale = LocalDensity.current.fontScale,
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.title,
-                    color = if (isCurrent) RakyzuAqua else MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.artist,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Text(
-                text = item.durationMs.toPlaybackTimeLabel(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-            )
-            IconButton(
-                onClick = { onMoveUp?.invoke() },
-                enabled = onMoveUp != null,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.ArrowUpward,
-                    contentDescription = "Move ${item.title} earlier in queue",
-                )
-            }
-            IconButton(
-                onClick = { onMoveDown?.invoke() },
-                enabled = onMoveDown != null,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.ArrowDownward,
-                    contentDescription = "Move ${item.title} later in queue",
-                )
-            }
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = "Remove ${item.title} from queue",
-                )
+            if (compact) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        QueueMetadata(item, index, isCurrent, titleMaxLines = 2)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        QueueActions(item, onMoveUp, onMoveDown, onRemove)
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    QueueMetadata(item, index, isCurrent, titleMaxLines = 1)
+                    QueueActions(item, onMoveUp, onMoveDown, onRemove)
+                }
             }
         }
     }
 }
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.QueueMetadata(
+    item: PlaybackQueueItem,
+    index: Int,
+    isCurrent: Boolean,
+    titleMaxLines: Int,
+) {
+    Text(
+        text = (index + 1).toString(),
+        modifier = Modifier.width(28.dp),
+        color = if (isCurrent) RakyzuAqua else MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = item.title,
+            color = if (isCurrent) RakyzuAqua else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+            maxLines = titleMaxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = item.artist,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = titleMaxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    Text(
+        text = item.durationMs.toPlaybackTimeLabel(),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelMedium,
+    )
+}
+
+@Composable
+private fun QueueActions(
+    item: PlaybackQueueItem,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
+    onRemove: () -> Unit,
+) {
+    IconButton(
+        onClick = { onMoveUp?.invoke() },
+        enabled = onMoveUp != null,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Icon(Icons.Rounded.ArrowUpward, "Move ${item.title} earlier in queue")
+    }
+    IconButton(
+        onClick = { onMoveDown?.invoke() },
+        enabled = onMoveDown != null,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Icon(Icons.Rounded.ArrowDownward, "Move ${item.title} later in queue")
+    }
+    IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
+        Icon(Icons.Rounded.Delete, "Remove ${item.title} from queue")
+    }
+}
+
+internal fun shouldUseCompactQueueLayout(availableWidthDp: Float, fontScale: Float): Boolean =
+    availableWidthDp < 380f || fontScale >= 1.3f
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable

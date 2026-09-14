@@ -94,12 +94,37 @@ The 0.5.1–0.5.5 batch ships as one cumulative 0.5.5 artifact, versionCode 51, 
 validation/publication cycle. Queue editing remains listener-directed: duplicate requests are
 deterministic, recommendations are never appended implicitly, restoration is paused, and only
 the local playback device is represented.
-- [ ] `0.5.6` — audio-quality and data-usage preferences enforced at the media source.
-- [ ] `0.5.7` — offline/degraded queue reconciliation and recovery.
-- [ ] `0.5.8` — adaptive queue layout, large-text behavior, and TalkBack regression.
-- [ ] `0.5.9` — privacy-safe playback diagnostics and performance hardening.
-- [ ] `0.5.10` — final Queue/playback regression, runtime, accessibility, resilience, and security gate.
-- `0.6.x`: Offline downloads, storage controls, resilient sync.
+- [x] `0.5.6` — audio-quality and data-usage preferences enforced at the media source.
+- [x] `0.5.7` — offline/degraded queue reconciliation and recovery.
+- [x] `0.5.8` — adaptive queue layout, large-text behavior, and TalkBack regression.
+- [x] `0.5.9` — privacy-safe playback diagnostics and performance hardening.
+- [x] `0.5.10` — final Queue/playback regression, accessibility, resilience, and security gate.
+
+The cumulative 0.5.6–0.5.10 artifact uses versionCode 56. Its Wi-Fi/mobile choices follow the
+public [Spotify audio-quality concept](https://support.spotify.com/id-id/article/audio-quality/),
+but use original Rakyzu labels and only the `low`, `standard`, and `high` variants actually
+defined by Rakyzu storage. Data Saver lowers metered playback, failures retain only the explicit
+queue for bounded recovery, and diagnostics contain coarse fixed state rather than listener or
+catalog data. Runtime playback still requires rights-cleared media objects for the selected R2
+variant; the release gate must not imply a catalog or remote-device capability that does not exist.
+
+- [ ] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
+- [ ] `0.6.1` — explicit album and playlist download actions with per-item progress.
+- [ ] `0.6.2` — Wi-Fi-first scheduler plus an opt-in mobile-download setting.
+- [ ] `0.6.3` — offline playback resolution without exposing raw R2 objects or credentials.
+- [ ] `0.6.4` — storage usage summary, available-space guard, and clear-download controls.
+- [ ] `0.6.5` — pause, resume, cancel, retry, and process-death-safe download work.
+- [ ] `0.6.6` — catalog revision and removed-content reconciliation with non-destructive cleanup.
+- [ ] `0.6.7` — per-account/device download isolation and sign-out retention policy.
+- [ ] `0.6.8` — adaptive Download UI, large-text layout, TalkBack status and action regression.
+- [ ] `0.6.9` — privacy-safe download diagnostics, bounded concurrency, and performance hardening.
+- [ ] `0.6.10` — final Offline/storage resilience, runtime, security, accessibility, and quota gate.
+
+The 0.6 plan takes only public concepts from Spotify's
+[offline listening](https://support.spotify.com/us/article/listen-offline/) and
+[storage guidance](https://support.spotify.com/us/article/storage-information/): explicit status,
+Wi-Fi-first transfer, storage visibility, and listener controls. Rakyzu limits, entitlements,
+encryption, expiry, and rights policy will be defined by its own licensed catalog and backend.
 - `0.7.x`: Lyrics, credits, social sharing, notifications.
 - `0.8.x`: Personalization, radio, mixes, history, recommendations.
 - `0.9.x`: subscriptions/entitlements, privacy, moderation, admin operations.

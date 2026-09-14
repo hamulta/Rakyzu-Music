@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                     connectivityMonitor = rakyzuApplication.connectivityMonitor,
                     recentSearchRepository = rakyzuApplication.recentSearchRepository,
                     playbackController = rakyzuApplication.playbackController,
+                    playbackPreferences = rakyzuApplication.playbackPreferences,
                 )
             }
         }

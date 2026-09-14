@@ -5,7 +5,8 @@ import { errorResponse, jsonResponse, responseHeaders } from "./responses";
 import type { RakyzuApiEnv, RequestDependencies } from "./types";
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 
-const API_VERSION = "0.5.5";
+const API_VERSION = "0.5.10";
+const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
 const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
@@ -110,7 +111,17 @@ export function createWorker(
               { "retry-after": "30" },
             );
           }
-          return await streamTrack(request, env, trackId, requestId, origin);
+          const quality = readAudioQuality(request.headers.get(AUDIO_QUALITY_HEADER));
+          if (quality === null) {
+            return errorResponse(
+              "invalid_audio_quality",
+              "Audio quality is invalid.",
+              400,
+              requestId,
+              origin,
+            );
+          }
+          return await streamTrack(request, env, trackId, quality, requestId, origin);
         }
 
         const albumId = artworkRoute?.[1]?.toLowerCase();
@@ -192,10 +203,11 @@ async function streamTrack(
   request: Request,
   env: RakyzuApiEnv,
   trackId: string,
+  quality: AudioQuality,
   requestId: string,
   origin: string | null,
 ): Promise<Response> {
-  const objectKey = `media/tracks/${trackId}/source.mp3`;
+  const objectKey = `media/tracks/${trackId}/${audioObjectName(quality)}`;
   const metadata = await env.MEDIA.head(objectKey);
   if (metadata === null) {
     return errorResponse("media_not_found", "Track media is unavailable.", 404, requestId, origin);
@@ -218,9 +230,10 @@ async function streamTrack(
   headers.set("accept-ranges", "bytes");
   headers.set("cache-control", "private, no-store");
   headers.set("etag", metadata.httpEtag);
+  headers.set("x-rakyzu-audio-quality", quality);
   headers.set(
     "access-control-expose-headers",
-    "Accept-Ranges, Content-Length, Content-Range, ETag, X-Request-ID",
+    "Accept-Ranges, Content-Length, Content-Range, ETag, X-Rakyzu-Audio-Quality, X-Request-ID",
   );
 
   if (request.method === "HEAD") {
@@ -247,6 +260,20 @@ async function streamTrack(
   return new Response(object.body, { status: 206, headers });
 }
 
+type AudioQuality = "low" | "standard" | "high";
+
+function readAudioQuality(value: string | null): AudioQuality | null {
+  if (value === null || value === "standard") return "standard";
+  if (value === "low" || value === "high") return value;
+  return null;
+}
+
+function audioObjectName(quality: AudioQuality): string {
+  if (quality === "low") return "source-low.mp3";
+  if (quality === "high") return "source-high.mp3";
+  return "source.mp3";
+}
+
 function allowedOrigin(request: Request, env: RakyzuApiEnv): string | null {
   const origin = request.headers.get("origin");
   if (origin === null) return null;
@@ -256,7 +283,10 @@ function allowedOrigin(request: Request, env: RakyzuApiEnv): string | null {
 
 function preflightResponse(requestId: string, origin: string | null): Response {
   const headers = responseHeaders(requestId, origin);
-  headers.set("access-control-allow-headers", "Authorization, Content-Type, Range");
+  headers.set(
+    "access-control-allow-headers",
+    "Authorization, Content-Type, Range, X-Rakyzu-Audio-Quality",
+  );
   headers.set("access-control-allow-methods", "GET, HEAD, PUT, DELETE, OPTIONS");
   headers.set("access-control-max-age", "86400");
   headers.set("cache-control", "no-store");

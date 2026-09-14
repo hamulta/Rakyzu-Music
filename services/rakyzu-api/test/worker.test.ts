@@ -15,7 +15,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.5" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.10" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -44,7 +44,38 @@ describe("Rakyzu Music API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("accept-ranges")).toBe("bytes");
     expect(response.headers.get("content-type")).toBe("audio/mpeg");
+    expect(response.headers.get("x-rakyzu-audio-quality")).toBe("standard");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(AUDIO);
+  });
+
+  it.each([
+    ["low", "rakyzu-audio-low"],
+    ["high", "rakyzu-audio-high"],
+  ])("selects the exact %s media variant", async (quality, expectedBody) => {
+    const response = await execute(`/v1/tracks/${TRACK_ID}/stream`, {
+      headers: {
+        authorization: "Bearer listener-token",
+        "x-rakyzu-audio-quality": quality,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-rakyzu-audio-quality")).toBe(quality);
+    expect(await response.text()).toBe(expectedBody);
+  });
+
+  it("rejects an unknown media variant after authorization", async () => {
+    const response = await execute(`/v1/tracks/${TRACK_ID}/stream`, {
+      headers: {
+        authorization: "Bearer listener-token",
+        "x-rakyzu-audio-quality": "lossless",
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "invalid_audio_quality" },
+    });
   });
 
   it("returns one validated byte range", async () => {
@@ -228,7 +259,14 @@ class FakeR2Bucket {
   }
 
   private bytes(key: string): Uint8Array {
-    return key.endsWith("/artwork.webp") ? ARTWORK : this.audioBytes;
+    if (key.endsWith("/artwork.webp")) return ARTWORK;
+    if (key.endsWith("/source-low.mp3")) {
+      return new TextEncoder().encode("rakyzu-audio-low");
+    }
+    if (key.endsWith("/source-high.mp3")) {
+      return new TextEncoder().encode("rakyzu-audio-high");
+    }
+    return this.audioBytes;
   }
 
   private metadata(key: string) {

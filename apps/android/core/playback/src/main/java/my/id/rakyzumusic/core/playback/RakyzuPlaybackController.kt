@@ -7,6 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,7 @@ class RakyzuPlaybackController(
     context: Context,
     private val onMediaItemTransition: (String) -> Unit = {},
     private val onQueueStateChanged: (PlaybackSnapshot) -> Unit = {},
+    private val diagnosticSink: PlaybackDiagnosticSink = NoOpPlaybackDiagnosticSink,
 ) {
     private val appContext = context.applicationContext
     private val mainExecutor = ContextCompat.getMainExecutor(appContext)
@@ -36,6 +38,7 @@ class RakyzuPlaybackController(
     val snapshot: StateFlow<PlaybackSnapshot> = mutableSnapshot.asStateFlow()
     private var progressSampler: PlaybackProgressSampler? = null
     private var playerError: PlaybackException? = null
+    private var playbackRecovery = PlaybackRecoveryState()
 
     init {
         controllerFuture.addListener(
@@ -67,6 +70,7 @@ class RakyzuPlaybackController(
             return
         }
         playerError = null
+        playbackRecovery = PlaybackRecoveryState()
         val selectedTrack = tracks[startIndex]
         val pendingSnapshot = PlaybackSnapshot(
             mediaId = selectedTrack.id,
@@ -80,6 +84,9 @@ class RakyzuPlaybackController(
             canSkipNext = startIndex < tracks.lastIndex,
         )
         mutableSnapshot.value = pendingSnapshot
+        diagnosticSink.record(
+            PlaybackDiagnosticEvent.QueueStarted(PlaybackQueueSize.from(tracks.size)),
+        )
         withController { controller ->
             controller.setMediaItems(
                 tracks.map(Track::toPlaybackMediaItem),
@@ -180,12 +187,51 @@ class RakyzuPlaybackController(
         }
     }
 
+    /** Retries only a retained, retryable queue and never inserts unrelated media. */
+    fun retryPlayback() {
+        withController { controller ->
+            val currentRecovery = playbackRecovery
+            if (
+                !currentRecovery.canRetry ||
+                currentRecovery.attemptCount >= MAXIMUM_RECOVERY_ATTEMPTS
+            ) {
+                return@withController
+            }
+            if (controller.currentMediaItem == null || controller.mediaItemCount == 0) {
+                playbackRecovery = PlaybackRecoveryState()
+                mutableSnapshot.value = mutableSnapshot.value.copy(recovery = playbackRecovery)
+                return@withController
+            }
+            val attempt = currentRecovery.attemptCount + 1
+            playbackRecovery = currentRecovery.copy(
+                canRetry = attempt < MAXIMUM_RECOVERY_ATTEMPTS,
+                attemptCount = attempt,
+                retainedQueueSize = controller.mediaItemCount,
+            )
+            playerError = null
+            mutableSnapshot.value = mutableSnapshot.value.copy(
+                status = PlaybackStatus.Buffering,
+                recovery = playbackRecovery,
+                error = null,
+            )
+            diagnosticSink.record(
+                PlaybackDiagnosticEvent.RecoveryAttempted(
+                    attempt = attempt,
+                    queueSize = PlaybackQueueSize.from(controller.mediaItemCount),
+                ),
+            )
+            controller.prepare()
+            controller.play()
+        }
+    }
+
     fun stopAndClear() {
         progressSampler?.stop()
         withController { controller ->
             controller.stop()
             controller.clearMediaItems()
             playerError = null
+            playbackRecovery = PlaybackRecoveryState()
             mutableSnapshot.value = PlaybackSnapshot()
         }
     }
@@ -198,6 +244,7 @@ class RakyzuPlaybackController(
         val restoration = sanitizeQueueForRestore(queue)
         if (restoration.items.isEmpty()) return
         playerError = null
+        playbackRecovery = PlaybackRecoveryState()
         val selected = restoration.items[restoration.currentIndex]
         mutableSnapshot.value = PlaybackSnapshot(
             mediaId = selected.mediaId,
@@ -271,6 +318,12 @@ class RakyzuPlaybackController(
             player.isPlaying -> PlaybackStatus.Playing
             else -> PlaybackStatus.Paused
         }
+        if (
+            playerError == null &&
+            (player.isPlaying || player.playbackState == Player.STATE_READY)
+        ) {
+            playbackRecovery = PlaybackRecoveryState()
+        }
         val snapshot = PlaybackSnapshot(
             mediaId = mediaItem?.mediaId,
             title = metadata?.title?.toString(),
@@ -284,6 +337,7 @@ class RakyzuPlaybackController(
             queue = queue,
             canSkipPrevious = mediaItem != null,
             canSkipNext = player.hasNextMediaItem(),
+            recovery = playbackRecovery,
             error = (error ?: playerError)?.let { PlaybackError(it.errorCodeName) },
         )
         mutableSnapshot.value = snapshot
@@ -321,6 +375,23 @@ class RakyzuPlaybackController(
 
         override fun onPlayerErrorChanged(error: PlaybackException?) {
             playerError = error
+            if (error != null) {
+                val httpResponseCode = error.httpResponseCode()
+                val retryable = isRetryablePlaybackError(error.errorCode, httpResponseCode)
+                playbackRecovery = PlaybackRecoveryState(
+                    canRetry = retryable &&
+                        playbackRecovery.attemptCount < MAXIMUM_RECOVERY_ATTEMPTS,
+                    attemptCount = playbackRecovery.attemptCount,
+                    retainedQueueSize = mutableSnapshot.value.queue.size,
+                )
+                diagnosticSink.record(
+                    PlaybackDiagnosticEvent.PlaybackFailed(
+                        failure = playbackFailureKind(error.errorCode, httpResponseCode),
+                        queueSize = PlaybackQueueSize.from(mutableSnapshot.value.queue.size),
+                        retryable = playbackRecovery.canRetry,
+                    ),
+                )
+            }
             controllerFuture.get().let {
                 publishSnapshot(it, error)
                 synchronizeProgressUpdates(it)
@@ -331,7 +402,35 @@ class RakyzuPlaybackController(
     private companion object {
         const val PROGRESS_UPDATE_INTERVAL_MS = 500L
         const val MAXIMUM_QUEUE_SIZE = 1_000
+        const val MAXIMUM_RECOVERY_ATTEMPTS = 3
     }
+}
+
+internal fun isRetryablePlaybackError(errorCode: Int, httpResponseCode: Int? = null): Boolean =
+    when (errorCode) {
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+        -> true
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+            httpResponseCode == 408 || httpResponseCode == 429 || httpResponseCode in 500..599
+        else -> false
+    }
+
+internal fun playbackFailureKind(
+    errorCode: Int,
+    httpResponseCode: Int? = null,
+): PlaybackFailureKind = when {
+    isRetryablePlaybackError(errorCode, httpResponseCode) -> PlaybackFailureKind.Network
+    errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..
+        PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE -> PlaybackFailureKind.Source
+    else -> PlaybackFailureKind.Unexpected
+}
+
+private tailrec fun Throwable?.httpResponseCode(): Int? = when (this) {
+    null -> null
+    is HttpDataSource.InvalidResponseCodeException -> responseCode
+    else -> cause.httpResponseCode()
 }
 
 internal fun nextQueueInsertionIndex(currentIndex: Int, itemCount: Int): Int =

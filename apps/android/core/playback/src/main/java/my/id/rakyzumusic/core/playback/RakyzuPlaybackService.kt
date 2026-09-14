@@ -30,7 +30,12 @@ class RakyzuPlaybackService : MediaSessionService() {
             val request = requestResolver.resolve(dataSpec.uri.toString())
             dataSpec
                 .withUri(request.url.toUri())
-                .withRequestHeaders(request.headers)
+                .withRequestHeaders(
+                    request.headers + (
+                        PLAYBACK_QUALITY_HEADER to
+                            dependencies.playbackQualityProvider.currentQuality().requestValue
+                        ),
+                )
         }
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(
@@ -78,6 +83,6 @@ class RakyzuPlaybackService : MediaSessionService() {
 
     private companion object {
         const val SESSION_ACTIVITY_REQUEST_CODE = 800
-        const val USER_AGENT = "Rakyzu Music Android/0.5.5"
+        const val USER_AGENT = "Rakyzu Music Android/0.5.10"
     }
 }

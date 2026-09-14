@@ -17,6 +17,7 @@ data class PlaybackSnapshot(
     val canSkipNext: Boolean = false,
     val autoplayPolicy: AutoplayPolicy = AutoplayPolicy.ExplicitQueueOnly,
     val device: PlaybackDeviceState = PlaybackDeviceState(),
+    val recovery: PlaybackRecoveryState = PlaybackRecoveryState(),
     val error: PlaybackError? = null,
 ) {
     val progressFraction: Float
@@ -45,7 +46,7 @@ enum class AutoplayPolicy {
 }
 
 /**
- * Foundation for the device picker. 0.5.5 only represents the local player and intentionally
+ * Foundation for the device picker. Rakyzu currently represents the local player and intentionally
  * makes no remote-control or device-transfer claim.
  */
 data class PlaybackDeviceState(
@@ -70,6 +71,12 @@ enum class PlaybackStatus {
 
 data class PlaybackError(
     val code: String,
+)
+
+data class PlaybackRecoveryState(
+    val canRetry: Boolean = false,
+    val attemptCount: Int = 0,
+    val retainedQueueSize: Int = 0,
 )
 
 internal fun resolvePlaybackQueue(

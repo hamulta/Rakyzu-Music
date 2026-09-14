@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -38,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -83,6 +87,8 @@ import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
+import my.id.rakyzumusic.core.playback.PlaybackPreferences
+import my.id.rakyzumusic.core.playback.PlaybackQuality
 import my.id.rakyzumusic.feature.auth.AuthRoute
 import my.id.rakyzumusic.feature.home.HomeRoute
 import my.id.rakyzumusic.feature.library.LibraryRoute
@@ -137,6 +143,7 @@ fun RakyzuMusicApp(
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
+    playbackPreferences: AndroidPlaybackPreferences,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -176,6 +183,7 @@ fun RakyzuMusicApp(
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
             playbackController = playbackController,
+            playbackPreferences = playbackPreferences,
             modifier = modifier,
         )
     }
@@ -195,6 +203,7 @@ private fun ProfileGatedRakyzuMusicApp(
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
+    playbackPreferences: AndroidPlaybackPreferences,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -237,6 +246,7 @@ private fun ProfileGatedRakyzuMusicApp(
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
             playbackController = playbackController,
+            playbackPreferences = playbackPreferences,
             modifier = modifier,
         )
     }
@@ -264,11 +274,13 @@ private fun AuthenticatedRakyzuMusicApp(
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
+    playbackPreferences: AndroidPlaybackPreferences,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
     val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
+    val playbackPreferenceState by playbackPreferences.state.collectAsStateWithLifecycle()
     val searchViewModel: SearchViewModel = viewModel(
         key = "search-$userId",
         factory = SearchViewModel.factory(
@@ -308,6 +320,10 @@ private fun AuthenticatedRakyzuMusicApp(
             message = signOutMessage,
             onDisplayNameChanged = onProfileDisplayNameChanged,
             onSaveProfile = onSaveProfile,
+            playbackPreferences = playbackPreferenceState,
+            onWifiQualityChanged = playbackPreferences::setWifiQuality,
+            onMobileQualityChanged = playbackPreferences::setMobileQuality,
+            onDataSaverChanged = playbackPreferences::setDataSaverEnabled,
             onDismiss = {
                 if (!isSigningOut && !isSavingProfile) {
                     onResetProfileDraft()
@@ -591,6 +607,7 @@ private fun AuthenticatedRakyzuMusicApp(
                             onQueueItemMove = playbackController::moveQueueItem,
                             onQueueItemRemove = playbackController::removeQueueItem,
                             onClearQueue = playbackController::clearQueue,
+                            onRetryPlayback = playbackController::retryPlayback,
                         )
                     }
                 },
@@ -661,6 +678,10 @@ private fun AccountSheet(
     message: String?,
     onDisplayNameChanged: (String) -> Unit,
     onSaveProfile: () -> Unit,
+    playbackPreferences: PlaybackPreferences,
+    onWifiQualityChanged: (PlaybackQuality) -> Unit,
+    onMobileQualityChanged: (PlaybackQuality) -> Unit,
+    onDataSaverChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -672,6 +693,7 @@ private fun AccountSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -734,6 +756,44 @@ private fun AccountSheet(
                 }
             }
             Text(
+                text = "Audio quality",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            QualitySelector(
+                label = "Wi-Fi streaming",
+                selected = playbackPreferences.wifiQuality,
+                onSelected = onWifiQualityChanged,
+                enabled = !isSigningOut,
+            )
+            QualitySelector(
+                label = "Mobile data streaming",
+                selected = playbackPreferences.mobileQuality,
+                onSelected = onMobileQualityChanged,
+                enabled = !isSigningOut && !playbackPreferences.dataSaverEnabled,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Data Saver", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Uses Low quality on metered networks.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = playbackPreferences.dataSaverEnabled,
+                    onCheckedChange = onDataSaverChanged,
+                    enabled = !isSigningOut,
+                )
+            }
+            Text(
                 text = "Signing out removes this device's encrypted session. Other devices stay signed in.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
@@ -765,6 +825,34 @@ private fun AccountSheet(
                 } else {
                     Text("Sign out", fontWeight = FontWeight.Bold)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QualitySelector(
+    label: String,
+    selected: PlaybackQuality,
+    onSelected: (PlaybackQuality) -> Unit,
+    enabled: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PlaybackQuality.entries.forEach { quality ->
+                FilterChip(
+                    selected = quality == selected,
+                    onClick = { onSelected(quality) },
+                    enabled = enabled,
+                    label = { Text(quality.name) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp),
+                )
             }
         }
     }
