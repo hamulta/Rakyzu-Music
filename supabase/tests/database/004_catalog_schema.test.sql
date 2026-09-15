@@ -26,29 +26,35 @@ select ok(
   'all catalog tables should enforce row level security'
 );
 
-select ok(
-  (
-    select count(*) = 1 and bool_and(policyname = 'artists_select_published')
+select results_eq(
+  $$
+    select policyname
     from pg_policies
     where schemaname = 'public' and tablename = 'artists'
-  ),
-  'artists should expose only its published-read policy'
+    order by policyname
+  $$,
+  array['artists_select_published'::name, 'artists_staff_select'::name],
+  'artists should expose only published and authorized staff reads'
 );
-select ok(
-  (
-    select count(*) = 1 and bool_and(policyname = 'albums_select_published')
+select results_eq(
+  $$
+    select policyname
     from pg_policies
     where schemaname = 'public' and tablename = 'albums'
-  ),
-  'albums should expose only its published-read policy'
+    order by policyname
+  $$,
+  array['albums_select_published'::name, 'albums_staff_select'::name],
+  'albums should expose only published and authorized staff reads'
 );
-select ok(
-  (
-    select count(*) = 1 and bool_and(policyname = 'tracks_select_published')
+select results_eq(
+  $$
+    select policyname
     from pg_policies
     where schemaname = 'public' and tablename = 'tracks'
-  ),
-  'tracks should expose only its published-read policy'
+    order by policyname
+  $$,
+  array['tracks_select_published'::name, 'tracks_staff_select'::name],
+  'tracks should expose only published and authorized staff reads'
 );
 
 select results_eq(
