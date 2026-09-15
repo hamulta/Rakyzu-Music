@@ -20,6 +20,10 @@ function fixture(allowed = true, canEdit = true) {
     verifyListener: async () => ({ userId }),
     playlistAccess: async () => allowed ? { ownerId: userId, canEdit } : null,
     canStreamTrack: async () => false, canAccessAlbumArtwork: async () => false,
+    staffContext: async () => ({
+      isStaff: false, role: null, displayRole: null, fullAccess: false, permissions: [],
+    }),
+    adminRpc: async () => ({}),
   };
   const worker = createWorker(dependencies);
   const call = (method: string, body?: Uint8Array, headers: Record<string, string> = {}) => worker.fetch!(

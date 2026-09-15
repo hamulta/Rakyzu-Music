@@ -1,6 +1,6 @@
 {
   "name": "@rakyzu/music-api",
-  "version": "0.5.10",
+  "version": "0.5.15",
   "private": true,
   "type": "module",
   "scripts": {

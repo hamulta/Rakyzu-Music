@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.AddCircle
+import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
@@ -69,6 +70,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import my.id.rakyzumusic.core.data.auth.AuthActionResult
+import my.id.rakyzumusic.core.data.admin.AdminRepository
+import my.id.rakyzumusic.core.data.admin.StaffPermission
 import my.id.rakyzumusic.core.data.auth.AuthFailure
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
@@ -90,6 +93,8 @@ import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.core.playback.PlaybackPreferences
 import my.id.rakyzumusic.core.playback.PlaybackQuality
 import my.id.rakyzumusic.feature.auth.AuthRoute
+import my.id.rakyzumusic.feature.admin.AdminRoute
+import my.id.rakyzumusic.feature.admin.AdminViewModel
 import my.id.rakyzumusic.feature.home.HomeRoute
 import my.id.rakyzumusic.feature.library.LibraryRoute
 import my.id.rakyzumusic.feature.library.LibraryViewModel
@@ -124,11 +129,17 @@ private data class TopLevelDestination(
     val icon: ImageVector,
 )
 
-private val topLevelDestinations = listOf(
+private val listenerDestinations = listOf(
     TopLevelDestination(RakyzuRoute.Home, "Home", Icons.Rounded.Home),
     TopLevelDestination(RakyzuRoute.Search, "Search", Icons.Rounded.Search),
     TopLevelDestination(RakyzuRoute.Library, "Your Library", Icons.Rounded.LibraryMusic),
     TopLevelDestination(RakyzuRoute.Create, "Create", Icons.Rounded.AddCircle),
+)
+
+private val adminDestination = TopLevelDestination(
+    RakyzuRoute.Admin,
+    "Admin",
+    Icons.Rounded.AdminPanelSettings,
 )
 
 @Composable
@@ -144,6 +155,7 @@ fun RakyzuMusicApp(
     recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
     playbackPreferences: AndroidPlaybackPreferences,
+    adminRepository: AdminRepository,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -184,6 +196,7 @@ fun RakyzuMusicApp(
             recentSearchRepository = recentSearchRepository,
             playbackController = playbackController,
             playbackPreferences = playbackPreferences,
+            adminRepository = adminRepository,
             modifier = modifier,
         )
     }
@@ -204,6 +217,7 @@ private fun ProfileGatedRakyzuMusicApp(
     recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
     playbackPreferences: AndroidPlaybackPreferences,
+    adminRepository: AdminRepository,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -247,6 +261,7 @@ private fun ProfileGatedRakyzuMusicApp(
             recentSearchRepository = recentSearchRepository,
             playbackController = playbackController,
             playbackPreferences = playbackPreferences,
+            adminRepository = adminRepository,
             modifier = modifier,
         )
     }
@@ -275,6 +290,7 @@ private fun AuthenticatedRakyzuMusicApp(
     recentSearchRepository: RecentSearchRepository,
     playbackController: RakyzuPlaybackController,
     playbackPreferences: AndroidPlaybackPreferences,
+    adminRepository: AdminRepository,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
@@ -302,6 +318,20 @@ private fun AuthenticatedRakyzuMusicApp(
         key = "playlists-$userId",
         factory = PlaylistViewModel.factory(userId, playlistRepository),
     )
+    val adminViewModel: AdminViewModel = viewModel(
+        key = "admin-$userId",
+        factory = AdminViewModel.factory(adminRepository),
+    )
+    val adminState by adminViewModel.uiState.collectAsStateWithLifecycle()
+    val topLevelDestinations = if (
+        adminState.dashboard?.context?.let {
+            it.isStaff && it.can(StaffPermission.AdminAccess)
+        } == true
+    ) {
+        listenerDestinations + adminDestination
+    } else {
+        listenerDestinations
+    }
     val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
@@ -539,6 +569,12 @@ private fun AuthenticatedRakyzuMusicApp(
                             val route = RakyzuRoute.PlaylistDetail(playlist.id)
                             if (backStack.lastOrNull() != route) backStack.add(route)
                         })
+                    }
+                    entry<RakyzuRoute.Admin> {
+                        AdminRoute(
+                            repository = adminRepository,
+                            viewModel = adminViewModel,
+                        )
                     }
                     entry<RakyzuRoute.PlaylistDetail> { route ->
                         val detailViewModel: PlaylistDetailViewModel = viewModel(

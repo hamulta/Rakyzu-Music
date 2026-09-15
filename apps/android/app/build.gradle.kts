@@ -27,8 +27,8 @@ android {
         applicationId = "my.id.rakyzumusic"
         minSdk = 26
         targetSdk = 37
-        versionCode = 56
-        versionName = "0.5.10"
+        versionCode = 61
+        versionName = "0.5.15"
 
         buildConfigField("String", "SUPABASE_URL", supabaseUrl.asBuildConfigString())
         buildConfigField(
@@ -86,6 +86,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:playback"))
     implementation(project(":feature:auth"))
+    implementation(project(":feature:admin"))
     implementation(project(":feature:home"))
     implementation(project(":feature:library"))
     implementation(project(":feature:player"))

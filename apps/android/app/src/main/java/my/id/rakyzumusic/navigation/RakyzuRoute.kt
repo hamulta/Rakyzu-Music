@@ -24,6 +24,9 @@ sealed interface RakyzuRoute : NavKey {
     data object Create : RakyzuRoute
 
     @Serializable
+    data object Admin : RakyzuRoute
+
+    @Serializable
     data class PlaylistDetail(val playlistId: String) : RakyzuRoute
 
     @Serializable

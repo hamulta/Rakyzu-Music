@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.5.10** (resilient, quality-aware playback and Queue, versionCode 56)
+Current version: **0.5.15** (server-authoritative staff RBAC, moderation, and Android Admin Panel, versionCode 61)
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.10-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.15-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
 
 ## Configuration and security
 
@@ -76,7 +76,9 @@ Create lists accessible playlists in bounded cursor pages and incrementally load
 
 Room schema 7 keeps validated account-scoped list/detail pages and a durable mutation outbox. A UUID operation receipt makes retries idempotent; stale revisions refresh the verified server snapshot before another action. Playlist cover GET/HEAD requests resolve the canonical owner through Supabase so authorized collaborators can read the private R2 object, while only the owner may PUT/DELETE. Android strips image metadata and bounds payloads; Worker validates PNG structure, size and dimensions and returns `private, no-store`.
 
-The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Queue order and the active item are synchronized from meaningful Media3 timeline edits and item transitions into an account-scoped, transactional Room cache; restoration is paused, removes malformed/duplicate legacy entries, and cannot append recommendation media. Listeners can play next, add to queue, reorder, remove, or clear items with explicit TalkBack labels. Compact widths and font scales at 1.3x or above stack Queue actions beneath two-line metadata. Retryable network/source delivery failures keep the explicit queue and expose at most three retries, including one recovery attempt when Android validates connectivity again; no recommendation media is inserted. Playback reports only the local device and does not claim remote transfer/control. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.10.md) for actual gate status and limitations.
+The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Queue order and the active item are synchronized from meaningful Media3 timeline edits and item transitions into an account-scoped, transactional Room cache; restoration is paused, removes malformed/duplicate legacy entries, and cannot append recommendation media. Listeners can play next, add to queue, reorder, remove, or clear items with explicit TalkBack labels. Compact widths and font scales at 1.3x or above stack Queue actions beneath two-line metadata. Retryable network/source delivery failures keep the explicit queue and expose at most three retries, including one recovery attempt when Android validates connectivity again; no recommendation media is inserted. Playback reports only the local device and does not claim remote transfer/control.
+
+The Android Admin Panel appears only after the Rakyzu API returns an active organization role. Officer, Supervisor, Manager, C-Level Executive, and CEO permissions are stored in Supabase rather than editable user metadata. Officer handles triage and escalation; Supervisor adds final moderation decisions; Manager adds assignment and catalog drafting; C-Level adds audio upload and catalog publication; CEO receives the complete permission set and can manage every rank. Direct client table writes remain revoked. Exact-email role assignment, draft creation, MP3 upload, atomic album publication, moderation, and immutable audit evidence use authenticated Worker/RPC boundaries with forced RLS and rank checks. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.15.md) for the current gate status.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs and the strict `low`/`standard`/`high` quality header to private R2 keys, and streams full or single-range responses without buffering the object in memory. Unknown quality values fail closed; missing values retain the compatible standard variant. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

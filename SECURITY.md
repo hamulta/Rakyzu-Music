@@ -31,6 +31,15 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - The Room cache contains metadata only. It never stores database credentials, R2 keys, or privileged media URLs.
 - Recently played metadata is bounded, remains local to the device, is keyed by the authenticated listener ID, and accepts only track IDs present in the verified Room catalog.
 - Storage and database authorization are verified server-side; client claims are never trusted directly.
+- Staff authority comes only from active database assignments and fixed permission rows, never from
+  user-editable Auth metadata or Android navigation state. Direct authenticated writes to roles,
+  moderation, audit, media inventory, and catalog tables are revoked.
+- Every Admin Worker request verifies the Supabase session and current staff context. Ranked RPCs
+  prevent lower offices from assigning equal/higher roles, reserve CEO appointments to an active
+  CEO, and prevent disabling the final active CEO.
+- Audio administration accepts only bounded MP3 input, derives the exact private R2 key from a
+  validated track UUID and quality, removes the object if database recording fails, and requires a
+  standard variant for every track before atomic catalog publication.
 - The media Worker verifies Supabase ES256 JWT issuer, audience, role, and UUID subject through JWKS, then forwards the same bearer session to PostgREST so catalog RLS remains authoritative.
 - Media responses support one validated byte range, stream the R2 body without application buffering, use private/no-store caching, and return bounded errors that do not expose upstream details.
 - Schema changes use reviewed, reversible migrations.

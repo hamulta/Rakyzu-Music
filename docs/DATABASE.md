@@ -89,3 +89,25 @@ roles, and stale revisions cannot overwrite an existing verified snapshot.
 `recently_played` is device-local metadata keyed by `(user_id, track_id)`. Writes are accepted only for a track in the verified Room catalog, capped at the 20 most recent entries per listener, and intentionally survive catalog replacement without creating a destructive foreign-key path. Home resolves retained IDs back through the current verified catalog and omits tracks no longer available.
 
 Credentials belong only in local ignored files or GitHub encrypted secrets. Neither SQL migrations nor the Android build may contain privileged keys.
+
+### Organization RBAC and moderation — 0.5.11–0.5.15
+
+`staff_roles` fixes the Officer, Supervisor, Manager, C-Level Executive, and CEO hierarchy, while
+`staff_role_permissions` maps explicit capabilities and `staff_assignments` binds one active role
+to a Supabase Auth account. Role state is not copied into user-editable metadata. The final active
+CEO cannot disable itself, only a CEO can appoint another CEO, and every other staff manager can
+change only roles below its own rank. The Admin Panel resolves an exact account email inside a
+permission-checked RPC, so operators never need direct `auth.users` access or a database-only UUID
+workflow.
+
+`moderation_cases` and `moderation_actions` provide a bounded active queue and immutable decision
+history. Officers may open, claim, and escalate cases; Supervisors and above may action or dismiss;
+Managers and above may assign lower ranks. `staff_audit_log` captures privileged operations and
+has no authenticated table grant. All organization tables force RLS, deny anonymous access, and
+expose only narrowly granted RPCs with fixed search paths and server-side permission checks.
+
+Catalog drafts record their creator and publication actor. Managers and above may draft artists,
+albums, and tracks; only C-Level and CEO may upload bounded MP3 variants through the Worker and
+publish. `track_media_variants` records the exact private R2 key only after upload succeeds.
+`admin_publish_album` rejects empty releases or tracks without a standard-quality object, then
+publishes the artist, album, and complete track set atomically.

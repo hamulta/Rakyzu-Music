@@ -108,6 +108,23 @@ queue for bounded recovery, and diagnostics contain coarse fixed state rather th
 catalog data. Runtime playback still requires rights-cleared media objects for the selected R2
 variant; the release gate must not imply a catalog or remote-device capability that does not exist.
 
+- [x] `0.5.11` — fixed organization role hierarchy, permission matrix, and account assignments.
+- [x] `0.5.12` — forced-RLS moderation, audit, and catalog administration RPC boundaries.
+- [x] `0.5.13` — dynamically role-gated Android Admin Panel and server-authoritative session context.
+- [x] `0.5.14` — artist/album/track drafting, bounded private R2 MP3 upload, and atomic publication.
+- [x] `0.5.15` — role-specific moderation actions, staff assignment controls, accessibility, and security regression.
+- [ ] `0.5.16` — content takedown/quarantine workflow with reversible reasoned decisions.
+- [ ] `0.5.17` — artist and label team scopes without widening organization-global access.
+- [ ] `0.5.18` — artwork/release review queues, approval previews, and scheduled publication.
+- [ ] `0.5.19` — privacy-safe audit search, export, retention controls, and anomaly diagnostics.
+- [ ] `0.5.20` — final Admin/moderation runtime, hierarchy, resilience, accessibility, and performance gate.
+
+The CEO-directed extended 0.5 train ships `0.5.11`–`0.5.15` as one cumulative artifact with
+versionCode 61. Its access-level vocabulary is informed by
+[Spotify for Artists' public access levels](https://support.spotify.com/mx-en/artists/article/access-levels-in-spotify-for-artists/),
+while Rakyzu uses its own ranked organization model. Android
+never grants authority: Supabase RLS/RPC and the Rakyzu Worker independently fail closed.
+
 - [ ] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
 - [ ] `0.6.1` — explicit album and playlist download actions with per-item progress.
 - [ ] `0.6.2` — Wi-Fi-first scheduler plus an opt-in mobile-download setting.
@@ -127,7 +144,7 @@ Wi-Fi-first transfer, storage visibility, and listener controls. Rakyzu limits, 
 encryption, expiry, and rights policy will be defined by its own licensed catalog and backend.
 - `0.7.x`: Lyrics, credits, social sharing, notifications.
 - `0.8.x`: Personalization, radio, mixes, history, recommendations.
-- `0.9.x`: subscriptions/entitlements, privacy, moderation, admin operations.
+- `0.9.x`: subscriptions/entitlements, privacy, and advanced trust-and-safety governance.
 - `0.10.x`: release candidate hardening, accessibility, localization, performance, security, Play readiness.
 - `1.0.0`: signed production release after all quality gates pass.
 

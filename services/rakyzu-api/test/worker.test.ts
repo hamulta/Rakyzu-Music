@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createWorker } from "../src/worker";
 import { playlistAccess } from "../src/playlist-artwork";
-import type { RakyzuApiEnv, RequestDependencies } from "../src/types";
+import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } from "../src/types";
 
 const TRACK_ID = "a3000000-0000-4000-8000-000000000001";
 const ALBUM_ID = "a2000000-0000-4000-8000-000000000001";
@@ -15,7 +15,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.10" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.15" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -183,13 +183,127 @@ describe("Rakyzu Music API", () => {
     expect(response.status).toBe(403);
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
   });
+
+  it("returns a non-staff context without exposing admin tools", async () => {
+    const response = await execute("/v1/admin/context", {
+      headers: { authorization: "Bearer listener-token" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      isStaff: false,
+      role: null,
+      displayRole: null,
+      fullAccess: false,
+      permissions: [],
+    });
+  });
+
+  it("blocks an officer from catalog creation at the Worker boundary", async () => {
+    const response = await execute("/v1/admin/artists", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer officer-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Unauthorized draft" }),
+      staff: staffContext("officer", ["admin.access", "moderation.view", "moderation.triage"]),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "forbidden" } });
+  });
+
+  it("allows a manager to create a validated artist draft", async () => {
+    const response = await execute("/v1/admin/artists", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer manager-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Rakyzu Original" }),
+      staff: staffContext("manager", ["admin.access", "catalog.draft"]),
+      adminResult: { id: "d1000000-0000-4000-8000-000000000001", name: "Rakyzu Original" },
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({ name: "Rakyzu Original" });
+  });
+
+  it("assigns a lower role through an exact account email", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/admin/staff", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer manager-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ email: "officer@example.test", role: "officer", active: true }),
+      staff: staffContext("manager", ["admin.access", "staff.manage"]),
+      adminCalls: calls,
+      adminResult: { role: "officer", active: true },
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([{
+      name: "admin_assign_staff_by_email",
+      payload: {
+        target_email: "officer@example.test",
+        target_role: "officer",
+        target_active: true,
+      },
+    }]);
+  });
+
+  it("allows C-Level audio upload only for bounded MP3 media", async () => {
+    const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00, 0x00]);
+    const response = await execute(`/v1/admin/tracks/${TRACK_ID}/audio/standard`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer executive-token",
+        "content-type": "audio/mpeg",
+        "content-length": String(mp3.length),
+      },
+      body: mp3,
+      staff: staffContext("c_level_executive", ["admin.access", "catalog.upload_audio"]),
+      adminResult: { trackId: TRACK_ID, quality: "standard", sizeBytes: mp3.length },
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      trackId: TRACK_ID,
+      quality: "standard",
+      sizeBytes: mp3.length,
+    });
+  });
+
+  it("rejects arbitrary bytes before writing an audio object", async () => {
+    const bytes = new Uint8Array([0x52, 0x41, 0x4b, 0x59]);
+    const response = await execute(`/v1/admin/tracks/${TRACK_ID}/audio/high`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer executive-token",
+        "content-type": "audio/mpeg",
+        "content-length": String(bytes.length),
+      },
+      body: bytes,
+      staff: staffContext("c_level_executive", ["admin.access", "catalog.upload_audio"]),
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "invalid_audio" } });
+  });
 });
 
 interface ExecuteOptions {
+  adminCalls?: Array<{ name: AdminRpcName; payload: Record<string, unknown> }>;
+  adminResult?: unknown;
+  body?: BodyInit;
   catalogError?: Error;
   headers?: HeadersInit;
   method?: string;
   published?: boolean;
+  staff?: StaffContext;
 }
 
 async function execute(path: string, options: ExecuteOptions = {}): Promise<Response> {
@@ -212,6 +326,19 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
       if (options.catalogError) throw options.catalogError;
       return options.published ?? true;
     },
+    async staffContext() {
+      return options.staff ?? {
+        isStaff: false,
+        role: null,
+        displayRole: null,
+        fullAccess: false,
+        permissions: [],
+      };
+    },
+    async adminRpc(name, payload) {
+      options.adminCalls?.push({ name, payload });
+      return options.adminResult ?? {};
+    },
   };
   const worker = createWorker(dependencies);
   const env = { ...testEnv(), MEDIA: media as unknown as R2Bucket } satisfies RakyzuApiEnv;
@@ -219,6 +346,7 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
     new Request(`https://api.rakyzu.my.id${path}`, {
       headers: options.headers,
       method: options.method,
+      body: options.body,
     }),
     env,
     {} as ExecutionContext,
@@ -258,6 +386,13 @@ class FakeR2Bucket {
     } as R2ObjectBody;
   }
 
+  async put(key: string, value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob): Promise<R2Object> {
+    void value;
+    return this.metadata(key) as R2Object;
+  }
+
+  async delete(_key: string): Promise<void> {}
+
   private bytes(key: string): Uint8Array {
     if (key.endsWith("/artwork.webp")) return ARTWORK;
     if (key.endsWith("/source-low.mp3")) {
@@ -288,4 +423,15 @@ class FakeR2Bucket {
       },
     };
   }
+}
+
+function staffContext(role: string, permissions: string[]): StaffContext {
+  return {
+    isStaff: true,
+    role,
+    displayRole: role === "c_level_executive" ? "C-Level Executive" :
+      role.charAt(0).toUpperCase() + role.slice(1),
+    fullAccess: role === "ceo",
+    permissions,
+  };
 }

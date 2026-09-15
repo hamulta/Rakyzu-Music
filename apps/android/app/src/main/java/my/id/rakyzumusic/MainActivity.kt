@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
                     recentSearchRepository = rakyzuApplication.recentSearchRepository,
                     playbackController = rakyzuApplication.playbackController,
                     playbackPreferences = rakyzuApplication.playbackPreferences,
+                    adminRepository = rakyzuApplication.adminRepository,
                 )
             }
         }

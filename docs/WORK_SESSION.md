@@ -1,8 +1,45 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.5.11–0.5.15 batch — 2026-09-15
+
+Baseline audit found a clean tagged `v0.5.10` release at
+`d9a337e034a41ead7b272d2b0ee43e517d3e21f3`. The CEO extended the 0.5 patch train through
+0.5.20 and requested the first five versions as one implementation and publication cycle.
+
+- [x] `0.5.11`: add fixed Officer, Supervisor, Manager, C-Level Executive, and CEO ranks with
+  explicit permissions and server-owned account assignments.
+- [x] `0.5.12`: add forced-RLS moderation, action history, media inventory and append-only audit
+  tables plus hierarchy-safe, narrowly granted RPCs.
+- [x] `0.5.13`: add a role-gated adaptive Android Admin Panel whose destinations and actions are
+  derived from the current server context, never user-editable metadata.
+- [x] `0.5.14`: add original artist, album and track drafting; validated 50 MiB MP3 upload to exact
+  private R2 keys; and atomic publication that requires standard audio for every track.
+- [x] `0.5.15`: add role-specific moderation controls, staff management, accessibility contracts,
+  version/docs/automation synchronization, and the cumulative security gate.
+- [x] Run final Android, Worker, database replay/pgTAP/lint, configuration and secret validation.
+- [ ] Inspect the explicit diff, commit and push once, verify all CI/deploy jobs, provision the CEO
+  role through the trusted database channel, then publish and re-audit the v0.5.15 artifact.
+
+No Appetize, emulator, ADB, or physical-device runtime claim is planned for this batch. Privileged
+credentials remain outside Android and tracked source. The role matrix follows least privilege;
+CEO full access is explicit but still authenticated and audited.
+
+The final local Android gate completed successfully from the final source: 215 unit tests passed
+with zero skips, failures, or errors; all 14 module lint reports contain zero errors; debug,
+Android-test, and R8-shrunk release APK assembly passed. The configured debug APK identifies as
+`my.id.rakyzumusic`, versionName `0.5.15`, versionCode `61`, and has one APK Signature Scheme v2
+signer. Its pre-CI SHA-256 is
+`fa7e0ccc6de22cc1d387ce717e23227b8791a3c3c06f384ef7cb60769e78e95b`.
+
+Worker binding/type checks, deployment dry-run, and all 43 tests passed. The complete migration,
+pgTAP scenario, email-based appointment, hierarchy, CEO-protection, moderation, publication, and
+audit behavior passed in a real Supabase PostgreSQL rollback transaction, so no pre-CI production
+schema mutation occurred. GitHub secret presence and the live Cloudflare R2 bucket were verified;
+tracked source and the configured APK contain zero privileged credential matches.
+
 ## Active cumulative 0.5.6–0.5.10 batch — 2026-09-14
 
-Baseline audit found a clean `main` worktree at signed release tag `v0.5.5`; local `main`,
+Baseline audit found a clean `main` worktree at release tag `v0.5.5`; local `main`,
 `origin/main`, and the tagged commit all resolve to `94fecfd0b96b0bf727e866df267f9373d175e73b`.
 This batch remains Android-only and uses Spotify's public product behavior as a reference without
 copying source, assets, catalog content, trademarks, or private infrastructure.
@@ -21,9 +58,9 @@ copying source, assets, catalog content, trademarks, or private infrastructure.
   account identifiers, or authorization material.
 - [x] `0.5.10`: synchronize versions/docs/automation, run the cumulative Android/Worker/security
   regression gate, and record honest runtime and catalog limitations.
-- [ ] Inspect the complete diff and explicit staging set, then create one cumulative Conventional
+- [x] Inspect the complete diff and explicit staging set, then create one cumulative Conventional
   Commit, push `main` once, verify CI/CD, deploy Worker, and run linked service checks.
-- [ ] Publish one signed `v0.5.10` tag/release, download and inspect the public APK, and complete
+- [x] Publish one annotated `v0.5.10` tag/release, download and inspect the public APK, and complete
   the final branch/worktree/artifact/secret audit.
 
 No milestone is marked complete until its implementation and focused tests exist. No Appetize,
