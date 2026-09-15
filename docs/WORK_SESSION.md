@@ -20,7 +20,7 @@ requested the five planned governance milestones and a ten-version Artist/Admin 
 - [x] Add the explicit `0.5.21`–`0.5.30` Artist identity, profile, badge, analytics, commerce,
   enforcement, deletion, and strengthened Admin roadmap.
 - [x] Complete final Android, Worker, PostgreSQL pgTAP/lint, configuration, and secret validation.
-- [ ] Inspect the explicit diff; commit and push; verify CI/deploy; tag and publish the exact CI APK;
+- [x] Inspect the explicit diff; commit and push; verify CI/deploy; tag and publish the exact CI APK;
   then download and re-audit the release asset.
 
 The schema was exercised against the real Supabase PostgreSQL engine inside rollback transactions
@@ -47,6 +47,18 @@ No Appetize, emulator, ADB, or physical-device runtime claim is planned for this
 credentials remain outside tracked source and Android. Artist identity is intentionally not inferred
 from a catalog row or email: activation will require an authenticated invitation acceptance and
 versioned consent in the next train.
+
+The cumulative feature commit is `9195bf9ab03f1bef06363cb2685aa6815df865ef`. Android CI
+`35011222137`, Worker CI/deployment `35011222310`, and Database pgTAP/lint/deployment
+`35011222233` all completed successfully. Production reports Worker `0.5.20`, rejects an
+unauthenticated Admin request with `401`, and contains exactly one deployed migration record plus
+the enforcement, team, review, schedule, and governance RPC objects.
+
+Annotated tag and GitHub Release `v0.5.20` point to the validated feature commit. The downloaded
+release APK is byte-identical to the Android CI artifact: 28,640,820 bytes with SHA-256
+`ffd547e6a7e56fe7c560ded179302f07b17e19bb0db053b8094c8d525c71c481`. Its package/version,
+single v2 signer, and privileged-secret scan were revalidated after download. Release URL:
+<https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.20>.
 
 ## Active cumulative 0.5.11–0.5.15 batch — 2026-09-15
 
