@@ -17,7 +17,7 @@ Baseline audit found a clean tagged `v0.5.10` release at
 - [x] `0.5.15`: add role-specific moderation controls, staff management, accessibility contracts,
   version/docs/automation synchronization, and the cumulative security gate.
 - [x] Run final Android, Worker, database replay/pgTAP/lint, configuration and secret validation.
-- [ ] Inspect the explicit diff, commit and push once, verify all CI/deploy jobs, provision the CEO
+- [x] Inspect the explicit diff, publish the validated commits, verify all CI/deploy jobs, provision the CEO
   role through the trusted database channel, then publish and re-audit the v0.5.15 artifact.
 
 No Appetize, emulator, ADB, or physical-device runtime claim is planned for this batch. Privileged
@@ -36,6 +36,19 @@ pgTAP scenario, email-based appointment, hierarchy, CEO-protection, moderation, 
 audit behavior passed in a real Supabase PostgreSQL rollback transaction, so no pre-CI production
 schema mutation occurred. GitHub secret presence and the live Cloudflare R2 bucket were verified;
 tracked source and the configured APK contain zero privileged credential matches.
+
+The cumulative feature commit is `ce56184a3501c074f3a4d65bc0fcac44a1558d1a`; the catalog-policy
+contract correction is `211e036dcd641801c472a2948476e93f2a5e5a7b`. Worker CI/CD, database
+CI/deployment, and Android CI all completed successfully. The production Worker reports `0.5.15`
+and rejects an unauthenticated Admin context request with `401`. The confirmed CEO account is
+active with the complete eight-permission set, and its idempotent bootstrap has exactly one audit
+entry.
+
+Annotated tag and GitHub release `v0.5.15` point to the validated code. The downloaded release APK
+is byte-identical to the Android CI artifact: 28,575,284 bytes with SHA-256
+`b544642d3b3d50e2595a072e0e169fc1e1f4287686fa37ccc851f22880e51d8c`. Its package/version,
+single v2 signer, and privileged-secret scan were revalidated after download. Release URL:
+<https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.15>.
 
 ## Active cumulative 0.5.6–0.5.10 batch — 2026-09-14
 
