@@ -26,7 +26,7 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 
 - Row Level Security is mandatory on all exposed Supabase tables.
 - Listener profile reads and updates are restricted to the active `auth.uid()` and covered by owner/cross-owner pgTAP tests.
-- Catalog clients receive only published metadata through authenticated SELECT policies; anonymous reads and all client catalog mutations are denied.
+- Catalog clients receive only published, non-restricted, server-time-available metadata through authenticated SELECT policies; anonymous reads and all client catalog mutations are denied.
 - Editorial shelf clients receive only published shelves whose referenced tracks are also published; anonymous access and listener mutations are denied by RLS and grants.
 - The Room cache contains metadata only. It never stores database credentials, R2 keys, or privileged media URLs.
 - Recently played metadata is bounded, remains local to the device, is keyed by the authenticated listener ID, and accepts only track IDs present in the verified Room catalog.
@@ -40,6 +40,19 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
 - Audio administration accepts only bounded MP3 input, derives the exact private R2 key from a
   validated track UUID and quality, removes the object if database recording fails, and requires a
   standard variant for every track before atomic catalog publication.
+- Content enforcement is append-only and reasoned. Quarantine or takedown changes listener
+  visibility through RLS; restore preserves the full evidence chain rather than deleting history.
+- Artist/label team membership is scope-only and cannot grant staff authority. A catalog artist row
+  or matching email is not treated as an authenticated Artist identity before explicit invitation
+  consent is implemented.
+- Album artwork accepts only bounded WebP with a validated signature and canonical private R2 key;
+  compensating deletion removes an object when its database inventory write fails.
+- Release publication requires approved artwork and metadata reviews from an authorized account
+  other than the submitter. Future schedules remain hidden until database server time reaches the
+  approved instant.
+- Audit export is capped and excludes raw details and email. Retention settings record intent only;
+  actual evidence deletion is a separate destructive maintenance operation requiring backup and
+  explicit approval.
 - The media Worker verifies Supabase ES256 JWT issuer, audience, role, and UUID subject through JWKS, then forwards the same bearer session to PostgREST so catalog RLS remains authoritative.
 - Media responses support one validated byte range, stream the R2 body without application buffering, use private/no-store caching, and return bounded errors that do not expose upstream details.
 - Schema changes use reviewed, reversible migrations.

@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: Server-authoritative staff RBAC, moderation, and Android Admin Panel `0.5.15`; release evidence in `WORK_SESSION.md`.
+Status: Governed catalog enforcement, review, scheduling, scoped teams, and audit controls `0.5.20`; release evidence in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -25,7 +25,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
-- `feature:admin`: role-gated moderation, organization access, catalog drafting, audio upload, and publication controls.
+- `feature:admin`: role-gated moderation, reversible enforcement, scoped catalog teams, independent review, scheduled publication, and audit controls.
 - `feature:home`: offline-first editorial feed, recently played, new releases, and complete-catalog shelves.
 - `feature:player`: branded Now Playing, seek controls, transport actions, and the current Media3 queue surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, and degraded profile UI.
@@ -41,7 +41,9 @@ The Android app never connects to R2 using S3 credentials. Catalog metadata and 
 
 Supabase schema changes are committed as ordered forward migrations. Client-facing tables start with RLS enabled and forced, explicit role grants, and pgTAP coverage for both allowed and denied access. The initial `profiles` boundary is private to its authenticated owner; privileged lifecycle operations remain server-controlled.
 
-Organization authorization is resolved from active `staff_assignments`, fixed ranked roles, and an explicit permission matrix on every Admin API request. It is never trusted from Android UI state or user-editable Auth metadata. Direct authenticated mutation privileges are absent from staff, moderation, audit, media-inventory, and catalog tables. Narrow security-definer RPCs pin an empty search path, recheck `auth.uid()`, enforce hierarchy rules, and append audit evidence; the Worker validates the same capability before accepting JSON or bounded MP3 bytes. Only C-Level and CEO may upload audio or publish, and publication atomically exposes an artist, album, and tracks only when every track has a registered standard-quality R2 object.
+Organization authorization is resolved from active `staff_assignments`, fixed ranked roles, and an explicit permission matrix on every Admin API request. It is never trusted from Android UI state or user-editable Auth metadata. Direct authenticated mutation privileges are absent from staff, moderation, audit, media-inventory, review, enforcement, and catalog-team tables. Narrow security-definer RPCs pin an empty search path, recheck `auth.uid()`, enforce hierarchy rules, and append audit evidence; the Worker validates the same capability before accepting JSON, bounded MP3, or exact WebP bytes. Supervisor and above can record reversible enforcement; Manager and above can manage scope-only artist/label teams; C-Level and CEO can independently review, publish, schedule, and export bounded audit evidence. Publication requires standard audio plus independently approved artwork and release metadata. Server-time RLS hides future schedules and every active quarantine/takedown from listener surfaces.
+
+Artist rows remain catalog entities in `0.5.20`; catalog-team membership grants only an explicit artist or label scope and is not an Artist identity or organization role. The invitation, consent, profile, badge, and Artist workspace state machine is reserved for `0.5.21` onward so no listener receives implicit privilege from an email match alone.
 
 The app observes Supabase `sessionStatus` as the sole authentication navigation source. Signup explicitly supplies the branded `my.id.rakyzumusic://auth` PKCE redirect. A valid confirmation callback exchanges or imports the session before navigation can pass through the profile gate to Home. The SDK's session and verifier stores are replaced by AES-GCM persistence whose non-exportable key is generated in Android Keystore; corrupt or invalidated encrypted state is discarded and requires a new sign-in. Auth failures are mapped to bounded product errors so raw backend responses and tokens never reach the UI or logs.
 

@@ -1,5 +1,53 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.5.16–0.5.20 batch — 2026-09-15
+
+Baseline audit found clean synchronized `main` after the published `v0.5.15` evidence commit.
+The audit confirmed that Artist was a catalog entity, not yet an account role: no Artist invitation
+consent, separate authenticated profile, privilege set, or verification badge existed. The CEO
+requested the five planned governance milestones and a ten-version Artist/Admin roadmap extension.
+
+- [x] `0.5.16`: add append-only quarantine/takedown/restore enforcement with required reasons and
+  listener visibility enforced inside catalog RLS.
+- [x] `0.5.17`: add artist and label records, links, and exact-email viewer/editor/admin team scopes
+  without granting organization-global staff access.
+- [x] `0.5.18`: add bounded private WebP artwork, independent artwork/release review, and automatic
+  server-time scheduled visibility after the complete publication gate.
+- [x] `0.5.19`: add permission-filtered audit summary, anomaly threshold, bounded privacy-safe CSV
+  export, and CEO retention intent without destructive evidence deletion.
+- [x] `0.5.20`: connect the adaptive Android Control Room, synchronize version/docs/automation, and
+  run the cumulative regression, security, accessibility, deployment, and artifact gate.
+- [x] Add the explicit `0.5.21`–`0.5.30` Artist identity, profile, badge, analytics, commerce,
+  enforcement, deletion, and strengthened Admin roadmap.
+- [x] Complete final Android, Worker, PostgreSQL pgTAP/lint, configuration, and secret validation.
+- [ ] Inspect the explicit diff; commit and push; verify CI/deploy; tag and publish the exact CI APK;
+  then download and re-audit the release asset.
+
+The schema was exercised against the real Supabase PostgreSQL engine inside rollback transactions
+before publication. The first rollback probe correctly caught missing execute access for two
+read-only RLS helpers; the grant was narrowed to those helpers and both the prior RBAC scenario and
+new governance scenario then completed and rolled back successfully. No production row was changed
+by these pre-publication probes.
+
+The final local gate completed all 1,633 Android tasks once, then recompiled the corrected Admin
+permission boundary and rebuilt lint/debug/release from the final source. All 216 unit tests passed
+with zero failures, errors, or skips; all 14 module lint reports contain zero errors; Android-test
+APKs compiled; and the R8-shrunk release variant assembled. The signed debug APK identifies as
+`my.id.rakyzumusic`, versionName `0.5.20`, versionCode `66`, with one v2 signer. Its pre-CI SHA-256
+is `6cd520ce3fc400faba01847e44cf2f848da4c6daa094f9007c9485d482c9fbcf`.
+
+Worker validation passed all 51 tests, both TypeScript targets, generated-binding checks, and a
+no-write deployment dry-run. The old RBAC pgTAP scenario and the new governance scenario both
+passed against the linked Supabase PostgreSQL engine inside rollback transactions, including the
+regression that replacement artwork invalidates its previous approval. GitHub Actions secret names,
+the live Cloudflare R2 media bucket, and configured public endpoints were verified. Exact-value and
+credential-pattern scans found zero privileged-secret matches in tracked source and both local APKs.
+
+No Appetize, emulator, ADB, or physical-device runtime claim is planned for this batch. Privileged
+credentials remain outside tracked source and Android. Artist identity is intentionally not inferred
+from a catalog row or email: activation will require an authenticated invitation acceptance and
+versioned consent in the next train.
+
 ## Active cumulative 0.5.11–0.5.15 batch — 2026-09-15
 
 Baseline audit found a clean tagged `v0.5.10` release at

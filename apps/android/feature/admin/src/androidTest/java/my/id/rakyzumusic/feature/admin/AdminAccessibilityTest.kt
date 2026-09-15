@@ -57,6 +57,8 @@ class AdminAccessibilityTest {
 
         composeRule.onNodeWithText("Full organization access").assertIsDisplayed()
         composeRule.onNodeWithText("Create artist profile").performScrollTo().assertHasClickAction()
+        composeRule.onNodeWithText("Record enforcement").performScrollTo().assertHasClickAction()
+        composeRule.onNodeWithText("Export bounded CSV").performScrollTo().assertHasClickAction()
         composeRule.onNodeWithText("Apply role assignment").performScrollTo().assertHasClickAction()
     }
 
@@ -74,6 +76,16 @@ class AdminAccessibilityTest {
                     onCreateModerationCase = { _, _, _, _ -> },
                     onModerate = { _, _, _ -> },
                     onAssignStaff = { _, _, _ -> },
+                    onEnforceContent = { _, _, _, _, _ -> },
+                    onAssignCatalogTeam = { _, _, _, _, _ -> },
+                    onCreateCatalogLabel = {},
+                    onLinkCatalogLabelArtist = { _, _ -> },
+                    onUploadArtwork = { _, _ -> },
+                    onSubmitReview = { _, _, _ -> },
+                    onDecideReview = { _, _, _ -> },
+                    onScheduleAlbum = { _, _ -> },
+                    onExportAudit = { _, _ -> },
+                    onSetAuditRetention = {},
                 )
             }
         }

@@ -43,8 +43,15 @@ enum class StaffPermission(val wireName: String) {
     ModerationDecide("moderation.decide"),
     CatalogDraft("catalog.draft"),
     CatalogUploadAudio("catalog.upload_audio"),
+    CatalogUploadArtwork("catalog.upload_artwork"),
     CatalogPublish("catalog.publish"),
-    StaffManage("staff.manage");
+    StaffManage("staff.manage"),
+    ContentEnforce("content.enforce"),
+    CatalogTeamManage("catalog.team_manage"),
+    CatalogReview("catalog.review"),
+    AuditView("audit.view"),
+    AuditExport("audit.export"),
+    GovernanceManage("governance.manage");
 
     companion object {
         fun fromWire(value: String): StaffPermission? = entries.firstOrNull { it.wireName == value }
@@ -88,11 +95,66 @@ data class StaffAssignment(
     val active: Boolean,
 )
 
+data class ContentEnforcement(
+    val id: String,
+    val subjectType: String,
+    val subjectId: String,
+    val action: String,
+    val reason: String,
+    val createdAt: String,
+)
+
+data class CatalogTeamMembership(
+    val scopeType: String,
+    val scopeId: String,
+    val userId: String,
+    val accessLevel: String,
+    val active: Boolean,
+)
+
+data class CatalogLabel(
+    val id: String,
+    val name: String,
+)
+
+data class CatalogReview(
+    val id: String,
+    val reviewType: String,
+    val targetType: String,
+    val targetId: String,
+    val status: String,
+    val submissionNotes: String,
+    val submittedAt: String,
+)
+
+data class ScheduledRelease(
+    val albumId: String,
+    val publishAt: String,
+    val status: String,
+)
+
+data class AuditSummary(
+    val events24h: Int,
+    val deniedOrEnforced24h: Int,
+    val highActivity: Boolean,
+    val retentionDays: Int,
+)
+
+data class GovernanceDashboard(
+    val enforcements: List<ContentEnforcement> = emptyList(),
+    val labels: List<CatalogLabel> = emptyList(),
+    val teams: List<CatalogTeamMembership> = emptyList(),
+    val reviews: List<CatalogReview> = emptyList(),
+    val schedules: List<ScheduledRelease> = emptyList(),
+    val auditSummary: AuditSummary? = null,
+)
+
 data class AdminDashboard(
     val context: StaffAccessContext,
     val moderationCases: List<ModerationCase> = emptyList(),
     val catalog: List<CatalogDraft> = emptyList(),
     val staff: List<StaffAssignment> = emptyList(),
+    val governance: GovernanceDashboard = GovernanceDashboard(),
 )
 
 sealed interface AdminDashboardResult {
@@ -104,6 +166,11 @@ sealed interface AdminDashboardResult {
 sealed interface AdminActionResult {
     data class Success(val message: String) : AdminActionResult
     data class Failure(val reason: AdminFailure) : AdminActionResult
+}
+
+sealed interface AdminAuditExportResult {
+    data class Success(val csv: String) : AdminAuditExportResult
+    data class Failure(val reason: AdminFailure) : AdminAuditExportResult
 }
 
 enum class AdminFailure {
@@ -136,6 +203,32 @@ interface AdminRepository {
     ): AdminActionResult
     suspend fun moderate(caseId: String, action: String, notes: String): AdminActionResult
     suspend fun assignStaff(email: String, role: StaffRole, active: Boolean): AdminActionResult
+    suspend fun enforceContent(
+        subjectType: String,
+        subjectId: String,
+        action: String,
+        reason: String,
+        caseId: String?,
+    ): AdminActionResult
+    suspend fun assignCatalogTeam(
+        scopeType: String,
+        scopeId: String,
+        email: String,
+        accessLevel: String,
+        active: Boolean,
+    ): AdminActionResult
+    suspend fun createCatalogLabel(name: String): AdminActionResult
+    suspend fun linkCatalogLabelArtist(labelId: String, artistId: String): AdminActionResult
+    suspend fun uploadArtwork(albumId: String, bytes: ByteArray): AdminActionResult
+    suspend fun submitReview(
+        reviewType: String,
+        targetId: String,
+        notes: String,
+    ): AdminActionResult
+    suspend fun decideReview(reviewId: String, decision: String, notes: String): AdminActionResult
+    suspend fun scheduleAlbum(albumId: String, publishAt: String): AdminActionResult
+    suspend fun exportAudit(operation: String?, targetType: String?): AdminAuditExportResult
+    suspend fun setAuditRetention(days: Int): AdminActionResult
 }
 
 internal class AuthenticatedAdminRepository(
@@ -174,7 +267,13 @@ internal class AuthenticatedAdminRepository(
             }
             parseStaff(response.body)
         } else emptyList()
-        AdminDashboardResult.Success(AdminDashboard(context, moderation, catalog, staff))
+        val governanceResponse = request("GET", "/v1/admin/governance")
+        if (governanceResponse.status !in 200..299 || governanceResponse.body == null) {
+            return@withContext AdminDashboardResult.Unavailable
+        }
+        AdminDashboardResult.Success(
+            AdminDashboard(context, moderation, catalog, staff, parseGovernance(governanceResponse.body)),
+        )
     }
 
     override suspend fun createArtist(name: String): AdminActionResult = action(
@@ -271,6 +370,123 @@ internal class AuthenticatedAdminRepository(
         }, "Staff access updated",
     )
 
+    override suspend fun enforceContent(
+        subjectType: String,
+        subjectId: String,
+        action: String,
+        reason: String,
+        caseId: String?,
+    ): AdminActionResult = action(
+        "POST", "/v1/admin/enforcement", buildJsonObject {
+            put("subjectType", subjectType)
+            put("subjectId", subjectId.trim())
+            put("action", action)
+            put("reason", reason.trim())
+            if (caseId.isNullOrBlank()) put("caseId", JsonNull) else put("caseId", caseId.trim())
+        }, "Content enforcement recorded",
+    )
+
+    override suspend fun assignCatalogTeam(
+        scopeType: String,
+        scopeId: String,
+        email: String,
+        accessLevel: String,
+        active: Boolean,
+    ): AdminActionResult = action(
+        "POST", "/v1/admin/catalog/teams", buildJsonObject {
+            put("scopeType", scopeType)
+            put("scopeId", scopeId.trim())
+            put("email", email.trim().lowercase())
+            put("accessLevel", accessLevel)
+            put("active", active)
+        }, "Catalog team access updated",
+    )
+
+    override suspend fun createCatalogLabel(name: String): AdminActionResult = action(
+        "POST", "/v1/admin/catalog/labels", buildJsonObject { put("name", name.trim()) },
+        "Catalog label created",
+    )
+
+    override suspend fun linkCatalogLabelArtist(
+        labelId: String,
+        artistId: String,
+    ): AdminActionResult = action(
+        "POST", "/v1/admin/catalog/labels/artists", buildJsonObject {
+            put("labelId", labelId.trim())
+            put("artistId", artistId.trim())
+        }, "Artist linked to label",
+    )
+
+    override suspend fun uploadArtwork(albumId: String, bytes: ByteArray): AdminActionResult =
+        withContext(Dispatchers.IO) {
+            if (!UUID.matches(albumId) || bytes.size !in 12..MAX_ARTWORK_BYTES || !looksLikeWebp(bytes)) {
+                return@withContext AdminActionResult.Failure(AdminFailure.InvalidInput)
+            }
+            request(
+                method = "PUT",
+                path = "/v1/admin/albums/${albumId.lowercase()}/artwork",
+                binary = bytes,
+                binaryContentType = "image/webp",
+            ).toActionResult("Artwork uploaded for review")
+        }
+
+    override suspend fun submitReview(
+        reviewType: String,
+        targetId: String,
+        notes: String,
+    ): AdminActionResult = action(
+        "POST", "/v1/admin/reviews", buildJsonObject {
+            put("reviewType", reviewType)
+            put("targetType", "album")
+            put("targetId", targetId.trim())
+            put("notes", notes.trim())
+        }, "Catalog review submitted",
+    )
+
+    override suspend fun decideReview(
+        reviewId: String,
+        decision: String,
+        notes: String,
+    ): AdminActionResult = action(
+        "PATCH", "/v1/admin/reviews/${reviewId.trim().lowercase()}", buildJsonObject {
+            put("decision", decision)
+            put("notes", notes.trim())
+        }, "Catalog review decision recorded",
+    )
+
+    override suspend fun scheduleAlbum(albumId: String, publishAt: String): AdminActionResult = action(
+        "POST", "/v1/admin/albums/${albumId.trim().lowercase()}/schedule", buildJsonObject {
+            put("publishAt", publishAt.trim())
+        }, "Album publication scheduled",
+    )
+
+    override suspend fun exportAudit(
+        operation: String?,
+        targetType: String?,
+    ): AdminAuditExportResult = withContext(Dispatchers.IO) {
+        val response = request("POST", "/v1/admin/audit/export", buildJsonObject {
+            if (operation.isNullOrBlank()) put("operation", JsonNull) else put("operation", operation.trim())
+            if (targetType.isNullOrBlank()) put("targetType", JsonNull) else put("targetType", targetType.trim())
+            put("before", JsonNull)
+            put("pageSize", 200)
+        })
+        if (response.status !in 200..299 || response.body !is JsonArray) {
+            return@withContext AdminAuditExportResult.Failure(response.toFailure())
+        }
+        val lines = mutableListOf("id,operation,target_type,target_id,created_at")
+        response.body.forEach { raw ->
+            val item = raw as? JsonObject ?: return@forEach
+            lines += listOf("id", "operation", "targetType", "targetId", "createdAt")
+                .joinToString(",") { key -> csvCell(item.string(key).orEmpty()) }
+        }
+        AdminAuditExportResult.Success(lines.joinToString("\n"))
+    }
+
+    override suspend fun setAuditRetention(days: Int): AdminActionResult = action(
+        "POST", "/v1/admin/audit/retention", buildJsonObject { put("retentionDays", days) },
+        "Audit retention policy updated",
+    )
+
     private suspend fun action(
         method: String,
         path: String,
@@ -294,6 +510,7 @@ internal class AuthenticatedAdminRepository(
         path: String,
         body: JsonObject? = null,
         binary: ByteArray? = null,
+        binaryContentType: String = "audio/mpeg",
     ): ApiResponse {
         val base = origin ?: return ApiResponse(503, null)
         val token = tokens.currentAccessTokenOrNull()?.takeIf(String::isNotBlank)
@@ -311,7 +528,7 @@ internal class AuthenticatedAdminRepository(
                 connection.doOutput = true
                 connection.setRequestProperty(
                     "Content-Type",
-                    if (binary == null) "application/json" else "audio/mpeg",
+                    if (binary == null) "application/json" else binaryContentType,
                 )
                 connection.setFixedLengthStreamingMode(bytes.size)
                 connection.outputStream.use { it.write(bytes) }
@@ -408,6 +625,75 @@ internal class AuthenticatedAdminRepository(
             )
         }
 
+    private fun parseGovernance(element: JsonElement): GovernanceDashboard {
+        val root = element as? JsonObject ?: return GovernanceDashboard()
+        val enforcements = root.array("enforcements").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            ContentEnforcement(
+                id = item.string("id") ?: return@mapNotNull null,
+                subjectType = item.string("subjectType") ?: return@mapNotNull null,
+                subjectId = item.string("subjectId") ?: return@mapNotNull null,
+                action = item.string("action") ?: return@mapNotNull null,
+                reason = item.string("reason") ?: return@mapNotNull null,
+                createdAt = item.string("createdAt") ?: return@mapNotNull null,
+            )
+        }
+        val teams = root.array("teams").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            CatalogTeamMembership(
+                scopeType = item.string("scopeType") ?: return@mapNotNull null,
+                scopeId = item.string("scopeId") ?: return@mapNotNull null,
+                userId = item.string("userId") ?: return@mapNotNull null,
+                accessLevel = item.string("accessLevel") ?: return@mapNotNull null,
+                active = item.boolean("active") ?: return@mapNotNull null,
+            )
+        }
+        val labels = root.array("labels").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            CatalogLabel(
+                id = item.string("id") ?: return@mapNotNull null,
+                name = item.string("name") ?: return@mapNotNull null,
+            )
+        }
+        val reviews = root.array("reviews").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            CatalogReview(
+                id = item.string("id") ?: return@mapNotNull null,
+                reviewType = item.string("reviewType") ?: return@mapNotNull null,
+                targetType = item.string("targetType") ?: return@mapNotNull null,
+                targetId = item.string("targetId") ?: return@mapNotNull null,
+                status = item.string("status") ?: return@mapNotNull null,
+                submissionNotes = item.string("submissionNotes").orEmpty(),
+                submittedAt = item.string("submittedAt") ?: return@mapNotNull null,
+            )
+        }
+        val schedules = root.array("schedules").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            ScheduledRelease(
+                albumId = item.string("albumId") ?: return@mapNotNull null,
+                publishAt = item.string("publishAt") ?: return@mapNotNull null,
+                status = item.string("status") ?: return@mapNotNull null,
+            )
+        }
+        val audit = (root["auditSummary"] as? JsonObject)?.let { item ->
+            AuditSummary(
+                events24h = item.int("events24h") ?: return@let null,
+                deniedOrEnforced24h = item.int("deniedOrEnforced24h") ?: return@let null,
+                highActivity = item.boolean("highActivity") ?: return@let null,
+                retentionDays = item.int("retentionDays") ?: return@let null,
+            )
+        }
+        return GovernanceDashboard(enforcements, labels, teams, reviews, schedules, audit)
+    }
+
+    private fun ApiResponse.toFailure(): AdminFailure = when (status) {
+        400, 404, 409, 422 -> AdminFailure.InvalidInput
+        401 -> AdminFailure.NotAuthenticated
+        403 -> AdminFailure.Forbidden
+        413 -> AdminFailure.PayloadTooLarge
+        else -> AdminFailure.ServiceUnavailable
+    }
+
     private data class ApiResponse(val status: Int, val body: JsonElement?)
 
     private companion object {
@@ -417,12 +703,21 @@ internal class AuthenticatedAdminRepository(
         )
         val AUDIO_QUALITIES = setOf("low", "standard", "high")
         const val MAX_AUDIO_BYTES = 50 * 1024 * 1024
+        const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
         const val MAX_JSON_BYTES = 1024 * 1024
 
         fun looksLikeMp3(bytes: ByteArray): Boolean = bytes.size >= 4 && (
             (bytes[0] == 0x49.toByte() && bytes[1] == 0x44.toByte() && bytes[2] == 0x33.toByte()) ||
                 (bytes[0] == 0xff.toByte() && (bytes[1].toInt() and 0xe0) == 0xe0)
             )
+
+        fun looksLikeWebp(bytes: ByteArray): Boolean = bytes.size >= 12 &&
+            bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() &&
+            bytes[2] == 0x46.toByte() && bytes[3] == 0x46.toByte() &&
+            bytes[8] == 0x57.toByte() && bytes[9] == 0x45.toByte() &&
+            bytes[10] == 0x42.toByte() && bytes[11] == 0x50.toByte()
+
+        fun csvCell(value: String): String = "\"${value.replace("\"", "\"\"")}\""
     }
 }
 
@@ -441,6 +736,21 @@ internal data object UnavailableAdminRepository : AdminRepository {
     ) = unavailable()
     override suspend fun moderate(caseId: String, action: String, notes: String) = unavailable()
     override suspend fun assignStaff(email: String, role: StaffRole, active: Boolean) = unavailable()
+    override suspend fun enforceContent(
+        subjectType: String, subjectId: String, action: String, reason: String, caseId: String?,
+    ) = unavailable()
+    override suspend fun assignCatalogTeam(
+        scopeType: String, scopeId: String, email: String, accessLevel: String, active: Boolean,
+    ) = unavailable()
+    override suspend fun createCatalogLabel(name: String) = unavailable()
+    override suspend fun linkCatalogLabelArtist(labelId: String, artistId: String) = unavailable()
+    override suspend fun uploadArtwork(albumId: String, bytes: ByteArray) = unavailable()
+    override suspend fun submitReview(reviewType: String, targetId: String, notes: String) = unavailable()
+    override suspend fun decideReview(reviewId: String, decision: String, notes: String) = unavailable()
+    override suspend fun scheduleAlbum(albumId: String, publishAt: String) = unavailable()
+    override suspend fun exportAudit(operation: String?, targetType: String?) =
+        AdminAuditExportResult.Failure(AdminFailure.ServiceUnavailable)
+    override suspend fun setAuditRetention(days: Int) = unavailable()
     private fun unavailable() = AdminActionResult.Failure(AdminFailure.ServiceUnavailable)
 }
 
@@ -450,3 +760,5 @@ private fun JsonObject.string(key: String): String? =
 private fun JsonObject.boolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
 
 private fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
+
+private fun JsonObject.array(key: String): JsonArray = this[key] as? JsonArray ?: JsonArray(emptyList())

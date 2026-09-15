@@ -166,9 +166,38 @@ select is(
   )->>'quality',
   'standard', 'C-Level can register an authorized Worker audio upload'
 );
+reset role;
+insert into public.album_artwork_assets(
+  album_id, object_key, content_type, size_bytes, etag, uploaded_by
+) values (
+  current_setting('test.album_id')::uuid,
+  'media/albums/' || current_setting('test.album_id') || '/artwork.webp',
+  'image/webp', 4096, 'test-artwork-etag',
+  'b1000000-0000-4000-8000-000000000004'
+);
+insert into public.catalog_review_items(
+  review_type, target_type, target_id, status, submission_notes, decision_notes,
+  submitted_by, decided_by, decided_at
+) values
+  (
+    'artwork', 'album', current_setting('test.album_id')::uuid, 'approved',
+    'Artwork ready', 'Artwork approved',
+    'b1000000-0000-4000-8000-000000000002',
+    'b1000000-0000-4000-8000-000000000001', now()
+  ),
+  (
+    'release', 'album', current_setting('test.album_id')::uuid, 'approved',
+    'Release ready', 'Release approved',
+    'b1000000-0000-4000-8000-000000000002',
+    'b1000000-0000-4000-8000-000000000001', now()
+  );
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000004', true);
+select set_config('request.jwt.claims',
+  '{"sub":"b1000000-0000-4000-8000-000000000004","role":"authenticated"}', true);
 select is(
   public.admin_publish_album(current_setting('test.album_id')::uuid)->>'published',
-  'true', 'C-Level can publish an album only after standard media exists'
+  'true', 'C-Level publishes only after standard media and independent reviews exist'
 );
 
 reset role;

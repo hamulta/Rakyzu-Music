@@ -18,18 +18,29 @@ export interface StaffContext {
 }
 
 export type AdminRpcName =
+  | "admin_apply_content_enforcement"
   | "admin_assign_staff"
   | "admin_assign_staff_by_email"
+  | "admin_assign_catalog_team_by_email"
   | "admin_create_album"
   | "admin_create_artist"
+  | "admin_create_catalog_label"
   | "admin_create_moderation_case"
   | "admin_create_track"
+  | "admin_decide_catalog_review"
+  | "admin_export_audit"
+  | "admin_governance_dashboard"
   | "admin_list_catalog_drafts"
   | "admin_list_moderation_cases"
   | "admin_list_staff"
+  | "admin_link_catalog_label_artist"
   | "admin_moderate_case"
   | "admin_publish_album"
-  | "admin_record_track_media";
+  | "admin_record_album_artwork"
+  | "admin_record_track_media"
+  | "admin_schedule_album"
+  | "admin_set_audit_retention"
+  | "admin_submit_catalog_review";
 
 export interface RequestDependencies {
   playlistAccess(

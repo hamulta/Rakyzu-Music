@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current version: **0.5.15** (server-authoritative staff RBAC, moderation, and Android Admin Panel, versionCode 61)
+Current version: **0.5.20** (governed catalog enforcement, scoped teams, independent review, scheduling, and audit controls, versionCode 66)
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.15-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.20-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
 
 ## Configuration and security
 
@@ -78,7 +78,9 @@ Room schema 7 keeps validated account-scoped list/detail pages and a durable mut
 
 The cumulative CI gate builds all variants once, runs unit tests/lint, and scans the produced APK for all required public endpoints without exposing their values. Queue order and the active item are synchronized from meaningful Media3 timeline edits and item transitions into an account-scoped, transactional Room cache; restoration is paused, removes malformed/duplicate legacy entries, and cannot append recommendation media. Listeners can play next, add to queue, reorder, remove, or clear items with explicit TalkBack labels. Compact widths and font scales at 1.3x or above stack Queue actions beneath two-line metadata. Retryable network/source delivery failures keep the explicit queue and expose at most three retries, including one recovery attempt when Android validates connectivity again; no recommendation media is inserted. Playback reports only the local device and does not claim remote transfer/control.
 
-The Android Admin Panel appears only after the Rakyzu API returns an active organization role. Officer, Supervisor, Manager, C-Level Executive, and CEO permissions are stored in Supabase rather than editable user metadata. Officer handles triage and escalation; Supervisor adds final moderation decisions; Manager adds assignment and catalog drafting; C-Level adds audio upload and catalog publication; CEO receives the complete permission set and can manage every rank. Direct client table writes remain revoked. Exact-email role assignment, draft creation, MP3 upload, atomic album publication, moderation, and immutable audit evidence use authenticated Worker/RPC boundaries with forced RLS and rank checks. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.15.md) for the current gate status.
+The Android Admin Panel appears only after the Rakyzu API returns an active organization role. Officer, Supervisor, Manager, C-Level Executive, and CEO permissions are stored in Supabase rather than editable user metadata. Officer handles triage; Supervisor adds moderation decisions and reversible content enforcement; Manager adds lower-rank staff, catalog drafting, scoped artist/label teams, and audit summary; C-Level adds media upload, independent review, publication, scheduling, and bounded audit export; CEO receives the complete permission set, every-rank management, and non-destructive retention controls. Direct client table writes remain revoked. Publication requires standard audio plus independently approved WebP artwork and release metadata. Future schedules remain hidden through RLS until server time reaches the approved instant. See [work session and evidence](docs/WORK_SESSION.md) and [release notes](docs/releases/0.5.20.md) for the current gate status.
+
+Artist catalog pages exist today, but an authenticated Artist identity, invitation acceptance, distinct Artist profile, and Rakyzu verification badge are scheduled for `0.5.21`–`0.5.30`. A scoped catalog-team membership in `0.5.20` does not silently turn a listener into staff or an Artist; this prevents privilege widening before the consent and identity lifecycle is implemented.
 
 Protected media requests use the listener's in-memory Supabase access token only in an `Authorization` header to `https://api.rakyzu.my.id`. The Worker verifies the ES256 JWT against Supabase JWKS, rechecks catalog visibility through RLS, maps validated track IDs and the strict `low`/`standard`/`high` quality header to private R2 keys, and streams full or single-range responses without buffering the object in memory. Unknown quality values fail closed; missing values retain the compatible standard variant. The API health endpoint is public; media endpoints fail closed without a valid listener session.
 

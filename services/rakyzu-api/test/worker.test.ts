@@ -15,7 +15,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.15" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.20" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -292,6 +292,163 @@ describe("Rakyzu Music API", () => {
 
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "invalid_audio" } });
+  });
+
+  it("records a reasoned reversible enforcement action", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/admin/enforcement", {
+      method: "POST",
+      headers: { authorization: "Bearer supervisor-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        subjectType: "track",
+        subjectId: TRACK_ID,
+        action: "quarantine",
+        reason: "Rights review pending",
+        caseId: null,
+      }),
+      staff: staffContext("supervisor", ["admin.access", "content.enforce"]),
+      adminCalls: calls,
+      adminResult: { subjectId: TRACK_ID, action: "quarantine" },
+    });
+
+    expect(response.status).toBe(201);
+    expect(calls).toEqual([{
+      name: "admin_apply_content_enforcement",
+      payload: {
+        target_subject_type: "track",
+        target_subject_id: TRACK_ID,
+        enforcement_action: "quarantine",
+        enforcement_reason: "Rights review pending",
+        target_case_id: null,
+      },
+    }]);
+  });
+
+  it("does not widen officers into content enforcement", async () => {
+    const response = await execute("/v1/admin/enforcement", {
+      method: "POST",
+      headers: { authorization: "Bearer officer-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        subjectType: "track", subjectId: TRACK_ID, action: "take_down", reason: "Policy breach",
+      }),
+      staff: staffContext("officer", ["admin.access", "moderation.triage"]),
+    });
+
+    expect(response.status).toBe(403);
+  });
+
+  it("assigns an exact-email artist team member without staff authority", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/admin/catalog/teams", {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        scopeType: "artist", scopeId: TRACK_ID, email: "Artist@Example.Test",
+        accessLevel: "editor", active: true,
+      }),
+      staff: staffContext("manager", ["admin.access", "catalog.team_manage"]),
+      adminCalls: calls,
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      name: "admin_assign_catalog_team_by_email",
+      payload: { target_email: "artist@example.test", target_access_level: "editor" },
+    });
+  });
+
+  it("uploads only bounded WebP artwork to the exact private key", async () => {
+    const webp = new Uint8Array([
+      0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+    ]);
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/admin/albums/${ALBUM_ID}/artwork`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer executive-token",
+        "content-type": "image/webp",
+        "content-length": String(webp.length),
+      },
+      body: webp,
+      staff: staffContext("c_level_executive", ["admin.access", "catalog.upload_artwork"]),
+      adminCalls: calls,
+      adminResult: { albumId: ALBUM_ID, sizeBytes: webp.length },
+    });
+
+    expect(response.status).toBe(201);
+    expect(calls[0]).toMatchObject({
+      name: "admin_record_album_artwork",
+      payload: {
+        target_album_id: ALBUM_ID,
+        media_object_key: `media/albums/${ALBUM_ID}/artwork.webp`,
+        media_content_type: "image/webp",
+      },
+    });
+  });
+
+  it("routes independent catalog review decisions through review permission", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/admin/reviews/${TRACK_ID}`, {
+      method: "PATCH",
+      headers: { authorization: "Bearer executive-token", "content-type": "application/json" },
+      body: JSON.stringify({ decision: "approved", notes: "Independent review passed" }),
+      staff: staffContext("c_level_executive", ["admin.access", "catalog.review"]),
+      adminCalls: calls,
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      name: "admin_decide_catalog_review",
+      payload: { review_decision: "approved", review_notes: "Independent review passed" },
+    });
+  });
+
+  it("normalizes a validated scheduled publication instant", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/admin/albums/${ALBUM_ID}/schedule`, {
+      method: "POST",
+      headers: { authorization: "Bearer executive-token", "content-type": "application/json" },
+      body: JSON.stringify({ publishAt: "2026-10-01T07:00:00+07:00" }),
+      staff: staffContext("c_level_executive", ["admin.access", "catalog.publish"]),
+      adminCalls: calls,
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]?.payload.requested_publish_at).toBe("2026-10-01T00:00:00.000Z");
+  });
+
+  it("exports only bounded privacy-safe audit fields for authorized executives", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/admin/audit/export", {
+      method: "POST",
+      headers: { authorization: "Bearer executive-token", "content-type": "application/json" },
+      body: JSON.stringify({ operation: null, targetType: "album", before: null, pageSize: 200 }),
+      staff: staffContext("c_level_executive", ["admin.access", "audit.export"]),
+      adminCalls: calls,
+      adminResult: [],
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toEqual({
+      name: "admin_export_audit",
+      payload: {
+        operation_filter: null,
+        target_type_filter: "album",
+        before_time: null,
+        page_size: 200,
+      },
+    });
+  });
+
+  it("reserves retention governance for CEO permission", async () => {
+    const response = await execute("/v1/admin/audit/retention", {
+      method: "POST",
+      headers: { authorization: "Bearer executive-token", "content-type": "application/json" },
+      body: JSON.stringify({ retentionDays: 730 }),
+      staff: staffContext("c_level_executive", ["admin.access", "audit.export"]),
+    });
+
+    expect(response.status).toBe(403);
   });
 });
 

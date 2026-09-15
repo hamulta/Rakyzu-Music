@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.data.admin.AdminActionResult
+import my.id.rakyzumusic.core.data.admin.AdminAuditExportResult
 import my.id.rakyzumusic.core.data.admin.AdminDashboard
 import my.id.rakyzumusic.core.data.admin.AdminDashboardResult
 import my.id.rakyzumusic.core.data.admin.AdminFailure
@@ -22,6 +23,7 @@ data class AdminUiState(
     val dashboard: AdminDashboard? = null,
     val message: String? = null,
     val messageIsError: Boolean = false,
+    val auditExportCsv: String? = null,
 )
 
 class AdminViewModel(
@@ -87,6 +89,76 @@ class AdminViewModel(
         repository.assignStaff(userId, role, active)
     }
 
+    fun enforceContent(
+        subjectType: String,
+        subjectId: String,
+        action: String,
+        reason: String,
+        caseId: String?,
+    ) = runAction { repository.enforceContent(subjectType, subjectId, action, reason, caseId) }
+
+    fun assignCatalogTeam(
+        scopeType: String,
+        scopeId: String,
+        email: String,
+        accessLevel: String,
+        active: Boolean,
+    ) = runAction {
+        repository.assignCatalogTeam(scopeType, scopeId, email, accessLevel, active)
+    }
+
+    fun createCatalogLabel(name: String) = runAction { repository.createCatalogLabel(name) }
+
+    fun linkCatalogLabelArtist(labelId: String, artistId: String) = runAction {
+        repository.linkCatalogLabelArtist(labelId, artistId)
+    }
+
+    fun uploadArtwork(albumId: String, bytes: ByteArray) = runAction {
+        repository.uploadArtwork(albumId, bytes)
+    }
+
+    fun submitReview(reviewType: String, targetId: String, notes: String) = runAction {
+        repository.submitReview(reviewType, targetId, notes)
+    }
+
+    fun decideReview(reviewId: String, decision: String, notes: String) = runAction {
+        repository.decideReview(reviewId, decision, notes)
+    }
+
+    fun scheduleAlbum(albumId: String, publishAt: String) = runAction {
+        repository.scheduleAlbum(albumId, publishAt)
+    }
+
+    fun setAuditRetention(days: Int) = runAction { repository.setAuditRetention(days) }
+
+    fun exportAudit(operation: String?, targetType: String?) {
+        if (mutableUiState.value.isWorking) return
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isWorking = true, message = null, auditExportCsv = null) }
+            when (val result = repository.exportAudit(operation, targetType)) {
+                is AdminAuditExportResult.Success -> mutableUiState.update {
+                    it.copy(
+                        isWorking = false,
+                        message = "Audit export ready",
+                        messageIsError = false,
+                        auditExportCsv = result.csv,
+                    )
+                }
+                is AdminAuditExportResult.Failure -> mutableUiState.update {
+                    it.copy(
+                        isWorking = false,
+                        message = result.reason.toMessage(),
+                        messageIsError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    fun consumeAuditExport() {
+        mutableUiState.update { it.copy(auditExportCsv = null) }
+    }
+
     private fun runAction(block: suspend () -> AdminActionResult) {
         if (mutableUiState.value.isWorking) return
         viewModelScope.launch {
@@ -150,6 +222,6 @@ private fun AdminFailure.toMessage(): String = when (this) {
     AdminFailure.InvalidInput -> "Check the supplied IDs and metadata"
     AdminFailure.NotAuthenticated -> "Sign in again to continue"
     AdminFailure.Forbidden -> "Your role cannot perform this action"
-    AdminFailure.PayloadTooLarge -> "The selected audio file is too large"
+    AdminFailure.PayloadTooLarge -> "The selected media file is too large"
     AdminFailure.ServiceUnavailable -> "Admin services are temporarily unavailable"
 }

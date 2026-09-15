@@ -36,6 +36,28 @@ class AdminAuthorizationTest {
         assertTrue(context.can(StaffPermission.ModerationTriage))
         assertFalse(context.can(StaffPermission.ModerationDecide))
         assertFalse(context.can(StaffPermission.CatalogDraft))
+        assertFalse(context.can(StaffPermission.ContentEnforce))
+        assertFalse(context.can(StaffPermission.AuditExport))
+    }
+
+    @Test
+    fun `scoped governance permissions do not imply CEO authority`() {
+        val context = StaffAccessContext(
+            isStaff = true,
+            role = StaffRole.CLevelExecutive,
+            displayRole = "C-Level Executive",
+            fullAccess = false,
+            permissions = setOf(
+                StaffPermission.AdminAccess,
+                StaffPermission.CatalogReview,
+                StaffPermission.AuditExport,
+            ),
+        )
+
+        assertTrue(context.can(StaffPermission.CatalogReview))
+        assertTrue(context.can(StaffPermission.AuditExport))
+        assertFalse(context.can(StaffPermission.GovernanceManage))
+        assertFalse(context.can(StaffPermission.StaffManage))
     }
 
     @Test

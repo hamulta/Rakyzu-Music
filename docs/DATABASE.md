@@ -111,3 +111,26 @@ albums, and tracks; only C-Level and CEO may upload bounded MP3 variants through
 publish. `track_media_variants` records the exact private R2 key only after upload succeeds.
 `admin_publish_album` rejects empty releases or tracks without a standard-quality object, then
 publishes the artist, album, and complete track set atomically.
+
+### Governance and catalog review — 0.5.16–0.5.20
+
+`content_enforcement_events` is an append-only quarantine, takedown, and restore ledger. Listener
+catalog policies resolve the latest event, so restricted artists, albums, and tracks disappear
+without destructive metadata deletion and a reasoned restore makes them available again.
+
+`catalog_labels`, `catalog_label_artists`, and `catalog_team_memberships` model exact artist/label
+scope. An exact-email membership can be viewer, editor, or admin, but never grants an organization
+role. The formal Artist identity, invitation consent, distinct profile, and badge lifecycle remain
+explicitly scheduled for 0.5.21 onward.
+
+`album_artwork_assets`, `catalog_review_items`, and `scheduled_releases` form the publication gate.
+The Worker accepts only bounded WebP bytes at the canonical private R2 key. Artwork and release
+metadata require approval by a different authorized account from the submitter. Immediate and
+scheduled publication also require standard audio for every track; scheduled rows are hidden by
+RLS until the database clock reaches `publish_at`.
+
+`admin_governance_dashboard` returns only permission-relevant queues and aggregate anomaly state.
+`admin_export_audit` exposes at most 500 rows with operation, target, and time—not raw details or
+account email. `audit_retention_policy` records CEO intent between 90 and 2555 days; it does not
+delete evidence. Physical retention maintenance remains a separate destructive operation requiring
+backup and explicit approval.

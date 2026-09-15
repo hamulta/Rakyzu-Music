@@ -11,17 +11,21 @@ import { errorResponse, jsonResponse, responseHeaders } from "./responses";
 import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } from "./types";
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 
-const API_VERSION = "0.5.15";
+const API_VERSION = "0.5.20";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
 const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const ADMIN_ALBUM_PUBLISH_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/publish/?$`, "i");
+const ADMIN_ALBUM_SCHEDULE_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/schedule/?$`, "i");
+const ADMIN_ARTWORK_UPLOAD_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/artwork/?$`, "i");
 const ADMIN_AUDIO_ROUTE = new RegExp(`^/v1/admin/tracks/${UUID}/audio/(low|standard|high)/?$`, "i");
 const ADMIN_MODERATION_ACTION_ROUTE = new RegExp(`^/v1/admin/moderation/${UUID}/?$`, "i");
 const ADMIN_STAFF_ASSIGNMENT_ROUTE = new RegExp(`^/v1/admin/staff/${UUID}/?$`, "i");
+const ADMIN_REVIEW_ACTION_ROUTE = new RegExp(`^/v1/admin/reviews/${UUID}/?$`, "i");
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+const MAX_ARTWORK_BYTES = 5 * 1024 * 1024;
 const ARTWORK_CACHE_CONTROL = "private, max-age=86400";
 const dependencies: RequestDependencies = {
   verifyListener,
@@ -61,14 +65,25 @@ export function createWorker(
         const isAdminRoute = url.pathname === "/v1/admin/context" ||
           url.pathname === "/v1/admin/staff" ||
           url.pathname === "/v1/admin/catalog/drafts" ||
+          url.pathname === "/v1/admin/governance" ||
+          url.pathname === "/v1/admin/enforcement" ||
+          url.pathname === "/v1/admin/catalog/teams" ||
+          url.pathname === "/v1/admin/catalog/labels" ||
+          url.pathname === "/v1/admin/catalog/labels/artists" ||
+          url.pathname === "/v1/admin/reviews" ||
+          url.pathname === "/v1/admin/audit/export" ||
+          url.pathname === "/v1/admin/audit/retention" ||
           url.pathname === "/v1/admin/artists" ||
           url.pathname === "/v1/admin/albums" ||
           url.pathname === "/v1/admin/tracks" ||
           url.pathname === "/v1/admin/moderation" ||
           ADMIN_ALBUM_PUBLISH_ROUTE.test(url.pathname) ||
+          ADMIN_ALBUM_SCHEDULE_ROUTE.test(url.pathname) ||
+          ADMIN_ARTWORK_UPLOAD_ROUTE.test(url.pathname) ||
           ADMIN_AUDIO_ROUTE.test(url.pathname) ||
           ADMIN_MODERATION_ACTION_ROUTE.test(url.pathname) ||
-          ADMIN_STAFF_ASSIGNMENT_ROUTE.test(url.pathname);
+          ADMIN_STAFF_ASSIGNMENT_ROUTE.test(url.pathname) ||
+          ADMIN_REVIEW_ACTION_ROUTE.test(url.pathname);
         const trackRoute = url.pathname.match(TRACK_ROUTE);
         const artworkRoute = url.pathname.match(ALBUM_ARTWORK_ROUTE);
         const playlistRoute = url.pathname.match(PLAYLIST_ARTWORK_ROUTE);
@@ -231,6 +246,43 @@ async function adminRequest(
       return await rpcResponse("admin_list_catalog_drafts", {}, "catalog.draft", context, token, env,
         requestDependencies, requestId, origin);
     }
+    if (path === "/v1/admin/governance" && request.method === "GET") {
+      return await rpcResponse("admin_governance_dashboard", {}, "admin.access", context, token, env,
+        requestDependencies, requestId, origin);
+    }
+    if (path === "/v1/admin/enforcement" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_apply_content_enforcement", {
+        target_subject_type: readString(body, "subjectType", 20),
+        target_subject_id: readUuid(body, "subjectId"),
+        enforcement_action: readString(body, "action", 20),
+        enforcement_reason: readString(body, "reason", 500),
+        target_case_id: readOptionalUuid(body, "caseId"),
+      }, "content.enforce", context, token, env, requestDependencies, requestId, origin, 201);
+    }
+    if (path === "/v1/admin/catalog/teams" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_assign_catalog_team_by_email", {
+        target_scope_type: readString(body, "scopeType", 20),
+        target_scope_id: readUuid(body, "scopeId"),
+        target_email: readString(body, "email", 254).toLowerCase(),
+        target_access_level: readString(body, "accessLevel", 20),
+        target_active: readBoolean(body, "active"),
+      }, "catalog.team_manage", context, token, env, requestDependencies, requestId, origin);
+    }
+    if (path === "/v1/admin/catalog/labels" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_create_catalog_label", {
+        label_name: readString(body, "name", 120),
+      }, "catalog.draft", context, token, env, requestDependencies, requestId, origin, 201);
+    }
+    if (path === "/v1/admin/catalog/labels/artists" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_link_catalog_label_artist", {
+        target_label_id: readUuid(body, "labelId"),
+        target_artist_id: readUuid(body, "artistId"),
+      }, "catalog.team_manage", context, token, env, requestDependencies, requestId, origin);
+    }
     if (path === "/v1/admin/artists" && request.method === "POST") {
       const body = await readJsonObject(request);
       return await rpcResponse("admin_create_artist", { artist_name: readString(body, "name", 120) },
@@ -260,6 +312,21 @@ async function adminRequest(
       return await rpcResponse("admin_publish_album", {
         target_album_id: publishMatch[1].toLowerCase(),
       }, "catalog.publish", context, token, env, requestDependencies, requestId, origin);
+    }
+    const scheduleMatch = path.match(ADMIN_ALBUM_SCHEDULE_ROUTE);
+    if (scheduleMatch?.[1] && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_schedule_album", {
+        target_album_id: scheduleMatch[1].toLowerCase(),
+        requested_publish_at: readInstant(body, "publishAt"),
+      }, "catalog.publish", context, token, env, requestDependencies, requestId, origin);
+    }
+    const artworkMatch = path.match(ADMIN_ARTWORK_UPLOAD_ROUTE);
+    if (artworkMatch?.[1] && request.method === "PUT") {
+      return await uploadAlbumArtwork(
+        request, env, artworkMatch[1].toLowerCase(), context, token,
+        requestDependencies, requestId, origin,
+      );
     }
     const audioMatch = path.match(ADMIN_AUDIO_ROUTE);
     if (audioMatch?.[1] && audioMatch[2] && request.method === "PUT") {
@@ -293,6 +360,39 @@ async function adminRequest(
         action_notes: readOptionalString(body, "notes", 500),
       }, permission, context, token, env, requestDependencies, requestId, origin);
     }
+    if (path === "/v1/admin/reviews" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_submit_catalog_review", {
+        requested_review_type: readString(body, "reviewType", 20),
+        requested_target_type: readString(body, "targetType", 20),
+        requested_target_id: readUuid(body, "targetId"),
+        requested_notes: readOptionalString(body, "notes", 500),
+      }, "catalog.draft", context, token, env, requestDependencies, requestId, origin, 201);
+    }
+    const reviewMatch = path.match(ADMIN_REVIEW_ACTION_ROUTE);
+    if (reviewMatch?.[1] && request.method === "PATCH") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_decide_catalog_review", {
+        target_review_id: reviewMatch[1].toLowerCase(),
+        review_decision: readString(body, "decision", 20),
+        review_notes: readString(body, "notes", 500),
+      }, "catalog.review", context, token, env, requestDependencies, requestId, origin);
+    }
+    if (path === "/v1/admin/audit/export" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_export_audit", {
+        operation_filter: readNullableString(body, "operation", 80),
+        target_type_filter: readNullableString(body, "targetType", 40),
+        before_time: readNullableInstant(body, "before"),
+        page_size: readOptionalInteger(body, "pageSize", 1, 500, 200),
+      }, "audit.export", context, token, env, requestDependencies, requestId, origin);
+    }
+    if (path === "/v1/admin/audit/retention" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_set_audit_retention", {
+        requested_days: readInteger(body, "retentionDays", 90, 2555),
+      }, "governance.manage", context, token, env, requestDependencies, requestId, origin);
+    }
     return errorResponse("method_not_allowed", "Method not allowed.", 405, requestId, origin);
   } catch (error) {
     if (error instanceof AdminRequestRejected) {
@@ -309,6 +409,49 @@ async function adminRequest(
     }
     return errorResponse("invalid_admin_request", "The admin request is invalid.",
       422, requestId, origin);
+  }
+}
+
+async function uploadAlbumArtwork(
+  request: Request,
+  env: RakyzuApiEnv,
+  albumId: string,
+  context: StaffContext,
+  token: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  if (!context.permissions.includes("catalog.upload_artwork")) return adminForbidden(requestId, origin);
+  if (request.headers.get("content-type")?.split(";", 1)[0]?.trim() !== "image/webp") {
+    return errorResponse("invalid_artwork", "Upload WebP artwork.", 415, requestId, origin);
+  }
+  const claimedLength = Number(request.headers.get("content-length"));
+  if (!Number.isInteger(claimedLength) || claimedLength < 12 || claimedLength > MAX_ARTWORK_BYTES) {
+    return errorResponse("invalid_artwork_size", "Artwork must be at most 5 MiB.", 413,
+      requestId, origin);
+  }
+  const bytes = await readExactBody(request, claimedLength);
+  if (bytes === null || !looksLikeWebp(bytes)) {
+    return errorResponse("invalid_artwork", "The file is not valid WebP artwork.", 422,
+      requestId, origin);
+  }
+  const objectKey = `media/albums/${albumId}/artwork.webp`;
+  const uploaded = await env.MEDIA.put(objectKey, bytes, {
+    httpMetadata: { contentType: "image/webp", cacheControl: "private, no-store" },
+  });
+  try {
+    const result = await requestDependencies.adminRpc("admin_record_album_artwork", {
+      target_album_id: albumId,
+      media_object_key: objectKey,
+      media_size_bytes: bytes.length,
+      media_content_type: "image/webp",
+      media_etag: uploaded.etag,
+    }, token, env);
+    return jsonResponse(result, 201, requestId, origin);
+  } catch (error) {
+    await env.MEDIA.delete(objectKey);
+    throw error;
   }
 }
 
@@ -350,29 +493,8 @@ async function uploadTrackAudio(
   if (!Number.isInteger(claimedLength) || claimedLength < 4 || claimedLength > MAX_AUDIO_BYTES) {
     return errorResponse("invalid_audio_size", "Audio must be at most 50 MiB.", 413, requestId, origin);
   }
-  if (!request.body) {
-    return errorResponse("invalid_audio", "The file is not a valid MP3 upload.", 422,
-      requestId, origin);
-  }
-  const bytes = new Uint8Array(claimedLength);
-  const reader = request.body.getReader();
-  let offset = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (offset + chunk.value.length > claimedLength) {
-        await reader.cancel();
-        return errorResponse("invalid_audio_size", "Audio length does not match.", 413,
-          requestId, origin);
-      }
-      bytes.set(chunk.value, offset);
-      offset += chunk.value.length;
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  if (offset !== claimedLength || !looksLikeMp3(bytes)) {
+  const bytes = await readExactBody(request, claimedLength);
+  if (bytes === null || !looksLikeMp3(bytes)) {
     return errorResponse("invalid_audio", "The file is not a valid MP3 upload.", 422,
       requestId, origin);
   }
@@ -397,11 +519,39 @@ async function uploadTrackAudio(
   }
 }
 
+async function readExactBody(request: Request, claimedLength: number): Promise<Uint8Array | null> {
+  if (!request.body) return null;
+  const bytes = new Uint8Array(claimedLength);
+  const reader = request.body.getReader();
+  let offset = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (offset + chunk.value.length > claimedLength) {
+        await reader.cancel();
+        return null;
+      }
+      bytes.set(chunk.value, offset);
+      offset += chunk.value.length;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return offset === claimedLength ? bytes : null;
+}
+
 function looksLikeMp3(bytes: Uint8Array): boolean {
   return bytes.length >= 4 && (
     (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
     (bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0)
   );
+}
+
+function looksLikeWebp(bytes: Uint8Array): boolean {
+  return bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 &&
+    bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 &&
+    bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
 }
 
 async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
@@ -439,6 +589,17 @@ function readOptionalString(body: Record<string, unknown>, key: string, max: num
   return value.trim();
 }
 
+function readNullableString(body: Record<string, unknown>, key: string, max: number): string | null {
+  const value = readOptionalString(body, key, max);
+  return value.length === 0 ? null : value;
+}
+
+function readOptionalUuid(body: Record<string, unknown>, key: string): string | null {
+  const value = body[key];
+  if (value === undefined || value === null || value === "") return null;
+  return readUuid(body, key);
+}
+
 function readUuid(body: Record<string, unknown>, key: string): string {
   const value = readString(body, key, 36).toLowerCase();
   if (!new RegExp(`^${UUID}$`, "i").test(value)) throw new AdminRequestRejected(422);
@@ -459,6 +620,26 @@ function readInteger(
     throw new AdminRequestRejected(422);
   }
   return value as number;
+}
+
+function readOptionalInteger(
+  body: Record<string, unknown>, key: string, minimum: number, maximum: number, fallback: number,
+): number {
+  if (body[key] === undefined || body[key] === null) return fallback;
+  return readInteger(body, key, minimum, maximum);
+}
+
+function readInstant(body: Record<string, unknown>, key: string): string {
+  const value = readString(body, key, 40);
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp) || !value.includes("T")) throw new AdminRequestRejected(422);
+  return new Date(timestamp).toISOString();
+}
+
+function readNullableInstant(body: Record<string, unknown>, key: string): string | null {
+  const value = body[key];
+  if (value === undefined || value === null || value === "") return null;
+  return readInstant(body, key);
 }
 
 function readOptionalDate(body: Record<string, unknown>, key: string): string | null {

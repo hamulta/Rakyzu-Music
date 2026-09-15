@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.setMain
 import my.id.rakyzumusic.core.data.admin.AdminActionResult
 import my.id.rakyzumusic.core.data.admin.AdminDashboard
 import my.id.rakyzumusic.core.data.admin.AdminDashboardResult
+import my.id.rakyzumusic.core.data.admin.AdminAuditExportResult
 import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.admin.StaffAccessContext
 import my.id.rakyzumusic.core.data.admin.StaffPermission
@@ -94,6 +95,21 @@ class AdminViewModelTest {
         ) = ok()
         override suspend fun moderate(caseId: String, action: String, notes: String) = ok()
         override suspend fun assignStaff(email: String, role: StaffRole, active: Boolean) = ok()
+        override suspend fun enforceContent(
+            subjectType: String, subjectId: String, action: String, reason: String, caseId: String?,
+        ) = ok()
+        override suspend fun assignCatalogTeam(
+            scopeType: String, scopeId: String, email: String, accessLevel: String, active: Boolean,
+        ) = ok()
+        override suspend fun createCatalogLabel(name: String) = ok()
+        override suspend fun linkCatalogLabelArtist(labelId: String, artistId: String) = ok()
+        override suspend fun uploadArtwork(albumId: String, bytes: ByteArray) = ok()
+        override suspend fun submitReview(reviewType: String, targetId: String, notes: String) = ok()
+        override suspend fun decideReview(reviewId: String, decision: String, notes: String) = ok()
+        override suspend fun scheduleAlbum(albumId: String, publishAt: String) = ok()
+        override suspend fun exportAudit(operation: String?, targetType: String?) =
+            AdminAuditExportResult.Success("id,operation,target_type,target_id,created_at")
+        override suspend fun setAuditRetention(days: Int) = ok()
         private fun ok() = AdminActionResult.Success("Updated")
     }
 }

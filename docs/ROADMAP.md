@@ -113,17 +113,52 @@ variant; the release gate must not imply a catalog or remote-device capability t
 - [x] `0.5.13` — dynamically role-gated Android Admin Panel and server-authoritative session context.
 - [x] `0.5.14` — artist/album/track drafting, bounded private R2 MP3 upload, and atomic publication.
 - [x] `0.5.15` — role-specific moderation actions, staff assignment controls, accessibility, and security regression.
-- [ ] `0.5.16` — content takedown/quarantine workflow with reversible reasoned decisions.
-- [ ] `0.5.17` — artist and label team scopes without widening organization-global access.
-- [ ] `0.5.18` — artwork/release review queues, approval previews, and scheduled publication.
-- [ ] `0.5.19` — privacy-safe audit search, export, retention controls, and anomaly diagnostics.
-- [ ] `0.5.20` — final Admin/moderation runtime, hierarchy, resilience, accessibility, and performance gate.
+- [x] `0.5.16` — content takedown/quarantine workflow with reversible reasoned decisions.
+- [x] `0.5.17` — artist and label team scopes without widening organization-global access.
+- [x] `0.5.18` — artwork/release review queues, approval previews, and scheduled publication.
+- [x] `0.5.19` — privacy-safe audit search, export, retention controls, and anomaly diagnostics.
+- [x] `0.5.20` — final Admin/moderation runtime, hierarchy, resilience, accessibility, and performance gate.
 
 The CEO-directed extended 0.5 train ships `0.5.11`–`0.5.15` as one cumulative artifact with
 versionCode 61. Its access-level vocabulary is informed by
 [Spotify for Artists' public access levels](https://support.spotify.com/mx-en/artists/article/access-levels-in-spotify-for-artists/),
 while Rakyzu uses its own ranked organization model. Android
 never grants authority: Supabase RLS/RPC and the Rakyzu Worker independently fail closed.
+
+The cumulative `0.5.16`–`0.5.20` artifact uses versionCode 66. Enforcement is append-only and
+reversible; catalog teams are scope-bound; publication requires independent artwork and release
+approval; scheduled releases remain invisible to listeners until their server time; and raw audit
+tables stay unavailable to Android. Retention changes record policy intent only—physical deletion
+remains a separately approved maintenance operation.
+
+### Artist identity and strengthened Control Room — CEO extension
+
+- [ ] `0.5.21` — exact-email Artist invitation state machine, server-authoritative Artist role,
+  expiry/revocation, and Resend delivery through the Worker secret boundary.
+- [ ] `0.5.22` — mandatory in-app invitation popup, versioned Artist terms, explicit acceptance,
+  rejection, and immutable consent evidence before any Artist privilege activates.
+- [ ] `0.5.23` — distinct Artist profile and navigation, ownership-linked public identity, and a
+  Rakyzu verification badge whose meaning is limited to verified identity/profile management.
+- [ ] `0.5.24` — Artist workspace for scoped biography, images, team, catalog drafts, and release
+  submissions without organization-global staff permissions or self-publication.
+- [ ] `0.5.25` — privacy-thresholded Artist analytics for streams, listeners, followers, releases,
+  geography, date ranges, and CSV export with aggregation and anti-reidentification controls.
+- [ ] `0.5.26` — Admin commerce dashboard for user subscriptions and purchases, provider-signed
+  webhook ledger, entitlements, receipts, refunds, disputes, reconciliation, and least-privilege
+  financial visibility; no card data is stored by Rakyzu.
+- [ ] `0.5.27` — reasoned user warning, temporary suspension, ban, expiry, session revocation,
+  appeal/evidence workflow, and dual-control permanent enforcement.
+- [ ] `0.5.28` — Artist suspension, badge/privilege revocation, team freeze, catalog quarantine,
+  appeal, and safe reinstatement without deleting audit history.
+- [ ] `0.5.29` — listener and Artist account-deletion requests with reauthentication, cooling-off,
+  legal-retention holds, ownership transfer, anonymization, cancellation, and completion evidence.
+- [ ] `0.5.30` — strengthened Admin analytics, security alerts, dual approval for destructive actions,
+  scoped search/export, accessibility, performance, resilience, and Artist lifecycle release gate.
+
+Spotify's current public wording distinguishes a profile-management registration mark from broader
+quality endorsement. Rakyzu's badge will therefore state exactly what was verified, be controlled
+only by trusted server state, and be revocable. Invitation emails identify the intended existing
+account but never grant access until that same authenticated account accepts the current terms.
 
 - [ ] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
 - [ ] `0.6.1` — explicit album and playlist download actions with per-item progress.
