@@ -68,8 +68,12 @@ class AdminAccessibilityTest {
                 AdminScreen(
                     state = state,
                     onRefresh = {},
-                    onCreateArtist = {},
+                    onCreateArtist = { _, _ -> },
+                    onUpdateArtist = { _, _, _ -> },
+                    onArchiveArtist = {},
                     onCreateAlbum = { _, _, _ -> },
+                    onUpdateAlbum = { _, _, _ -> },
+                    onArchiveAlbum = {},
                     onCreateTrack = { _, _, _, _, _, _ -> },
                     onUploadAudio = { _, _, _ -> },
                     onPublishAlbum = {},
@@ -86,6 +90,9 @@ class AdminAccessibilityTest {
                     onScheduleAlbum = { _, _ -> },
                     onExportAudit = { _, _ -> },
                     onSetAuditRetention = {},
+                    onUpsertRecommendation = { _, _, _, _, _, _ -> },
+                    onDeleteRecommendation = {},
+                    onUploadRecommendationArtwork = { _, _ -> },
                 )
             }
         }
