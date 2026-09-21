@@ -120,8 +120,8 @@ without destructive metadata deletion and a reasoned restore makes them availabl
 
 `catalog_labels`, `catalog_label_artists`, and `catalog_team_memberships` model exact artist/label
 scope. An exact-email membership can be viewer, editor, or admin, but never grants an organization
-role. The formal Artist identity, invitation consent, distinct profile, and badge lifecycle remain
-explicitly scheduled for 0.5.21 onward.
+role. The formal Artist identity, consent, and profile lifecycle is introduced in the following
+`0.5.21`–`0.5.25` migration batch.
 
 `album_artwork_assets`, `catalog_review_items`, and `scheduled_releases` form the publication gate.
 The Worker accepts only bounded WebP bytes at the canonical private R2 key. Artwork and release
@@ -134,3 +134,24 @@ RLS until the database clock reaches `publish_at`.
 account email. `audit_retention_policy` records CEO intent between 90 and 2555 days; it does not
 delete evidence. Physical retention maintenance remains a separate destructive operation requiring
 backup and explicit approval.
+
+### Artist identity, staff bootstrap, and editorial lifecycle — 0.5.21–0.5.25
+
+`artist_account_links` stores one optional normalized email per Artist, links an existing or future
+`auth.users` account, and keeps status `unclaimed`, `pending_consent`, `active`, or `revoked`.
+`get_my_profile_context` exposes only the matched account's pending/active Artist identity;
+`accept_artist_terms` records immutable versioned evidence in `artist_terms_consents` before
+activating it. An email change invalidates the match. `artist_update_biography` is self-scoped to
+the active linked account, while the Worker validates the corresponding request before the RPC.
+
+`staff_assignment_intents` holds the CEO-designated normalized emails and role mapping. A trusted
+`auth.users` trigger applies an intent on signup or email change and disables an automatically
+assigned role if that address changes away. Manual hierarchy and moderation RPCs remain separate.
+All new client-visible tables force RLS and direct authenticated mutation grants stay revoked.
+
+`profile_avatar_assets`, `editorial_shelf_artwork_assets`, and the added `track_media_variants`
+format columns inventory private R2 objects. The Worker serves them only after session/catalog
+checks. `get_track_media_key` selects the authoritative current audio variant only for a published,
+available track; it prevents stale MP3 keys from shadowing a newly uploaded format. Artist/album
+archive markers hide records without deleting them; recommendation rows can be reordered or
+removed through permission-checked RPCs with staff audit entries.

@@ -49,11 +49,23 @@ class AdminViewModel(
         }
     }
 
-    fun createArtist(name: String) = runAction { repository.createArtist(name) }
+    fun createArtist(name: String, email: String?) = runAction { repository.createArtist(name, email) }
+
+    fun updateArtist(id: String, name: String, email: String?) = runAction {
+        repository.updateArtist(id, name, email)
+    }
+
+    fun archiveArtist(id: String) = runAction { repository.archiveArtist(id) }
 
     fun createAlbum(artistId: String, title: String, releaseDate: String?) = runAction {
         repository.createAlbum(artistId, title, releaseDate)
     }
+
+    fun updateAlbum(id: String, title: String, releaseDate: String?) = runAction {
+        repository.updateAlbum(id, title, releaseDate)
+    }
+
+    fun archiveAlbum(id: String) = runAction { repository.archiveAlbum(id) }
 
     fun createTrack(
         albumId: String,
@@ -130,6 +142,19 @@ class AdminViewModel(
     }
 
     fun setAuditRetention(days: Int) = runAction { repository.setAuditRetention(days) }
+
+    fun upsertRecommendation(
+        id: String?, title: String, subtitle: String?, position: Int,
+        trackId: String?, published: Boolean,
+    ) = runAction {
+        repository.upsertRecommendation(id, title, subtitle, position, trackId, published)
+    }
+
+    fun deleteRecommendation(id: String) = runAction { repository.deleteRecommendation(id) }
+
+    fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = runAction {
+        repository.uploadRecommendationArtwork(id, bytes)
+    }
 
     fun exportAudit(operation: String?, targetType: String?) {
         if (mutableUiState.value.isWorking) return

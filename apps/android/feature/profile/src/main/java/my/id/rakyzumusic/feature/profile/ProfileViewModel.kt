@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.data.profile.DisplayName
 import my.id.rakyzumusic.core.data.profile.ListenerProfile
+import my.id.rakyzumusic.core.data.profile.ProfileAppearance
 import my.id.rakyzumusic.core.data.profile.ProfileFailure
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
@@ -101,6 +102,54 @@ class ProfileViewModel(
         }
     }
 
+    fun acceptArtistTerms(version: String) {
+        if (mutableUiState.value.isSaving || version.isBlank()) return
+        mutableUiState.update { it.copy(isSaving = true, message = null) }
+        viewModelScope.launch { applyResult(repository.acceptArtistTerms(version), "Welcome to Rakyzu Music Artists.") }
+    }
+
+    fun updateArtistBiography(biography: String) {
+        if (mutableUiState.value.isSaving || biography.length > 1_500) return
+        mutableUiState.update { it.copy(isSaving = true, message = null) }
+        viewModelScope.launch {
+            applyResult(repository.updateArtistBiography(biography), "Artist biography updated.")
+        }
+    }
+
+    fun updateAppearance(mode: ProfileAppearance) {
+        if (mutableUiState.value.isSaving) return
+        mutableUiState.update { it.copy(isSaving = true, message = null) }
+        viewModelScope.launch { applyResult(repository.updateAppearance(mode), "Profile appearance updated.") }
+    }
+
+    fun uploadAvatar(webpBytes: ByteArray) {
+        if (mutableUiState.value.isSaving) return
+        mutableUiState.update { it.copy(isSaving = true, message = null) }
+        viewModelScope.launch {
+            applyResult(repository.uploadAvatar(webpBytes), "Profile photo updated.")
+        }
+    }
+
+    fun deleteAvatar() {
+        if (mutableUiState.value.isSaving) return
+        mutableUiState.update { it.copy(isSaving = true, message = null) }
+        viewModelScope.launch {
+            applyResult(repository.deleteAvatar(), "Profile photo removed.")
+        }
+    }
+
+    private fun applyResult(result: ProfileResult, successMessage: String) {
+        when (result) {
+            is ProfileResult.Success -> mutableUiState.update { it.copy(
+                profile = result.profile, displayName = result.profile.displayName,
+                isSaving = false, message = successMessage, messageIsError = false,
+            ) }
+            is ProfileResult.Failure -> mutableUiState.update { it.copy(
+                isSaving = false, message = result.reason.toSafeMessage(), messageIsError = true,
+            ) }
+        }
+    }
+
     fun resetDraft() {
         mutableUiState.update {
             it.copy(
@@ -124,6 +173,7 @@ class ProfileViewModel(
 }
 
 private fun ProfileFailure.toSafeMessage(): String = when (this) {
+    ProfileFailure.InvalidRequest -> "The requested profile action is no longer available."
     ProfileFailure.InvalidDisplayName ->
         "Use ${DisplayName.MINIMUM_LENGTH}-${DisplayName.MAXIMUM_LENGTH} characters for your name."
     ProfileFailure.NoActiveSession -> "Your session expired. Sign in again to continue."

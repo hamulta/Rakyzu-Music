@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: Governed catalog enforcement, review, scheduling, scoped teams, and audit controls `0.5.20`; release evidence in `WORK_SESSION.md`.
+Status: `0.5.25` Android source adds Artist identity/consent, profile media, extended audio, and editorial/catalog controls to the verified `0.5.20` baseline; publication evidence in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -43,7 +43,7 @@ Supabase schema changes are committed as ordered forward migrations. Client-faci
 
 Organization authorization is resolved from active `staff_assignments`, fixed ranked roles, and an explicit permission matrix on every Admin API request. It is never trusted from Android UI state or user-editable Auth metadata. Direct authenticated mutation privileges are absent from staff, moderation, audit, media-inventory, review, enforcement, and catalog-team tables. Narrow security-definer RPCs pin an empty search path, recheck `auth.uid()`, enforce hierarchy rules, and append audit evidence; the Worker validates the same capability before accepting JSON, bounded MP3, or exact WebP bytes. Supervisor and above can record reversible enforcement; Manager and above can manage scope-only artist/label teams; C-Level and CEO can independently review, publish, schedule, and export bounded audit evidence. Publication requires standard audio plus independently approved artwork and release metadata. Server-time RLS hides future schedules and every active quarantine/takedown from listener surfaces.
 
-Artist rows remain catalog entities in `0.5.20`; catalog-team membership grants only an explicit artist or label scope and is not an Artist identity or organization role. The invitation, consent, profile, badge, and Artist workspace state machine is reserved for `0.5.21` onward so no listener receives implicit privilege from an email match alone.
+Artist rows remain catalog entities, but an optional exact-email `artist_account_links` row now establishes a pending identity for an existing or future account. The account receives no Artist badge or biography control until it accepts the current versioned terms in-app. A scoped catalog-team membership still does not turn a listener into staff or Artist. Staff status and Artist status are independently resolved server-side; public verification denotes a linked profile identity, not endorsement. Expanded Artist draft/release tools are deferred beyond `0.5.25`.
 
 The app observes Supabase `sessionStatus` as the sole authentication navigation source. Signup explicitly supplies the branded `my.id.rakyzumusic://auth` PKCE redirect. A valid confirmation callback exchanges or imports the session before navigation can pass through the profile gate to Home. The SDK's session and verifier stores are replaced by AES-GCM persistence whose non-exportable key is generated in Android Keystore; corrupt or invalidated encrypted state is discarded and requires a new sign-in. Auth failures are mapped to bounded product errors so raw backend responses and tokens never reach the UI or logs.
 

@@ -72,6 +72,7 @@ internal class SupabaseCatalogRemoteDataSource(
                     .orEmpty()
                     .sortedWith(compareBy(EditorialShelfTrackRow::position, EditorialShelfTrackRow::trackId))
                     .map { tracksById[it.trackId] ?: throw InvalidCatalogPayloadException() },
+                hasCustomArtwork = row.artworkObjectKey != null,
             )
         }.sortedWith(compareBy(EditorialShelf::position, EditorialShelf::id))
 
@@ -161,7 +162,9 @@ internal class SupabaseCatalogRemoteDataSource(
             "track_number",
             "is_explicit",
         )
-        val EDITORIAL_SHELF_COLUMNS = Columns.list("id", "title", "subtitle", "position")
+        val EDITORIAL_SHELF_COLUMNS = Columns.list(
+            "id", "title", "subtitle", "position", "artwork_object_key",
+        )
         val EDITORIAL_SHELF_TRACK_COLUMNS = Columns.list("shelf_id", "track_id", "position")
     }
 }
@@ -214,6 +217,7 @@ private data class EditorialShelfRow(
     val title: String,
     val subtitle: String?,
     val position: Int,
+    @SerialName("artwork_object_key") val artworkObjectKey: String? = null,
 )
 
 @Serializable

@@ -23,6 +23,8 @@ interface MediaDeliveryRepository {
     fun streamRequest(trackId: String): MediaStreamRequestResult
 
     fun artworkRequest(albumId: String): ArtworkRequestResult
+    fun recommendationArtworkRequest(shelfId: String): ArtworkRequestResult
+    fun profileAvatarRequest(userId: String): ArtworkRequestResult
 }
 
 sealed interface MediaStreamRequestResult {
@@ -123,6 +125,44 @@ internal class AuthenticatedMediaDeliveryRepository(
             ),
         )
     }
+
+    override fun recommendationArtworkRequest(shelfId: String): ArtworkRequestResult {
+        val origin = apiOrigin
+            ?: return ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
+        if (!mediaIdPattern.matches(shelfId)) {
+            return ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidAlbumId)
+        }
+        val accessToken = accessTokenProvider.currentAccessTokenOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: return ArtworkRequestResult.Failure(ArtworkRequestFailure.NotAuthenticated)
+        val normalizedId = shelfId.lowercase()
+        return ArtworkRequestResult.Ready(
+            ArtworkRequest(
+                url = "$origin/v1/recommendations/$normalizedId/artwork",
+                albumId = normalizedId,
+                accessToken = accessToken,
+            ),
+        )
+    }
+
+    override fun profileAvatarRequest(userId: String): ArtworkRequestResult {
+        val origin = apiOrigin
+            ?: return ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
+        if (!mediaIdPattern.matches(userId)) {
+            return ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidAlbumId)
+        }
+        val accessToken = accessTokenProvider.currentAccessTokenOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: return ArtworkRequestResult.Failure(ArtworkRequestFailure.NotAuthenticated)
+        val normalizedId = userId.lowercase()
+        return ArtworkRequestResult.Ready(
+            ArtworkRequest(
+                url = "$origin/v1/profiles/$normalizedId/avatar",
+                albumId = normalizedId,
+                accessToken = accessToken,
+            ),
+        )
+    }
 }
 
 internal data object UnavailableMediaDeliveryRepository : MediaDeliveryRepository {
@@ -130,5 +170,9 @@ internal data object UnavailableMediaDeliveryRepository : MediaDeliveryRepositor
         MediaStreamRequestResult.Failure(MediaStreamRequestFailure.InvalidConfiguration)
 
     override fun artworkRequest(albumId: String): ArtworkRequestResult =
+        ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
+    override fun recommendationArtworkRequest(shelfId: String): ArtworkRequestResult =
+        ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
+    override fun profileAvatarRequest(userId: String): ArtworkRequestResult =
         ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
 }

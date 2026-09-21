@@ -27,6 +27,12 @@ export type AdminRpcName =
   | "admin_create_catalog_label"
   | "admin_create_moderation_case"
   | "admin_create_track"
+  | "admin_update_artist"
+  | "admin_archive_artist"
+  | "admin_update_album"
+  | "admin_archive_album"
+  | "admin_list_recommendations"
+  | "admin_delete_editorial_shelf"
   | "admin_decide_catalog_review"
   | "admin_export_audit"
   | "admin_governance_dashboard"
@@ -37,7 +43,12 @@ export type AdminRpcName =
   | "admin_moderate_case"
   | "admin_publish_album"
   | "admin_record_album_artwork"
+  | "admin_record_editorial_artwork"
   | "admin_record_track_media"
+  | "record_profile_avatar"
+  | "delete_profile_avatar"
+  | "artist_update_biography"
+  | "admin_upsert_editorial_shelf"
   | "admin_schedule_album"
   | "admin_set_audit_retention"
   | "admin_submit_catalog_review";
@@ -50,7 +61,10 @@ export interface RequestDependencies {
   ): Promise<{ ownerId: string; canEdit: boolean } | null>;
   verifyListener(token: string, env: RakyzuApiEnv): Promise<ListenerIdentity>;
   canStreamTrack(trackId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
+  resolveTrackMediaKey(trackId: string, quality: "low" | "standard" | "high",
+    token: string, env: RakyzuApiEnv): Promise<string | null>;
   canAccessAlbumArtwork(albumId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
+  canAccessEditorialArtwork(shelfId: string, token: string, env: RakyzuApiEnv): Promise<boolean>;
   staffContext(token: string, env: RakyzuApiEnv): Promise<StaffContext>;
   adminRpc(
     name: AdminRpcName,

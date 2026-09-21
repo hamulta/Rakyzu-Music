@@ -148,13 +148,15 @@ private fun ArtworkRequest.toCoilRequest(context: android.content.Context): Imag
         requestHeaders().forEach { (name, value) -> set(name, value) }
     }.build()
     val cacheKey = artworkCacheKey(albumId)
+    val cachePolicy = if (url.contains("/v1/profiles/") ||
+        url.contains("/v1/recommendations/")) CachePolicy.DISABLED else CachePolicy.ENABLED
     return ImageRequest.Builder(context)
         .data(url)
         .httpHeaders(networkHeaders)
         .memoryCacheKey(cacheKey)
         .diskCacheKey(cacheKey)
-        .memoryCachePolicy(CachePolicy.ENABLED)
-        .diskCachePolicy(CachePolicy.ENABLED)
-        .networkCachePolicy(CachePolicy.ENABLED)
+        .memoryCachePolicy(cachePolicy)
+        .diskCachePolicy(cachePolicy)
+        .networkCachePolicy(cachePolicy)
         .build()
 }

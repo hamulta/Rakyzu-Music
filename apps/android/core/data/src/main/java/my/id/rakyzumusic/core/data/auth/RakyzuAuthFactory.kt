@@ -39,6 +39,7 @@ import my.id.rakyzumusic.core.data.playlist.PlaylistFailure
 import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.data.playlist.SupabasePlaylistRemoteDataSource
 import my.id.rakyzumusic.core.data.profile.ProfileFailure
+import my.id.rakyzumusic.core.data.profile.ProfileAppearance
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
 import my.id.rakyzumusic.core.data.profile.SupabaseProfileRepository
@@ -125,7 +126,7 @@ object RakyzuAuthFactory {
                 recoveryState = PasswordRecoveryState(encryptedStore),
                 applicationScope = applicationScope,
             ),
-            profileRepository = SupabaseProfileRepository(client.auth, client.postgrest),
+            profileRepository = SupabaseProfileRepository(client.auth, client.postgrest, apiConfiguration),
             catalogRepository = OfflineFirstCatalogRepository(
                 localDataSource = localDataSources.catalog,
                 remoteDataSource = SupabaseCatalogRemoteDataSource(client.postgrest),
@@ -258,6 +259,13 @@ private data object UnavailableProfileRepository : ProfileRepository {
         displayName: String,
         completeOnboarding: Boolean,
     ): ProfileResult = unavailable()
+
+    override suspend fun acceptArtistTerms(version: String): ProfileResult = unavailable()
+    override suspend fun updateArtistBiography(biography: String): ProfileResult = unavailable()
+
+    override suspend fun updateAppearance(mode: ProfileAppearance): ProfileResult = unavailable()
+    override suspend fun uploadAvatar(webpBytes: ByteArray): ProfileResult = unavailable()
+    override suspend fun deleteAvatar(): ProfileResult = unavailable()
 
     private fun unavailable() = ProfileResult.Failure(ProfileFailure.ServiceUnavailable)
 }

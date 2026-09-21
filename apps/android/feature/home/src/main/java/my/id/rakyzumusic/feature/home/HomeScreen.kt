@@ -171,6 +171,8 @@ fun HomeRoute(
     connectivityMonitor: ConnectivityMonitor,
     versionName: String,
     displayName: String,
+    avatarAvailable: Boolean = false,
+    avatarRevision: String? = null,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
@@ -192,12 +194,21 @@ fun HomeRoute(
     val artworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository) {
         mediaDeliveryRepository::artworkRequest
     }
+    val recommendationArtworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository) {
+        mediaDeliveryRepository::recommendationArtworkRequest
+    }
+    val profileArtworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository, avatarRevision) {
+        { profileId -> mediaDeliveryRepository.profileAvatarRequest(profileId) }
+    }
     key(userId) {
         HomeScreen(
             versionName = versionName,
             displayName = displayName,
+            avatarId = userId.takeIf { avatarAvailable },
+            profileArtworkRequestProvider = profileArtworkRequestProvider,
             state = state,
             artworkRequestProvider = artworkRequestProvider,
+            recommendationArtworkRequestProvider = recommendationArtworkRequestProvider,
             modifier = modifier,
             onRetryCatalog = homeViewModel::refresh,
             onTrackPlay = onTrackPlay,
@@ -219,6 +230,7 @@ fun HomeRoute(
 fun HomeScreen(
     versionName: String,
     displayName: String = "Rakyzu Listener",
+    avatarId: String? = null,
     state: HomeUiState = HomeUiState(),
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
@@ -226,6 +238,8 @@ fun HomeScreen(
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
+    recommendationArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
+    profileArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     likedTrackIds: Set<String> = emptySet(),
     savedAlbumIds: Set<String> = emptySet(),
     followedArtistIds: Set<String> = emptySet(),
@@ -275,6 +289,8 @@ fun HomeScreen(
                 HomeHeader(
                     versionName = versionName,
                     displayName = displayName,
+                    avatarId = avatarId,
+                    profileArtworkRequestProvider = profileArtworkRequestProvider,
                     horizontalPadding = layoutSpec.horizontalPadding,
                     onProfileClick = onProfileClick,
                 )
@@ -365,6 +381,8 @@ fun HomeScreen(
                         tracks = shelf.tracks,
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
+                        featuredArtworkId = shelf.id.takeIf { shelf.hasCustomArtwork },
+                        featuredArtworkRequestProvider = recommendationArtworkRequestProvider,
                         onTrackPlay = onTrackPlay,
                         likedTrackIds = likedTrackIds,
                         savedAlbumIds = savedAlbumIds,
@@ -591,6 +609,8 @@ private fun EmptyHomeState(
 private fun HomeHeader(
     versionName: String,
     displayName: String,
+    avatarId: String?,
+    profileArtworkRequestProvider: ArtworkRequestProvider,
     horizontalPadding: Dp,
     onProfileClick: () -> Unit,
 ) {
@@ -635,11 +655,20 @@ private fun HomeHeader(
             onClick = onProfileClick,
             modifier = Modifier.size(48.dp),
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Person,
-                contentDescription = "Profile",
-                tint = MaterialTheme.colorScheme.onBackground,
-            )
+            if (avatarId != null) {
+                AlbumArtwork(
+                    albumId = avatarId,
+                    colors = listOf(RakyzuPurple, RakyzuAqua),
+                    artworkRequestProvider = profileArtworkRequestProvider,
+                    modifier = Modifier.size(42.dp).clip(CircleShape),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Person,
+                    contentDescription = "Profile",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
         }
     }
 }
@@ -843,6 +872,8 @@ internal fun TrackShelf(
     tracks: List<Track>,
     layoutSpec: HomeLayoutSpec = HomeLayoutSpec.Standard,
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
+    featuredArtworkId: String? = null,
+    featuredArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     onTrackPlay: (List<Track>, Int) -> Unit,
     likedTrackIds: Set<String> = emptySet(),
     savedAlbumIds: Set<String> = emptySet(),
@@ -911,9 +942,13 @@ internal fun TrackShelf(
                     Box {
                         Column {
                             AlbumArtwork(
-                                albumId = track.albumId,
+                                albumId = if (index == 0 && featuredArtworkId != null) {
+                                    featuredArtworkId
+                                } else track.albumId,
                                 colors = catalogGradients[index % catalogGradients.size],
-                                artworkRequestProvider = artworkRequestProvider,
+                                artworkRequestProvider = if (index == 0 && featuredArtworkId != null) {
+                                    featuredArtworkRequestProvider
+                                } else artworkRequestProvider,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f),

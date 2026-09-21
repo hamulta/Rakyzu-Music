@@ -48,7 +48,7 @@ class AdminViewModelTest {
         val viewModel = AdminViewModel(repository)
         testScheduler.advanceUntilIdle()
 
-        viewModel.createArtist("Rakyzu Original")
+        viewModel.createArtist("Rakyzu Original", null)
         testScheduler.advanceUntilIdle()
 
         assertEquals("Rakyzu Original", repository.artistName)
@@ -78,12 +78,17 @@ class AdminViewModelTest {
             )
         }
 
-        override suspend fun createArtist(name: String): AdminActionResult {
+        override suspend fun createArtist(name: String, email: String?): AdminActionResult {
             artistName = name
             return AdminActionResult.Success("Artist draft created")
         }
 
+        override suspend fun updateArtist(id: String, name: String, email: String?) = ok()
+        override suspend fun archiveArtist(id: String) = ok()
+
         override suspend fun createAlbum(artistId: String, title: String, releaseDate: String?) = ok()
+        override suspend fun updateAlbum(id: String, title: String, releaseDate: String?) = ok()
+        override suspend fun archiveAlbum(id: String) = ok()
         override suspend fun createTrack(
             albumId: String, title: String, durationMs: Int, discNumber: Int,
             trackNumber: Int, explicit: Boolean,
@@ -110,6 +115,12 @@ class AdminViewModelTest {
         override suspend fun exportAudit(operation: String?, targetType: String?) =
             AdminAuditExportResult.Success("id,operation,target_type,target_id,created_at")
         override suspend fun setAuditRetention(days: Int) = ok()
+        override suspend fun upsertRecommendation(
+            id: String?, title: String, subtitle: String?, position: Int,
+            trackId: String?, published: Boolean,
+        ) = ok()
+        override suspend fun deleteRecommendation(id: String) = ok()
+        override suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = ok()
         private fun ok() = AdminActionResult.Success("Updated")
     }
 }

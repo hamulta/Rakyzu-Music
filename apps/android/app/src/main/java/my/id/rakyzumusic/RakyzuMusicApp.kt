@@ -1,5 +1,10 @@
 package my.id.rakyzumusic
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +75,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import java.io.ByteArrayOutputStream
 import my.id.rakyzumusic.core.data.auth.AuthActionResult
 import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.admin.StaffPermission
@@ -81,6 +88,8 @@ import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
+import my.id.rakyzumusic.core.data.profile.ListenerProfile
+import my.id.rakyzumusic.core.data.profile.ProfileAppearance
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
@@ -107,6 +116,8 @@ import my.id.rakyzumusic.feature.profile.OnboardingScreen
 import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
+import my.id.rakyzumusic.feature.profile.ArtistWelcomeDialog
+import my.id.rakyzumusic.feature.profile.IdentityName
 import my.id.rakyzumusic.feature.search.AlbumDetailRoute
 import my.id.rakyzumusic.feature.search.AlbumDetailViewModel
 import my.id.rakyzumusic.feature.search.ArtistDetailRoute
@@ -122,6 +133,8 @@ import my.id.rakyzumusic.navigation.openArtistDetail
 import my.id.rakyzumusic.navigation.openNowPlaying
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private data class TopLevelDestination(
     val route: RakyzuRoute,
@@ -244,6 +257,7 @@ private fun ProfileGatedRakyzuMusicApp(
             versionName = versionName,
             userId = userId,
             email = email,
+            profile = profile,
             displayName = profile.displayName,
             profileDisplayNameDraft = profileState.displayName,
             isSavingProfile = profileState.isSaving,
@@ -252,6 +266,11 @@ private fun ProfileGatedRakyzuMusicApp(
             onProfileDisplayNameChanged = profileViewModel::updateDisplayName,
             onSaveProfile = { profileViewModel.saveProfile(completeOnboarding = false) },
             onResetProfileDraft = profileViewModel::resetDraft,
+            onAcceptArtistTerms = profileViewModel::acceptArtistTerms,
+            onUpdateArtistBiography = profileViewModel::updateArtistBiography,
+            onProfileAppearanceChanged = profileViewModel::updateAppearance,
+            onUploadAvatar = profileViewModel::uploadAvatar,
+            onDeleteAvatar = profileViewModel::deleteAvatar,
             authRepository = authRepository,
             catalogRepository = catalogRepository,
             libraryRepository = libraryRepository,
@@ -271,6 +290,7 @@ private fun ProfileGatedRakyzuMusicApp(
 @Composable
 private fun AuthenticatedRakyzuMusicApp(
     versionName: String,
+    profile: ListenerProfile,
     userId: String,
     email: String?,
     displayName: String,
@@ -281,6 +301,11 @@ private fun AuthenticatedRakyzuMusicApp(
     onProfileDisplayNameChanged: (String) -> Unit,
     onSaveProfile: () -> Unit,
     onResetProfileDraft: () -> Unit,
+    onAcceptArtistTerms: (String) -> Unit,
+    onUpdateArtistBiography: (String) -> Unit,
+    onProfileAppearanceChanged: (ProfileAppearance) -> Unit,
+    onUploadAvatar: (ByteArray) -> Unit,
+    onDeleteAvatar: () -> Unit,
     authRepository: AuthRepository,
     catalogRepository: CatalogRepository,
     libraryRepository: LibraryRepository,
@@ -338,8 +363,15 @@ private fun AuthenticatedRakyzuMusicApp(
     var isSigningOut by remember { mutableStateOf(false) }
     var signOutMessage by remember { mutableStateOf<String?>(null) }
 
+    ArtistWelcomeDialog(
+        profile = profile,
+        isWorking = isSavingProfile,
+        onConfirm = onAcceptArtistTerms,
+    )
+
     if (showAccount) {
         AccountSheet(
+            profile = profile,
             email = email,
             displayName = displayName,
             displayNameDraft = profileDisplayNameDraft,
@@ -349,6 +381,10 @@ private fun AuthenticatedRakyzuMusicApp(
             isSigningOut = isSigningOut,
             message = signOutMessage,
             onDisplayNameChanged = onProfileDisplayNameChanged,
+            onAppearanceChanged = onProfileAppearanceChanged,
+            onUpdateArtistBiography = onUpdateArtistBiography,
+            onUploadAvatar = onUploadAvatar,
+            onDeleteAvatar = onDeleteAvatar,
             onSaveProfile = onSaveProfile,
             playbackPreferences = playbackPreferenceState,
             onWifiQualityChanged = playbackPreferences::setWifiQuality,
@@ -420,6 +456,8 @@ private fun AuthenticatedRakyzuMusicApp(
                             connectivityMonitor = connectivityMonitor,
                             versionName = versionName,
                             displayName = displayName,
+                            avatarAvailable = profile.avatarAvailable,
+                            avatarRevision = profile.avatarVersion,
                             onTrackPlay = playbackController::playQueue,
                             onProfileClick = {
                                 signOutMessage = null
@@ -704,6 +742,7 @@ private fun SessionLoadingScreen(modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountSheet(
+    profile: ListenerProfile,
     email: String?,
     displayName: String,
     displayNameDraft: String,
@@ -713,6 +752,10 @@ private fun AccountSheet(
     isSigningOut: Boolean,
     message: String?,
     onDisplayNameChanged: (String) -> Unit,
+    onAppearanceChanged: (ProfileAppearance) -> Unit,
+    onUpdateArtistBiography: (String) -> Unit,
+    onUploadAvatar: (ByteArray) -> Unit,
+    onDeleteAvatar: () -> Unit,
     onSaveProfile: () -> Unit,
     playbackPreferences: PlaybackPreferences,
     onWifiQualityChanged: (PlaybackQuality) -> Unit,
@@ -721,6 +764,19 @@ private fun AccountSheet(
     onDismiss: () -> Unit,
     onSignOut: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var artistBiography by remember(profile.artist?.id, profile.artist?.biography) {
+        mutableStateOf(profile.artist?.biography.orEmpty())
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val bytes = withContext(Dispatchers.IO) { decodeProfilePhoto(context, uri) }
+                if (bytes != null) onUploadAvatar(bytes)
+            }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = RakyzuSurface,
@@ -740,16 +796,67 @@ private fun AccountSheet(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
+            IdentityName(profile = profile)
+            if (profile.verified) {
+                Text(
+                    text = profile.role?.replace("_", " ")?.replaceFirstChar(Char::uppercase)
+                        ?: "Verified Artist",
+                    color = RakyzuAqua,
+                    fontWeight = FontWeight.Bold,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Role color animation", fontWeight = FontWeight.Bold)
+                        Text("Turn off to use the default name style.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(
+                        checked = profile.appearance == ProfileAppearance.Role,
+                        onCheckedChange = { enabled ->
+                            onAppearanceChanged(if (enabled) ProfileAppearance.Role else ProfileAppearance.Default)
+                        },
+                        enabled = !isSavingProfile && !isSigningOut,
+                    )
+                }
+            }
+            if (profile.artist?.isActive == true) {
+                Text("Artist workspace", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold)
+                Text("${profile.artist.name} · Verified Artist", color = RakyzuAqua)
+                OutlinedTextField(
+                    value = artistBiography,
+                    onValueChange = { artistBiography = it.take(1_500) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSavingProfile && !isSigningOut,
+                    label = { Text("Artist biography") },
+                    supportingText = { Text("Only the linked Artist account can edit this biography.") },
+                    minLines = 3,
+                )
+                Button(
+                    onClick = { onUpdateArtistBiography(artistBiography) },
+                    enabled = !isSavingProfile && !isSigningOut &&
+                        artistBiography != profile.artist.biography,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Save Artist biography") }
+            }
             Text(
                 text = email ?: "Signed in to Rakyzu Music",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyLarge,
             )
+            Button(
+                onClick = { photoPicker.launch(arrayOf("image/jpeg", "image/png", "image/webp")) },
+                enabled = !isSavingProfile && !isSigningOut,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (profile.avatarAvailable) "Change profile photo" else "Add profile photo")
+            }
+            if (profile.avatarAvailable) {
+                Button(
+                    onClick = onDeleteAvatar,
+                    enabled = !isSavingProfile && !isSigningOut,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Remove profile photo") }
+            }
             OutlinedTextField(
                 value = displayNameDraft,
                 onValueChange = onDisplayNameChanged,
@@ -863,6 +970,24 @@ private fun AccountSheet(
                 }
             }
         }
+    }
+}
+
+private fun decodeProfilePhoto(context: android.content.Context, uri: Uri): ByteArray? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        ?: return null
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (bounds.outWidth / sample > 2048 || bounds.outHeight / sample > 2048) sample *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    val bitmap = context.contentResolver.openInputStream(uri)?.use {
+        BitmapFactory.decodeStream(it, null, options)
+    } ?: return null
+    return ByteArrayOutputStream().use { output ->
+        @Suppress("DEPRECATION")
+        if (!bitmap.compress(Bitmap.CompressFormat.WEBP, 88, output)) return null
+        output.toByteArray().takeIf { it.size in 12..(5 * 1024 * 1024) }
     }
 }
 

@@ -374,3 +374,16 @@ commit/CI cycle solely to record identifiers that only exist after publication.
   failures before any application test ran. The CEO clarified that emulator execution is
   not required; the gate and KVM setup were removed. Physical-device ADB evidence above is
   the runtime gate, matching the established project workflow.
+# Active cumulative 0.5.21–0.5.25 batch — 2026-09-21
+
+- [x] Audit copied workspace and preserve the validated `0.5.20` baseline.
+- [x] Implement optional exact-email Artist identity, in-app consent, profile badge/color, scoped biography, and universal avatar.
+- [x] Implement requested staff email intents, Artist/album edit/archive, recommendation card lifecycle, and six audio containers.
+- [x] Synchronize source version to `0.5.25`/`71`, Worker package and CI artifact identity.
+- [x] Run Worker tests/typecheck on Node 22; see current command evidence below.
+- [ ] Run database migration replay, pgTAP tests, and database lint.
+- [ ] Run Android unit tests, lint, debug/test APK builds, and minified release build.
+- [ ] Run candidate CI, deploy forward migrations and Worker, verify live behavior.
+- [ ] Push validated main commit, tag/release, download and inspect APK, and complete final audit.
+
+The previous device's Android SDK path is unavailable in this copied ARM64 environment. No Android build, database replay, deployment, tag, or release is claimed until the corresponding gate succeeds. The `0.5.20` release remains the last verified published artifact.

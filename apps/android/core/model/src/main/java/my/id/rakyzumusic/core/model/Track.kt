@@ -43,6 +43,7 @@ data class EditorialShelf(
     val subtitle: String?,
     val position: Int,
     val tracks: List<Track>,
+    val hasCustomArtwork: Boolean = false,
 )
 
 data class HomeFeedSnapshot(

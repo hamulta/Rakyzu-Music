@@ -2,6 +2,8 @@ package my.id.rakyzumusic.feature.admin
 
 import android.content.Intent
 import android.net.Uri
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -84,7 +86,11 @@ fun AdminRoute(
         state = state,
         onRefresh = viewModel::refresh,
         onCreateArtist = viewModel::createArtist,
+        onUpdateArtist = viewModel::updateArtist,
+        onArchiveArtist = viewModel::archiveArtist,
         onCreateAlbum = viewModel::createAlbum,
+        onUpdateAlbum = viewModel::updateAlbum,
+        onArchiveAlbum = viewModel::archiveAlbum,
         onCreateTrack = viewModel::createTrack,
         onUploadAudio = viewModel::uploadAudio,
         onPublishAlbum = viewModel::publishAlbum,
@@ -101,6 +107,9 @@ fun AdminRoute(
         onScheduleAlbum = viewModel::scheduleAlbum,
         onExportAudit = viewModel::exportAudit,
         onSetAuditRetention = viewModel::setAuditRetention,
+        onUpsertRecommendation = viewModel::upsertRecommendation,
+        onDeleteRecommendation = viewModel::deleteRecommendation,
+        onUploadRecommendationArtwork = viewModel::uploadRecommendationArtwork,
         modifier = modifier,
     )
 }
@@ -109,8 +118,12 @@ fun AdminRoute(
 internal fun AdminScreen(
     state: AdminUiState,
     onRefresh: () -> Unit,
-    onCreateArtist: (String) -> Unit,
+    onCreateArtist: (String, String?) -> Unit,
+    onUpdateArtist: (String, String, String?) -> Unit,
+    onArchiveArtist: (String) -> Unit,
     onCreateAlbum: (String, String, String?) -> Unit,
+    onUpdateAlbum: (String, String, String?) -> Unit,
+    onArchiveAlbum: (String) -> Unit,
     onCreateTrack: (String, String, Int, Int, Int, Boolean) -> Unit,
     onUploadAudio: (String, String, ByteArray) -> Unit,
     onPublishAlbum: (String) -> Unit,
@@ -127,6 +140,9 @@ internal fun AdminScreen(
     onScheduleAlbum: (String, String) -> Unit,
     onExportAudit: (String?, String?) -> Unit,
     onSetAuditRetention: (Int) -> Unit,
+    onUpsertRecommendation: (String?, String, String?, Int, String?, Boolean) -> Unit,
+    onDeleteRecommendation: (String) -> Unit,
+    onUploadRecommendationArtwork: (String, ByteArray) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dashboard = state.dashboard
@@ -140,7 +156,11 @@ internal fun AdminScreen(
             state = state,
             onRefresh = onRefresh,
             onCreateArtist = onCreateArtist,
+            onUpdateArtist = onUpdateArtist,
+            onArchiveArtist = onArchiveArtist,
             onCreateAlbum = onCreateAlbum,
+            onUpdateAlbum = onUpdateAlbum,
+            onArchiveAlbum = onArchiveAlbum,
             onCreateTrack = onCreateTrack,
             onUploadAudio = onUploadAudio,
             onPublishAlbum = onPublishAlbum,
@@ -157,6 +177,9 @@ internal fun AdminScreen(
             onScheduleAlbum = onScheduleAlbum,
             onExportAudit = onExportAudit,
             onSetAuditRetention = onSetAuditRetention,
+            onUpsertRecommendation = onUpsertRecommendation,
+            onDeleteRecommendation = onDeleteRecommendation,
+            onUploadRecommendationArtwork = onUploadRecommendationArtwork,
             modifier = modifier,
         )
     }
@@ -167,8 +190,12 @@ private fun StaffAdminPanel(
     dashboard: AdminDashboard,
     state: AdminUiState,
     onRefresh: () -> Unit,
-    onCreateArtist: (String) -> Unit,
+    onCreateArtist: (String, String?) -> Unit,
+    onUpdateArtist: (String, String, String?) -> Unit,
+    onArchiveArtist: (String) -> Unit,
     onCreateAlbum: (String, String, String?) -> Unit,
+    onUpdateAlbum: (String, String, String?) -> Unit,
+    onArchiveAlbum: (String) -> Unit,
     onCreateTrack: (String, String, Int, Int, Int, Boolean) -> Unit,
     onUploadAudio: (String, String, ByteArray) -> Unit,
     onPublishAlbum: (String) -> Unit,
@@ -185,6 +212,9 @@ private fun StaffAdminPanel(
     onScheduleAlbum: (String, String) -> Unit,
     onExportAudit: (String?, String?) -> Unit,
     onSetAuditRetention: (Int) -> Unit,
+    onUpsertRecommendation: (String?, String, String?, Int, String?, Boolean) -> Unit,
+    onDeleteRecommendation: (String) -> Unit,
+    onUploadRecommendationArtwork: (String, ByteArray) -> Unit,
     modifier: Modifier,
 ) {
     val access = dashboard.context
@@ -278,11 +308,16 @@ private fun StaffAdminPanel(
         if (access.can(StaffPermission.CatalogDraft)) {
             item {
                 CatalogComposer(
+                    catalog = dashboard.catalog,
                     canUpload = access.can(StaffPermission.CatalogUploadAudio),
                     canPublish = access.can(StaffPermission.CatalogPublish),
                     enabled = !state.isWorking,
                     onCreateArtist = onCreateArtist,
+                    onUpdateArtist = onUpdateArtist,
+                    onArchiveArtist = onArchiveArtist,
                     onCreateAlbum = onCreateAlbum,
+                    onUpdateAlbum = onUpdateAlbum,
+                    onArchiveAlbum = onArchiveAlbum,
                     onCreateTrack = onCreateTrack,
                     onUploadAudio = onUploadAudio,
                     onPublishAlbum = onPublishAlbum,
@@ -353,6 +388,18 @@ private fun StaffAdminPanel(
                     title = "${member.scopeType.replaceFirstChar(Char::uppercase)} • ${member.accessLevel}",
                     detail = if (member.active) "Active scoped access" else "Disabled scoped access",
                     id = "${member.scopeId} • ${member.userId}",
+                )
+            }
+        }
+
+        if (access.can(StaffPermission.EditorialManage)) {
+            item {
+                RecommendationComposer(
+                    enabled = !state.isWorking,
+                    recommendations = dashboard.recommendations,
+                    onSave = onUpsertRecommendation,
+                    onDelete = onDeleteRecommendation,
+                    onUploadArtwork = onUploadRecommendationArtwork,
                 )
             }
         }
@@ -652,7 +699,7 @@ private fun ReleaseGovernanceComposer(
         )
         if (canUpload) {
             PrimaryAction("Select WebP artwork", enabled && albumId.length == 36) {
-                artworkPicker.launch(arrayOf("image/webp"))
+                artworkPicker.launch(arrayOf("image/jpeg", "image/png", "image/webp"))
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -772,16 +819,22 @@ private fun AuditGovernanceCard(
 
 @Composable
 private fun CatalogComposer(
+    catalog: List<my.id.rakyzumusic.core.data.admin.CatalogDraft>,
     canUpload: Boolean,
     canPublish: Boolean,
     enabled: Boolean,
-    onCreateArtist: (String) -> Unit,
+    onCreateArtist: (String, String?) -> Unit,
+    onUpdateArtist: (String, String, String?) -> Unit,
+    onArchiveArtist: (String) -> Unit,
     onCreateAlbum: (String, String, String?) -> Unit,
+    onUpdateAlbum: (String, String, String?) -> Unit,
+    onArchiveAlbum: (String) -> Unit,
     onCreateTrack: (String, String, Int, Int, Int, Boolean) -> Unit,
     onUploadAudio: (String, String, ByteArray) -> Unit,
     onPublishAlbum: (String) -> Unit,
 ) {
     var artistName by remember { mutableStateOf("") }
+    var artistEmail by remember { mutableStateOf("") }
     var artistId by remember { mutableStateOf("") }
     var albumTitle by remember { mutableStateOf("") }
     var releaseDate by remember { mutableStateOf("") }
@@ -805,17 +858,62 @@ private fun CatalogComposer(
 
     AdminSection("Catalog publishing") {
         Text("Manager drafts metadata. C-Level and CEO upload audio and publish releases.")
+        catalog.filter { it.kind == "artist" || it.kind == "album" || it.kind == "track" }
+            .take(30).forEach { draft ->
+                OutlinedButton(
+                    onClick = {
+                        when (draft.kind) {
+                            "artist" -> {
+                                artistId = draft.id
+                                artistName = draft.title
+                                artistEmail = draft.email.orEmpty()
+                            }
+                            "album" -> {
+                                albumId = draft.id
+                                artistId = draft.parentId.orEmpty()
+                                albumTitle = draft.title
+                                releaseDate = draft.releaseDate.orEmpty()
+                            }
+                            "track" -> {
+                                trackId = draft.id
+                                albumId = draft.parentId.orEmpty()
+                                trackTitle = draft.title
+                            }
+                        }
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Select ${draft.kind}: ${draft.title}") }
+            }
         OutlinedTextField(
             artistName, { artistName = it.take(120) }, label = { Text("New artist name") },
             modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = enabled,
         )
+        OutlinedTextField(
+            artistEmail, { artistEmail = it.take(254) },
+            label = { Text("Artist account email (optional)") },
+            supportingText = { Text("No email is sent; an exact account match sees in-app consent.") },
+            modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = enabled,
+        )
         PrimaryAction("Create artist profile", enabled && artistName.isNotBlank()) {
-            onCreateArtist(artistName)
+            onCreateArtist(artistName, artistEmail.ifBlank { null })
         }
         OutlinedTextField(
             artistId, { artistId = it }, label = { Text("Artist UUID") },
             modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = enabled,
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { onUpdateArtist(artistId, artistName, artistEmail.ifBlank { null }) },
+                enabled = enabled && artistId.isNotBlank() && artistName.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) { Text("Update artist") }
+            OutlinedButton(
+                onClick = { onArchiveArtist(artistId) },
+                enabled = enabled && artistId.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) { Text("Archive artist") }
+        }
         OutlinedTextField(
             albumTitle, { albumTitle = it.take(160) }, label = { Text("Album title") },
             modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = enabled,
@@ -831,6 +929,18 @@ private fun CatalogComposer(
             albumId, { albumId = it }, label = { Text("Album UUID") },
             modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = enabled,
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { onUpdateAlbum(albumId, albumTitle, releaseDate.ifBlank { null }) },
+                enabled = enabled && albumId.isNotBlank() && albumTitle.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) { Text("Update album") }
+            OutlinedButton(
+                onClick = { onArchiveAlbum(albumId) },
+                enabled = enabled && albumId.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) { Text("Archive album") }
+        }
         OutlinedTextField(
             trackTitle, { trackTitle = it.take(160) }, label = { Text("Track title") },
             modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = enabled,
@@ -878,8 +988,8 @@ private fun CatalogComposer(
                     )
                 }
             }
-            PrimaryAction("Select MP3 and upload", enabled && trackId.isNotBlank()) {
-                audioPicker.launch(arrayOf("audio/mpeg", "audio/mp3"))
+            PrimaryAction("Select audio and upload", enabled && trackId.isNotBlank()) {
+                audioPicker.launch(arrayOf("audio/mpeg", "audio/aac", "audio/mp4", "audio/webm", "audio/wav", "audio/flac"))
             }
         }
         if (canPublish) {
@@ -1041,24 +1151,36 @@ private fun readBoundedAudio(context: android.content.Context, uri: Uri): ByteAr
     }
 }
 
-private fun readBoundedArtwork(context: android.content.Context, uri: Uri): ByteArray? {
+internal fun readBoundedArtwork(context: android.content.Context, uri: Uri): ByteArray? {
     val output = ByteArrayOutputStream()
-    return context.contentResolver.openInputStream(uri)?.use { input ->
+    val source = context.contentResolver.openInputStream(uri)?.use { input ->
         val buffer = ByteArray(8192)
         while (true) {
             val count = input.read(buffer)
             if (count < 0) break
-            if (output.size() + count > MAX_ARTWORK_BYTES) return@use null
+            if (output.size() + count > MAX_ARTWORK_SOURCE_BYTES) return@use null
             output.write(buffer, 0, count)
         }
-        output.toByteArray().takeIf { bytes ->
-            bytes.size >= 12 && bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() &&
-                bytes[2] == 0x46.toByte() && bytes[3] == 0x46.toByte() &&
-                bytes[8] == 0x57.toByte() && bytes[9] == 0x45.toByte() &&
-                bytes[10] == 0x42.toByte() && bytes[11] == 0x50.toByte()
-        }
+        output.toByteArray()
+    } ?: return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0 ||
+        bounds.outWidth > 12_000 || bounds.outHeight > 12_000) return null
+    var sample = 1
+    while (bounds.outWidth / sample > 2048 || bounds.outHeight / sample > 2048) sample *= 2
+    val bitmap = BitmapFactory.decodeByteArray(
+        source, 0, source.size, BitmapFactory.Options().apply { inSampleSize = sample },
+    ) ?: return null
+    return try {
+        val encoded = ByteArrayOutputStream()
+        if (!bitmap.compress(Bitmap.CompressFormat.WEBP, 82, encoded)) null else
+            encoded.toByteArray().takeIf { it.size in 12..MAX_ARTWORK_BYTES }
+    } finally {
+        bitmap.recycle()
     }
 }
 
 private const val MAX_AUDIO_BYTES = 50 * 1024 * 1024
 private const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
+private const val MAX_ARTWORK_SOURCE_BYTES = 15 * 1024 * 1024

@@ -20,6 +20,8 @@ function fixture(allowed = true, canEdit = true) {
     verifyListener: async () => ({ userId }),
     playlistAccess: async () => allowed ? { ownerId: userId, canEdit } : null,
     canStreamTrack: async () => false, canAccessAlbumArtwork: async () => false,
+    resolveTrackMediaKey: async () => null,
+    canAccessEditorialArtwork: async () => false,
     staffContext: async () => ({
       isStaff: false, role: null, displayRole: null, fullAccess: false, permissions: [],
     }),

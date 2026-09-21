@@ -8,7 +8,52 @@ interface AlbumRow {
   id: string;
 }
 
+interface EditorialShelfRow {
+  id: string;
+}
+
 export class CatalogUnavailable extends Error {}
+
+export async function resolveTrackMediaKey(
+  trackId: string,
+  quality: "low" | "standard" | "high",
+  token: string,
+  env: RakyzuApiEnv,
+): Promise<string | null> {
+  const endpoint = new URL("/rest/v1/rpc/get_track_media_key", env.SUPABASE_URL);
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        apikey: env.SUPABASE_PUBLISHABLE_KEY,
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ target_track_id: trackId, requested_quality: quality }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new CatalogUnavailable();
+  }
+  if (!response.ok) throw new CatalogUnavailable();
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new CatalogUnavailable();
+  }
+  if (value === null) return null;
+  const prefix = `media/tracks/${trackId}/`;
+  const stem = quality === "low" ? "source-low" : quality === "high" ? "source-high" : "source";
+  if (typeof value !== "string" || ![
+    "mp3", "aac", "m4a", "webm", "wav", "flac",
+  ].some((extension) => value === `${prefix}${stem}.${extension}`)) {
+    throw new CatalogUnavailable();
+  }
+  return value;
+}
 
 export async function canStreamTrack(
   trackId: string,
@@ -26,8 +71,18 @@ export async function canAccessAlbumArtwork(
   return canAccessCatalogResource("albums", albumId, token, env, isMatchingAlbum(albumId));
 }
 
+export async function canAccessEditorialArtwork(
+  shelfId: string,
+  token: string,
+  env: RakyzuApiEnv,
+): Promise<boolean> {
+  return canAccessCatalogResource(
+    "editorial_shelves", shelfId, token, env, isMatchingShelf(shelfId),
+  );
+}
+
 async function canAccessCatalogResource<T>(
-  table: "albums" | "tracks",
+  table: "albums" | "tracks" | "editorial_shelves",
   resourceId: string,
   token: string,
   env: RakyzuApiEnv,
@@ -73,5 +128,12 @@ function isMatchingAlbum(albumId: string): (value: unknown) => value is AlbumRow
   return (value: unknown): value is AlbumRow => {
     if (typeof value !== "object" || value === null) return false;
     return "id" in value && value.id === albumId;
+  };
+}
+
+function isMatchingShelf(shelfId: string): (value: unknown) => value is EditorialShelfRow {
+  return (value: unknown): value is EditorialShelfRow => {
+    if (typeof value !== "object" || value === null) return false;
+    return "id" in value && value.id === shelfId;
   };
 }

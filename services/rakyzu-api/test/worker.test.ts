@@ -7,6 +7,7 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 const TRACK_ID = "a3000000-0000-4000-8000-000000000001";
 const ALBUM_ID = "a2000000-0000-4000-8000-000000000001";
 const PLAYLIST_ID = "a4000000-0000-4000-8000-000000000001";
+const PROFILE_ID = "b1000000-0000-4000-8000-000000000001";
 const AUDIO = new TextEncoder().encode("rakyzu-audio");
 const ARTWORK = new Uint8Array([0x52, 0x41, 0x4b, 0x59, 0x5a, 0x55]);
 
@@ -15,7 +16,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.20" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.25" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -230,6 +231,81 @@ describe("Rakyzu Music API", () => {
     await expect(response.json()).resolves.toMatchObject({ name: "Rakyzu Original" });
   });
 
+  it("passes an optional exact Artist email to the protected create RPC", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/admin/artists", {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token", "content-type": "application/json" },
+      body: JSON.stringify({ name: "New Artist", email: "Artist@Example.Test" }),
+      staff: staffContext("manager", ["admin.access", "catalog.draft"]),
+      adminCalls: calls,
+    });
+    expect(response.status).toBe(201);
+    expect(calls).toEqual([{ name: "admin_create_artist", payload: {
+      artist_name: "New Artist", artist_email: "Artist@Example.Test",
+    } }]);
+  });
+
+  it("restricts editing another listener's profile image", async () => {
+    const response = await execute(`/v1/profiles/${TRACK_ID}/avatar`, {
+      method: "DELETE",
+      headers: { authorization: "Bearer listener-token" },
+    });
+    expect(response.status).toBe(403);
+  });
+
+  it("allows a listener to upload a bounded WebP profile image", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 4, 0, 0, 0,
+      0x57, 0x45, 0x42, 0x50]);
+    const response = await execute(`/v1/profiles/${PROFILE_ID}/avatar`, {
+      method: "PUT",
+      headers: { authorization: "Bearer listener-token", "content-type": "image/webp",
+        "content-length": String(webp.length) },
+      body: webp,
+      adminCalls: calls,
+    });
+    expect(response.status).toBe(204);
+    expect(calls[0]?.name).toBe("record_profile_avatar");
+  });
+
+  it("forwards Artist biography changes to the self-scoped RPC", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/artists/me/biography", {
+      method: "PUT",
+      headers: { authorization: "Bearer artist-token", "content-type": "application/json" },
+      body: JSON.stringify({ biography: "Original music from Rakyzu." }),
+      adminCalls: calls,
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([{ name: "artist_update_biography",
+      payload: { requested_biography: "Original music from Rakyzu." } }]);
+  });
+
+  it("saves an editorial recommendation through the scoped permission", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/admin/recommendations", {
+      method: "POST",
+      headers: { authorization: "Bearer officer-token", "content-type": "application/json" },
+      body: JSON.stringify({ title: "Today", position: 0, trackId: TRACK_ID, published: true }),
+      staff: staffContext("officer", ["admin.access", "editorial.manage"]),
+      adminCalls: calls,
+    });
+    expect(response.status).toBe(201);
+    expect(calls[0]).toMatchObject({ name: "admin_upsert_editorial_shelf",
+      payload: { shelf_title: "Today", shelf_position: 0, target_track_id: TRACK_ID } });
+  });
+
+  it("blocks a recommendation position outside the database constraint", async () => {
+    const response = await execute("/v1/admin/recommendations", {
+      method: "POST",
+      headers: { authorization: "Bearer officer-token", "content-type": "application/json" },
+      body: JSON.stringify({ title: "Today", position: 1001, published: true }),
+      staff: staffContext("officer", ["admin.access", "editorial.manage"]),
+    });
+    expect(response.status).toBe(422);
+  });
+
   it("assigns a lower role through an exact account email", async () => {
     const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
     const response = await execute("/v1/admin/staff", {
@@ -275,6 +351,28 @@ describe("Rakyzu Music API", () => {
       quality: "standard",
       sizeBytes: mp3.length,
     });
+  });
+
+  it.each([
+    ["audio/aac", new Uint8Array([0xff, 0xf1, 0x50, 0x80]), "aac"],
+    ["audio/mp4", new Uint8Array([0, 0, 0, 12, 0x66, 0x74, 0x79, 0x70, 0, 0, 0, 0]), "m4a"],
+    ["audio/webm", new Uint8Array([0x1a, 0x45, 0xdf, 0xa3]), "webm"],
+    ["audio/wav", new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0,
+      0x57, 0x41, 0x56, 0x45]), "wav"],
+    ["audio/flac", new Uint8Array([0x66, 0x4c, 0x61, 0x43]), "flac"],
+  ])("accepts validated %s uploads", async (contentType, bytes, format) => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/admin/tracks/${TRACK_ID}/audio/standard`, {
+      method: "PUT",
+      headers: { authorization: "Bearer executive-token", "content-type": contentType,
+        "content-length": String(bytes.length) },
+      body: bytes,
+      staff: staffContext("c_level_executive", ["admin.access", "catalog.upload_audio"]),
+      adminCalls: calls,
+    });
+    expect(response.status).toBe(201);
+    expect(calls[0]).toMatchObject({ name: "admin_record_track_media",
+      payload: { media_format: format, media_content_type: contentType } });
   });
 
   it("rejects arbitrary bytes before writing an audio object", async () => {
@@ -479,7 +577,16 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
       if (options.catalogError) throw options.catalogError;
       return options.published ?? true;
     },
+    async resolveTrackMediaKey(trackId, quality) {
+      if (options.catalogError) throw options.catalogError;
+      const stem = quality === "low" ? "source-low" : quality === "high" ? "source-high" : "source";
+      return `media/tracks/${trackId}/${stem}.mp3`;
+    },
     async canAccessAlbumArtwork() {
+      if (options.catalogError) throw options.catalogError;
+      return options.published ?? true;
+    },
+    async canAccessEditorialArtwork() {
       if (options.catalogError) throw options.catalogError;
       return options.published ?? true;
     },

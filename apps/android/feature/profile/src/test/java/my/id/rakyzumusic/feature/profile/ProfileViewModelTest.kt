@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import my.id.rakyzumusic.core.data.profile.ListenerProfile
 import my.id.rakyzumusic.core.data.profile.ProfileFailure
+import my.id.rakyzumusic.core.data.profile.ProfileAppearance
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.profile.ProfileResult
 import org.junit.After
@@ -94,6 +95,13 @@ private class FakeProfileRepository(
             ),
         )
     }
+
+    override suspend fun acceptArtistTerms(version: String): ProfileResult = loadResult
+    override suspend fun updateArtistBiography(biography: String): ProfileResult = loadResult
+
+    override suspend fun updateAppearance(mode: ProfileAppearance): ProfileResult = loadResult
+    override suspend fun uploadAvatar(webpBytes: ByteArray): ProfileResult = loadResult
+    override suspend fun deleteAvatar(): ProfileResult = loadResult
 
     private companion object {
         val INCOMPLETE_PROFILE = ListenerProfile(

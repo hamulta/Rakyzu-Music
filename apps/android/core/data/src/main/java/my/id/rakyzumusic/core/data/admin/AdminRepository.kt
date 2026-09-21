@@ -51,7 +51,8 @@ enum class StaffPermission(val wireName: String) {
     CatalogReview("catalog.review"),
     AuditView("audit.view"),
     AuditExport("audit.export"),
-    GovernanceManage("governance.manage");
+    GovernanceManage("governance.manage"),
+    EditorialManage("editorial.manage");
 
     companion object {
         fun fromWire(value: String): StaffPermission? = entries.firstOrNull { it.wireName == value }
@@ -85,6 +86,8 @@ data class CatalogDraft(
     val parentId: String?,
     val published: Boolean,
     val hasStandardAudio: Boolean? = null,
+    val email: String? = null,
+    val releaseDate: String? = null,
 )
 
 data class StaffAssignment(
@@ -133,6 +136,16 @@ data class ScheduledRelease(
     val status: String,
 )
 
+data class RecommendationCard(
+    val id: String,
+    val title: String,
+    val subtitle: String?,
+    val position: Int,
+    val trackId: String?,
+    val published: Boolean,
+    val hasArtwork: Boolean,
+)
+
 data class AuditSummary(
     val events24h: Int,
     val deniedOrEnforced24h: Int,
@@ -155,6 +168,7 @@ data class AdminDashboard(
     val catalog: List<CatalogDraft> = emptyList(),
     val staff: List<StaffAssignment> = emptyList(),
     val governance: GovernanceDashboard = GovernanceDashboard(),
+    val recommendations: List<RecommendationCard> = emptyList(),
 )
 
 sealed interface AdminDashboardResult {
@@ -183,8 +197,12 @@ enum class AdminFailure {
 
 interface AdminRepository {
     suspend fun loadDashboard(): AdminDashboardResult
-    suspend fun createArtist(name: String): AdminActionResult
+    suspend fun createArtist(name: String, email: String?): AdminActionResult
+    suspend fun updateArtist(id: String, name: String, email: String?): AdminActionResult
+    suspend fun archiveArtist(id: String): AdminActionResult
     suspend fun createAlbum(artistId: String, title: String, releaseDate: String?): AdminActionResult
+    suspend fun updateAlbum(id: String, title: String, releaseDate: String?): AdminActionResult
+    suspend fun archiveAlbum(id: String): AdminActionResult
     suspend fun createTrack(
         albumId: String,
         title: String,
@@ -229,6 +247,12 @@ interface AdminRepository {
     suspend fun scheduleAlbum(albumId: String, publishAt: String): AdminActionResult
     suspend fun exportAudit(operation: String?, targetType: String?): AdminAuditExportResult
     suspend fun setAuditRetention(days: Int): AdminActionResult
+    suspend fun upsertRecommendation(
+        id: String?, title: String, subtitle: String?, position: Int,
+        trackId: String?, published: Boolean,
+    ): AdminActionResult
+    suspend fun deleteRecommendation(id: String): AdminActionResult
+    suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray): AdminActionResult
 }
 
 internal class AuthenticatedAdminRepository(
@@ -271,14 +295,43 @@ internal class AuthenticatedAdminRepository(
         if (governanceResponse.status !in 200..299 || governanceResponse.body == null) {
             return@withContext AdminDashboardResult.Unavailable
         }
+        val recommendations = if (context.can(StaffPermission.EditorialManage)) {
+            val response = request("GET", "/v1/admin/recommendations")
+            if (response.status !in 200..299 || response.body == null) {
+                return@withContext AdminDashboardResult.Unavailable
+            }
+            parseRecommendations(response.body)
+        } else emptyList()
         AdminDashboardResult.Success(
-            AdminDashboard(context, moderation, catalog, staff, parseGovernance(governanceResponse.body)),
+            AdminDashboard(
+                context = context,
+                moderationCases = moderation,
+                catalog = catalog,
+                staff = staff,
+                governance = parseGovernance(governanceResponse.body),
+                recommendations = recommendations,
+            ),
         )
     }
 
-    override suspend fun createArtist(name: String): AdminActionResult = action(
-        "POST", "/v1/admin/artists", buildJsonObject { put("name", name.trim()) },
+    override suspend fun createArtist(name: String, email: String?): AdminActionResult = action(
+        "POST", "/v1/admin/artists", buildJsonObject {
+            put("name", name.trim())
+            if (email.isNullOrBlank()) put("email", JsonNull) else put("email", email.trim().lowercase())
+        },
         successMessage = "Artist draft created",
+    )
+
+    override suspend fun updateArtist(id: String, name: String, email: String?): AdminActionResult = action(
+        "PUT", "/v1/admin/artists/${id.trim().lowercase()}", buildJsonObject {
+            put("name", name.trim())
+            if (email.isNullOrBlank()) put("email", JsonNull) else put("email", email.trim().lowercase())
+        }, "Artist profile updated",
+    )
+
+    override suspend fun archiveArtist(id: String): AdminActionResult = action(
+        "DELETE", "/v1/admin/artists/${id.trim().lowercase()}", buildJsonObject {},
+        "Artist profile archived",
     )
 
     override suspend fun createAlbum(
@@ -292,6 +345,23 @@ internal class AuthenticatedAdminRepository(
             if (releaseDate.isNullOrBlank()) put("releaseDate", JsonNull)
             else put("releaseDate", releaseDate.trim())
         }, successMessage = "Album draft created",
+    )
+
+    override suspend fun updateAlbum(
+        id: String,
+        title: String,
+        releaseDate: String?,
+    ): AdminActionResult = action(
+        "PUT", "/v1/admin/albums/${id.trim().lowercase()}", buildJsonObject {
+            put("title", title.trim())
+            if (releaseDate.isNullOrBlank()) put("releaseDate", JsonNull)
+            else put("releaseDate", releaseDate.trim())
+        }, "Album updated",
+    )
+
+    override suspend fun archiveAlbum(id: String): AdminActionResult = action(
+        "DELETE", "/v1/admin/albums/${id.trim().lowercase()}", buildJsonObject {},
+        "Album archived",
     )
 
     override suspend fun createTrack(
@@ -317,14 +387,16 @@ internal class AuthenticatedAdminRepository(
         quality: String,
         bytes: ByteArray,
     ): AdminActionResult = withContext(Dispatchers.IO) {
+        val audioType = detectAudioType(bytes)
         if (!UUID.matches(trackId) || quality !in AUDIO_QUALITIES ||
-            bytes.size !in 4..MAX_AUDIO_BYTES || !looksLikeMp3(bytes)) {
+            bytes.size !in 4..MAX_AUDIO_BYTES || audioType == null) {
             return@withContext AdminActionResult.Failure(AdminFailure.InvalidInput)
         }
         request(
             method = "PUT",
             path = "/v1/admin/tracks/${trackId.lowercase()}/audio/$quality",
             binary = bytes,
+            binaryContentType = audioType,
         ).toActionResult("Audio uploaded")
     }
 
@@ -352,7 +424,7 @@ internal class AuthenticatedAdminRepository(
         action: String,
         notes: String,
     ): AdminActionResult = action(
-        "PATCH", "/v1/admin/moderation/${caseId.trim().lowercase()}", buildJsonObject {
+        "PUT", "/v1/admin/moderation/${caseId.trim().lowercase()}", buildJsonObject {
             put("action", action)
             put("notes", notes.trim())
         }, "Moderation case updated",
@@ -448,7 +520,7 @@ internal class AuthenticatedAdminRepository(
         decision: String,
         notes: String,
     ): AdminActionResult = action(
-        "PATCH", "/v1/admin/reviews/${reviewId.trim().lowercase()}", buildJsonObject {
+        "PUT", "/v1/admin/reviews/${reviewId.trim().lowercase()}", buildJsonObject {
             put("decision", decision)
             put("notes", notes.trim())
         }, "Catalog review decision recorded",
@@ -480,6 +552,38 @@ internal class AuthenticatedAdminRepository(
                 .joinToString(",") { key -> csvCell(item.string(key).orEmpty()) }
         }
         AdminAuditExportResult.Success(lines.joinToString("\n"))
+    }
+
+    override suspend fun upsertRecommendation(
+        id: String?, title: String, subtitle: String?, position: Int,
+        trackId: String?, published: Boolean,
+    ): AdminActionResult = action("POST", "/v1/admin/recommendations", buildJsonObject {
+        if (id.isNullOrBlank()) put("id", JsonNull) else put("id", id.trim())
+        put("title", title.trim())
+        if (subtitle.isNullOrBlank()) put("subtitle", JsonNull) else put("subtitle", subtitle.trim())
+        put("position", position)
+        if (trackId.isNullOrBlank()) put("trackId", JsonNull) else put("trackId", trackId.trim())
+        put("published", published)
+    }, "Recommendation card saved")
+
+    override suspend fun deleteRecommendation(id: String): AdminActionResult = action(
+        "DELETE", "/v1/admin/recommendations/${id.trim().lowercase()}", buildJsonObject {},
+        "Recommendation card deleted",
+    )
+
+    override suspend fun uploadRecommendationArtwork(
+        id: String,
+        bytes: ByteArray,
+    ): AdminActionResult = withContext(Dispatchers.IO) {
+        if (!UUID.matches(id) || bytes.size !in 12..MAX_ARTWORK_BYTES || !looksLikeWebp(bytes)) {
+            return@withContext AdminActionResult.Failure(AdminFailure.InvalidInput)
+        }
+        request(
+            method = "PUT",
+            path = "/v1/admin/recommendations/${id.lowercase()}/artwork",
+            binary = bytes,
+            binaryContentType = "image/webp",
+        ).toActionResult("Recommendation artwork updated")
     }
 
     override suspend fun setAuditRetention(days: Int): AdminActionResult = action(
@@ -608,6 +712,8 @@ internal class AuthenticatedAdminRepository(
                     parentId = item.string(if (kind == "album") "artistId" else "albumId"),
                     published = item.boolean("published") ?: false,
                     hasStandardAudio = item.boolean("hasStandardAudio"),
+                    email = item.string("email"),
+                    releaseDate = item.string("releaseDate"),
                 )
             }
         return items("artists", "artist") + items("albums", "album") + items("tracks", "track")
@@ -686,6 +792,20 @@ internal class AuthenticatedAdminRepository(
         return GovernanceDashboard(enforcements, labels, teams, reviews, schedules, audit)
     }
 
+    private fun parseRecommendations(element: JsonElement): List<RecommendationCard> =
+        (element as? JsonArray).orEmpty().mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            RecommendationCard(
+                id = item.string("id") ?: return@mapNotNull null,
+                title = item.string("title") ?: return@mapNotNull null,
+                subtitle = item.string("subtitle"),
+                position = item.int("position") ?: return@mapNotNull null,
+                trackId = item.string("trackId"),
+                published = item.boolean("published") ?: false,
+                hasArtwork = item.boolean("hasArtwork") ?: false,
+            )
+        }
+
     private fun ApiResponse.toFailure(): AdminFailure = when (status) {
         400, 404, 409, 422 -> AdminFailure.InvalidInput
         401 -> AdminFailure.NotAuthenticated
@@ -706,10 +826,18 @@ internal class AuthenticatedAdminRepository(
         const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
         const val MAX_JSON_BYTES = 1024 * 1024
 
-        fun looksLikeMp3(bytes: ByteArray): Boolean = bytes.size >= 4 && (
-            (bytes[0] == 0x49.toByte() && bytes[1] == 0x44.toByte() && bytes[2] == 0x33.toByte()) ||
-                (bytes[0] == 0xff.toByte() && (bytes[1].toInt() and 0xe0) == 0xe0)
-            )
+        fun detectAudioType(bytes: ByteArray): String? {
+            if (bytes.size < 4) return null
+            if ((bytes[0] == 0x49.toByte() && bytes[1] == 0x44.toByte() && bytes[2] == 0x33.toByte()) ||
+                (bytes[0] == 0xff.toByte() && (bytes[1].toInt() and 0xe0) == 0xe0 && (bytes[1].toInt() and 0x06) != 0)) return "audio/mpeg"
+            if (bytes[0] == 0xff.toByte() && (bytes[1].toInt() and 0xf6) == 0xf0) return "audio/aac"
+            if (bytes.size >= 12 && bytes.copyOfRange(4, 8).contentEquals("ftyp".encodeToByteArray())) return "audio/mp4"
+            if (bytes.take(4).map(Byte::toInt).map { it and 0xff } == listOf(0x1a, 0x45, 0xdf, 0xa3)) return "audio/webm"
+            if (bytes.size >= 12 && bytes.copyOfRange(0, 4).contentEquals("RIFF".encodeToByteArray()) &&
+                bytes.copyOfRange(8, 12).contentEquals("WAVE".encodeToByteArray())) return "audio/wav"
+            if (bytes.copyOfRange(0, 4).contentEquals("fLaC".encodeToByteArray())) return "audio/flac"
+            return null
+        }
 
         fun looksLikeWebp(bytes: ByteArray): Boolean = bytes.size >= 12 &&
             bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() &&
@@ -723,8 +851,12 @@ internal class AuthenticatedAdminRepository(
 
 internal data object UnavailableAdminRepository : AdminRepository {
     override suspend fun loadDashboard() = AdminDashboardResult.Unavailable
-    override suspend fun createArtist(name: String) = unavailable()
+    override suspend fun createArtist(name: String, email: String?) = unavailable()
+    override suspend fun updateArtist(id: String, name: String, email: String?) = unavailable()
+    override suspend fun archiveArtist(id: String) = unavailable()
     override suspend fun createAlbum(artistId: String, title: String, releaseDate: String?) = unavailable()
+    override suspend fun updateAlbum(id: String, title: String, releaseDate: String?) = unavailable()
+    override suspend fun archiveAlbum(id: String) = unavailable()
     override suspend fun createTrack(
         albumId: String, title: String, durationMs: Int, discNumber: Int,
         trackNumber: Int, explicit: Boolean,
@@ -751,6 +883,12 @@ internal data object UnavailableAdminRepository : AdminRepository {
     override suspend fun exportAudit(operation: String?, targetType: String?) =
         AdminAuditExportResult.Failure(AdminFailure.ServiceUnavailable)
     override suspend fun setAuditRetention(days: Int) = unavailable()
+    override suspend fun upsertRecommendation(
+        id: String?, title: String, subtitle: String?, position: Int,
+        trackId: String?, published: Boolean,
+    ) = unavailable()
+    override suspend fun deleteRecommendation(id: String) = unavailable()
+    override suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = unavailable()
     private fun unavailable() = AdminActionResult.Failure(AdminFailure.ServiceUnavailable)
 }
 

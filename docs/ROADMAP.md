@@ -133,32 +133,32 @@ remains a separately approved maintenance operation.
 
 ### Artist identity and strengthened Control Room — CEO extension
 
-- [ ] `0.5.21` — exact-email Artist invitation state machine, server-authoritative Artist role,
-  expiry/revocation, and Resend delivery through the Worker secret boundary.
-- [ ] `0.5.22` — mandatory in-app invitation popup, versioned Artist terms, explicit acceptance,
-  rejection, and immutable consent evidence before any Artist privilege activates.
-- [ ] `0.5.23` — distinct Artist profile and navigation, ownership-linked public identity, and a
-  Rakyzu verification badge whose meaning is limited to verified identity/profile management.
-- [ ] `0.5.24` — Artist workspace for scoped biography, images, team, catalog drafts, and release
+- [ ] `0.5.21` — optional exact-email Artist account link, server-authoritative pending/active/revoked
+  identity, and automatic matching for an existing or future account. No extra Artist email challenge.
+- [ ] `0.5.22` — in-Home welcome, versioned terms, checked consent, and immutable consent evidence
+  before the matched Artist identity activates.
+- [ ] `0.5.23` — distinct Artist and rank-specific staff profile identity, revocable verification badge,
+  role-color animation with default toggle, and a self-scoped Artist biography workspace.
+- [ ] `0.5.24` — authenticated profile image for every account and validated MP3/AAC/M4A/WebM/WAV/FLAC
+  audio upload/streaming; album and recommendation images accept JPEG, PNG, or WebP selection.
+- [ ] `0.5.25` — CEO-requested staff email bootstrap, existing/new Artist and album edit/archive,
+  and full seeded/new Home recommendation edit/order/target/image/delete controls.
+- [ ] `0.5.26` — expand Artist workspace to scoped imagery, team, catalog drafts, and release
   submissions without organization-global staff permissions or self-publication.
-- [ ] `0.5.25` — privacy-thresholded Artist analytics for streams, listeners, followers, releases,
-  geography, date ranges, and CSV export with aggregation and anti-reidentification controls.
-- [ ] `0.5.26` — Admin commerce dashboard for user subscriptions and purchases, provider-signed
-  webhook ledger, entitlements, receipts, refunds, disputes, reconciliation, and least-privilege
-  financial visibility; no card data is stored by Rakyzu.
-- [ ] `0.5.27` — reasoned user warning, temporary suspension, ban, expiry, session revocation,
-  appeal/evidence workflow, and dual-control permanent enforcement.
-- [ ] `0.5.28` — Artist suspension, badge/privilege revocation, team freeze, catalog quarantine,
-  appeal, and safe reinstatement without deleting audit history.
-- [ ] `0.5.29` — listener and Artist account-deletion requests with reauthentication, cooling-off,
-  legal-retention holds, ownership transfer, anonymization, cancellation, and completion evidence.
-- [ ] `0.5.30` — strengthened Admin analytics, security alerts, dual approval for destructive actions,
-  scoped search/export, accessibility, performance, resilience, and Artist lifecycle release gate.
+- [ ] `0.5.27` — privacy-thresholded Artist/Admin analytics for streams, listeners, followers,
+  releases, geography, date ranges, and CSV export; add trusted event collection first.
+- [ ] `0.5.28` — Admin commerce dashboard for user subscriptions and purchases, provider-signed
+  webhook ledger, entitlements, receipts, refunds, disputes, and least-privilege visibility.
+- [ ] `0.5.29` — reasoned listener/Artist suspension or ban, appeal, badge/privilege revocation,
+  reinstatement, and retention-aware account-deletion requests with dual control.
+- [ ] `0.5.30` — strengthened Admin security alerts, destructive-action approval, scoped export,
+  accessibility, performance, resilience, and Artist lifecycle release gate.
 
 Spotify's current public wording distinguishes a profile-management registration mark from broader
 quality endorsement. Rakyzu's badge will therefore state exactly what was verified, be controlled
-only by trusted server state, and be revocable. Invitation emails identify the intended existing
-account but never grant access until that same authenticated account accepts the current terms.
+only by trusted server state, and be revocable. An optional Artist account email is an exact
+account match, not a second confirmation step; privileges activate only after the matched
+authenticated account accepts the current terms.
 
 - [ ] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
 - [ ] `0.6.1` — explicit album and playlist download actions with per-item progress.
