@@ -818,10 +818,11 @@ private fun AccountSheet(
                     )
                 }
             }
-            if (profile.artist?.isActive == true) {
+            val activeArtist = profile.artist?.takeIf { it.isActive }
+            if (activeArtist != null) {
                 Text("Artist workspace", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold)
-                Text("${profile.artist.name} · Verified Artist", color = RakyzuAqua)
+                Text("${activeArtist.name} · Verified Artist", color = RakyzuAqua)
                 OutlinedTextField(
                     value = artistBiography,
                     onValueChange = { artistBiography = it.take(1_500) },
@@ -834,7 +835,7 @@ private fun AccountSheet(
                 Button(
                     onClick = { onUpdateArtistBiography(artistBiography) },
                     enabled = !isSavingProfile && !isSigningOut &&
-                        artistBiography != profile.artist.biography,
+                        artistBiography != activeArtist.biography,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Save Artist biography") }
             }
