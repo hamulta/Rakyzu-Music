@@ -374,16 +374,32 @@ commit/CI cycle solely to record identifiers that only exist after publication.
   failures before any application test ran. The CEO clarified that emulator execution is
   not required; the gate and KVM setup were removed. Physical-device ADB evidence above is
   the runtime gate, matching the established project workflow.
-# Active cumulative 0.5.21–0.5.25 batch — 2026-09-21
+# Completed cumulative 0.5.21–0.5.25 batch — 2026-09-21
 
 - [x] Audit copied workspace and preserve the validated `0.5.20` baseline.
 - [x] Implement optional exact-email Artist identity, in-app consent, profile badge/color, scoped biography, and universal avatar.
 - [x] Implement requested staff email intents, Artist/album edit/archive, recommendation card lifecycle, and six audio containers.
 - [x] Synchronize source version to `0.5.25`/`71`, Worker package and CI artifact identity.
 - [x] Run Worker tests/typecheck on Node 22; see current command evidence below.
-- [ ] Run database migration replay, pgTAP tests, and database lint.
-- [ ] Run Android unit tests, lint, debug/test APK builds, and minified release build.
-- [ ] Run candidate CI, deploy forward migrations and Worker, verify live behavior.
-- [ ] Push validated main commit, tag/release, download and inspect APK, and complete final audit.
+- [x] Run database migration replay, pgTAP tests, and database lint in GitHub CI.
+- [x] Run Android unit tests, lint, debug/test APK builds, and minified release build in GitHub CI.
+- [x] Run candidate CI, deploy forward migrations and Worker, verify live behavior.
+- [x] Push validated main commit, tag/release, download and inspect APK, and complete final audit.
 
-The previous device's Android SDK path is unavailable in this copied ARM64 environment. No Android build, database replay, deployment, tag, or release is claimed until the corresponding gate succeeds. The `0.5.20` release remains the last verified published artifact.
+The copied ARM64 environment lacks the previous device's Android SDK path, so Android validation
+used the project's GitHub CI gate. Candidate and main Android, database, and Worker workflows
+all succeeded. The main Android run `35614289698` passed unit tests, lint, debug and Android-test
+APK compilation, and the release build. Database run `35614289594` passed pgTAP, lint, replay,
+and deployed two forward migrations; Worker run `35614289675` passed the full check (62 tests,
+type checks, and dry-run) and deployed the API. Live health reports `0.5.25`; production read-only
+checks found five designated roles and both new migration records. The Cloudflare deployment and
+R2 media bucket were independently confirmed.
+
+The cumulative feature commits are `fcfd330`, `995af79`, and `6d7682d`; the last is the tagged
+`v0.5.25` source on `main`. The GitHub prerelease contains the CI-built debug APK. Its ZIP passed
+archive verification; the APK passed package/version inspection and Android v2 signature
+verification with one signer. The published APK was downloaded again through the authenticated
+GitHub API and matched the CI artifact byte for byte: 28,722,740 bytes, SHA-256
+`664fb51a0b01d05decd5ea1fe585baa691971d51389d065b889e11e21a77925d`.
+Release: <https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.25>.
+No Appetize, emulator, ADB, or physical-device runtime test is claimed for this batch.

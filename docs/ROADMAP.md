@@ -133,15 +133,15 @@ remains a separately approved maintenance operation.
 
 ### Artist identity and strengthened Control Room — CEO extension
 
-- [ ] `0.5.21` — optional exact-email Artist account link, server-authoritative pending/active/revoked
+- [x] `0.5.21` — optional exact-email Artist account link, server-authoritative pending/active/revoked
   identity, and automatic matching for an existing or future account. No extra Artist email challenge.
-- [ ] `0.5.22` — in-Home welcome, versioned terms, checked consent, and immutable consent evidence
+- [x] `0.5.22` — in-Home welcome, versioned terms, checked consent, and immutable consent evidence
   before the matched Artist identity activates.
-- [ ] `0.5.23` — distinct Artist and rank-specific staff profile identity, revocable verification badge,
+- [x] `0.5.23` — distinct Artist and rank-specific staff profile identity, revocable verification badge,
   role-color animation with default toggle, and a self-scoped Artist biography workspace.
-- [ ] `0.5.24` — authenticated profile image for every account and validated MP3/AAC/M4A/WebM/WAV/FLAC
+- [x] `0.5.24` — authenticated profile image for every account and validated MP3/AAC/M4A/WebM/WAV/FLAC
   audio upload/streaming; album and recommendation images accept JPEG, PNG, or WebP selection.
-- [ ] `0.5.25` — CEO-requested staff email bootstrap, existing/new Artist and album edit/archive,
+- [x] `0.5.25` — CEO-requested staff email bootstrap, existing/new Artist and album edit/archive,
   and full seeded/new Home recommendation edit/order/target/image/delete controls.
 - [ ] `0.5.26` — expand Artist workspace to scoped imagery, team, catalog drafts, and release
   submissions without organization-global staff permissions or self-publication.
