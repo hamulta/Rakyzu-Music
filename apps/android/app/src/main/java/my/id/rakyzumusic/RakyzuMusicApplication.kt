@@ -37,6 +37,8 @@ import my.id.rakyzumusic.core.playback.PlaybackStreamRequestProvider
 import my.id.rakyzumusic.core.playback.PlaybackStreamRequestResult
 import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
@@ -47,18 +49,34 @@ import kotlinx.coroutines.launch
 import okio.Path.Companion.toOkioPath
 
 class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonImageLoader.Factory {
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val backgroundFailureHandler = CoroutineExceptionHandler { _, failure ->
+        // A failed optional background task must not kill the listener's foreground UI.
+        Log.e("RakyzuBackground", "Background task failed: ${failure.javaClass.simpleName}")
+    }
+    private val applicationScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + backgroundFailureHandler,
+    )
     private val queueStateUpdates = Channel<AccountQueueState>(Channel.CONFLATED)
     private var restoredQueueForUserId: String? = null
 
-    init {
+    override fun onCreate() {
+        super.onCreate()
+        // Initialize the repository graph after all property delegates exist, before any
+        // observer can race MainActivity for the same synchronized lazy instance.
+        repositories
         applicationScope.launch {
             for (update in queueStateUpdates) {
-                playbackQueueRepository.replace(
-                    userId = update.userId,
-                    items = update.snapshot.queue,
-                    currentIndex = update.snapshot.currentIndex,
-                )
+                try {
+                    playbackQueueRepository.replace(
+                        userId = update.userId,
+                        items = update.snapshot.queue,
+                        currentIndex = update.snapshot.currentIndex,
+                    )
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (failure: Exception) {
+                    Log.e("RakyzuBackground", "Queue persistence failed: ${failure.javaClass.simpleName}")
+                }
             }
         }
         applicationScope.launch {
@@ -69,15 +87,30 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
                 } else if (restoredQueueForUserId != userId) {
                     // A restored queue is intentionally paused. The listener makes the next play
                     // decision after returning to the app, rather than resuming unexpectedly.
-                    restoredQueueForUserId = userId
-                    playbackController.restoreQueue(playbackQueueRepository.read(userId))
+                    try {
+                        val queue = playbackQueueRepository.read(userId)
+                        playbackController.restoreQueue(queue)
+                        restoredQueueForUserId = userId
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (failure: Exception) {
+                        Log.e("RakyzuBackground", "Queue restore failed: ${failure.javaClass.simpleName}")
+                    }
                 }
             }
         }
         applicationScope.launch {
             connectivityMonitor.isOnline.drop(1).filter { it }.collect {
-                if (playbackController.snapshot.value.recovery.canRetry) {
-                    playbackController.retryPlayback()
+                if (playbackControllerDelegate.isInitialized() &&
+                    playbackController.snapshot.value.recovery.canRetry
+                ) {
+                    try {
+                        playbackController.retryPlayback()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (failure: Exception) {
+                        Log.e("RakyzuBackground", "Playback retry failed: ${failure.javaClass.simpleName}")
+                    }
                 }
             }
         }
@@ -139,7 +172,7 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
         PlaybackQualityProvider(playbackPreferences::effectiveQuality)
     }
 
-    val playbackController: RakyzuPlaybackController by lazy {
+    private val playbackControllerDelegate = lazy {
         RakyzuPlaybackController(
             context = this,
             onMediaItemTransition = { trackId ->
@@ -160,6 +193,15 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
                 Log.d("RakyzuPlayback", line)
             },
         )
+    }
+
+    val playbackController: RakyzuPlaybackController
+        get() = playbackControllerDelegate.value
+
+    fun stopPlaybackIfRunning() {
+        if (playbackControllerDelegate.isInitialized()) {
+            playbackControllerDelegate.value.stopAndClear()
+        }
     }
 
     @OptIn(ExperimentalCoilApi::class)

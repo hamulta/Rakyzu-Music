@@ -166,7 +166,8 @@ fun RakyzuMusicApp(
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
-    playbackController: RakyzuPlaybackController,
+    playbackControllerProvider: () -> RakyzuPlaybackController,
+    onSessionEnded: () -> Unit,
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
     modifier: Modifier = Modifier,
@@ -175,7 +176,7 @@ fun RakyzuMusicApp(
 
     LaunchedEffect(sessionState) {
         if (sessionState !is AuthSessionState.SignedIn) {
-            playbackController.stopAndClear()
+            onSessionEnded()
         }
     }
 
@@ -207,7 +208,7 @@ fun RakyzuMusicApp(
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
-            playbackController = playbackController,
+            playbackControllerProvider = playbackControllerProvider,
             playbackPreferences = playbackPreferences,
             adminRepository = adminRepository,
             modifier = modifier,
@@ -228,7 +229,7 @@ private fun ProfileGatedRakyzuMusicApp(
     mediaDeliveryRepository: MediaDeliveryRepository,
     connectivityMonitor: ConnectivityMonitor,
     recentSearchRepository: RecentSearchRepository,
-    playbackController: RakyzuPlaybackController,
+    playbackControllerProvider: () -> RakyzuPlaybackController,
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
     modifier: Modifier = Modifier,
@@ -278,7 +279,7 @@ private fun ProfileGatedRakyzuMusicApp(
             mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
-            playbackController = playbackController,
+            playbackController = playbackControllerProvider(),
             playbackPreferences = playbackPreferences,
             adminRepository = adminRepository,
             modifier = modifier,
