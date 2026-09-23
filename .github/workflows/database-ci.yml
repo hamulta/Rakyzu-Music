@@ -37,7 +37,20 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Start isolated Postgres
-        run: supabase db start
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if supabase db start; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Unable to start isolated Postgres after $attempt attempts"
+              exit 1
+            fi
+            delay=$((attempt * 30))
+            echo "::warning::Postgres image pull failed; retrying in ${delay}s (attempt $((attempt + 1))/4)"
+            sleep "$delay"
+          done
 
       - name: Test database policies
         run: supabase test db --local
