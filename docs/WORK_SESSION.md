@@ -1,5 +1,42 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.5.26–0.5.30 batch — 2026-09-22
+
+- [x] Audit clean `v0.5.25` baseline, released APK, Android startup path, and Appetize capability.
+- [x] Run released `0.5.25` APK on Appetize Android 13, 15, and 16 with debug logs.
+- [ ] Complete startup correction and confirm an Android 16 launch with the final APK.
+- [ ] `0.5.26`: scoped Artist imagery, team, catalog drafts, and review-only submissions.
+- [ ] `0.5.27`: trusted play-event foundation and privacy-thresholded Artist/Admin analytics.
+- [ ] `0.5.28`: signed commerce event ingestion, entitlement/receipt ledger, and scoped Admin dashboard.
+- [ ] `0.5.29`: reasoned suspension/ban, appeal, reinstatement, and dual-control deletion requests.
+- [ ] `0.5.30`: security alerts/approval, scoped export, accessibility/performance/resilience,
+  Android 8–17 compatibility review, and cumulative release gate.
+- [ ] Validate Worker, PostgreSQL, Android CI, production deployment, Appetize final APK,
+  GitHub tag/release/artifact, and final worktree audit.
+
+The CEO reports a force close on a fresh Android 16 install from GitHub Release `v0.5.25`.
+The physical-device logcat now establishes the root cause: `DefaultDispatcher-worker-*` entered
+the class `init` coroutine at old source line 65 before construction had initialized the later
+`repositories` delegated property at old line 86. Calling `authRepository` therefore invoked
+`Lazy.getValue()` on a null delegate and terminated the process. The repeated thermal, launcher,
+SurfaceFlinger, and Transsion service errors surrounding it are unrelated device/OEM noise.
+Candidate commit `d699554` removes all coroutine launches from the constructor and starts them
+only from `Application.onCreate()`, after Kotlin has initialized every property. It also initializes
+the repository graph deterministically, isolates optional background failures, and defers Media3
+playback creation until authenticated use.
+
+The exact published APK had previously started on Appetize Android 13, 15, and 16 without a
+captured `FATAL EXCEPTION`; the race was timing/device dependent. The Appetize ADB tunnel confirmed
+that a separate candidate APK from successful Android CI run `35714776254` resumed `MainActivity`,
+rendered the sign-in screen on Android 16, kept its process alive, and emitted no fatal crash.
+The physical stack trace matches the removed old-code path exactly, so the startup correction is
+now evidence-backed; the final `0.5.30` APK still requires the same runtime check. Android Studio
+IDE is unavailable on this Linux ARM64 host and unsupported by its official Linux system
+requirements; the official SDK/Gradle CI and Appetize ADB/logcat are the available diagnostics.
+Appetize offers selected Android versions from 8.1 through 16.0, not Android 17; Android 17
+source compatibility remains a review item rather than a runtime-tested claim. Temporary
+Appetize debug-log and ADB permissions were restored to authenticated after testing.
+
 ## Active cumulative 0.5.16–0.5.20 batch — 2026-09-15
 
 Baseline audit found clean synchronized `main` after the published `v0.5.15` evidence commit.
