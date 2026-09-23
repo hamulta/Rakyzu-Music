@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: database-${{ github.workflow }}-${{ github.ref }}
@@ -35,6 +36,11 @@ jobs:
         with:
           version: 2.115.0
           github-token: ${{ github.token }}
+
+      - name: Authenticate Supabase image registry
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Start isolated Postgres
         shell: bash
