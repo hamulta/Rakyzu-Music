@@ -25,7 +25,7 @@ jobs:
   validate:
     name: pgTAP, lint, and migration replay
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout Rakyzu Music
@@ -45,17 +45,16 @@ jobs:
       - name: Start isolated Postgres
         shell: bash
         run: |
-          for attempt in 1 2 3 4; do
+          for attempt in $(seq 1 12); do
             if supabase db start; then
               exit 0
             fi
-            if [ "$attempt" -eq 4 ]; then
+            if [ "$attempt" -eq 12 ]; then
               echo "::error::Unable to start isolated Postgres after $attempt attempts"
               exit 1
             fi
-            delay=$((attempt * 30))
-            echo "::warning::Postgres image pull failed; retrying in ${delay}s (attempt $((attempt + 1))/4)"
-            sleep "$delay"
+            echo "::warning::Postgres image pull failed; retrying in 30s (attempt $((attempt + 1))/12)"
+            sleep 30
           done
 
       - name: Test database policies
