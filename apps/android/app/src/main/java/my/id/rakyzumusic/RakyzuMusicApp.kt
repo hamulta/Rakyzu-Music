@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
@@ -77,6 +78,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import java.io.ByteArrayOutputStream
 import my.id.rakyzumusic.core.data.auth.AuthActionResult
+import my.id.rakyzumusic.core.data.artist.ArtistWorkspaceRepository
 import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.admin.StaffPermission
 import my.id.rakyzumusic.core.data.auth.AuthFailure
@@ -117,6 +119,8 @@ import my.id.rakyzumusic.feature.profile.ProfileLoadingScreen
 import my.id.rakyzumusic.feature.profile.ProfileUnavailableScreen
 import my.id.rakyzumusic.feature.profile.ProfileViewModel
 import my.id.rakyzumusic.feature.profile.ArtistWelcomeDialog
+import my.id.rakyzumusic.feature.profile.ArtistWorkspaceRoute
+import my.id.rakyzumusic.feature.profile.ArtistWorkspaceViewModel
 import my.id.rakyzumusic.feature.profile.IdentityName
 import my.id.rakyzumusic.feature.search.AlbumDetailRoute
 import my.id.rakyzumusic.feature.search.AlbumDetailViewModel
@@ -155,6 +159,12 @@ private val adminDestination = TopLevelDestination(
     Icons.Rounded.AdminPanelSettings,
 )
 
+private val artistWorkspaceDestination = TopLevelDestination(
+    RakyzuRoute.ArtistWorkspace,
+    "Artist",
+    Icons.Rounded.Album,
+)
+
 @Composable
 fun RakyzuMusicApp(
     versionName: String,
@@ -170,6 +180,7 @@ fun RakyzuMusicApp(
     onSessionEnded: () -> Unit,
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
+    artistWorkspaceRepository: ArtistWorkspaceRepository,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -211,6 +222,7 @@ fun RakyzuMusicApp(
             playbackControllerProvider = playbackControllerProvider,
             playbackPreferences = playbackPreferences,
             adminRepository = adminRepository,
+            artistWorkspaceRepository = artistWorkspaceRepository,
             modifier = modifier,
         )
     }
@@ -232,6 +244,7 @@ private fun ProfileGatedRakyzuMusicApp(
     playbackControllerProvider: () -> RakyzuPlaybackController,
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
+    artistWorkspaceRepository: ArtistWorkspaceRepository,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -282,6 +295,7 @@ private fun ProfileGatedRakyzuMusicApp(
             playbackController = playbackControllerProvider(),
             playbackPreferences = playbackPreferences,
             adminRepository = adminRepository,
+            artistWorkspaceRepository = artistWorkspaceRepository,
             modifier = modifier,
         )
     }
@@ -317,6 +331,7 @@ private fun AuthenticatedRakyzuMusicApp(
     playbackController: RakyzuPlaybackController,
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
+    artistWorkspaceRepository: ArtistWorkspaceRepository,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
@@ -349,7 +364,7 @@ private fun AuthenticatedRakyzuMusicApp(
         factory = AdminViewModel.factory(adminRepository),
     )
     val adminState by adminViewModel.uiState.collectAsStateWithLifecycle()
-    val topLevelDestinations = if (
+    val staffDestinations = if (
         adminState.dashboard?.context?.let {
             it.isStaff && it.can(StaffPermission.AdminAccess)
         } == true
@@ -358,6 +373,9 @@ private fun AuthenticatedRakyzuMusicApp(
     } else {
         listenerDestinations
     }
+    val topLevelDestinations = if (profile.artist?.isActive == true) {
+        staffDestinations + artistWorkspaceDestination
+    } else staffDestinations
     val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
@@ -614,6 +632,13 @@ private fun AuthenticatedRakyzuMusicApp(
                             repository = adminRepository,
                             viewModel = adminViewModel,
                         )
+                    }
+                    entry<RakyzuRoute.ArtistWorkspace> {
+                        val artistWorkspaceViewModel: ArtistWorkspaceViewModel = viewModel(
+                            key = "artist-workspace-$userId",
+                            factory = ArtistWorkspaceViewModel.factory(artistWorkspaceRepository),
+                        )
+                        ArtistWorkspaceRoute(viewModel = artistWorkspaceViewModel)
                     }
                     entry<RakyzuRoute.PlaylistDetail> { route ->
                         val detailViewModel: PlaylistDetailViewModel = viewModel(

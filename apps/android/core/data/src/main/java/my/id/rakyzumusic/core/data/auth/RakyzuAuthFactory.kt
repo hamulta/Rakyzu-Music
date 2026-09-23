@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.Json
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshFailure
+import my.id.rakyzumusic.core.data.artist.ArtistWorkspaceRepository
+import my.id.rakyzumusic.core.data.artist.AuthenticatedArtistWorkspaceRepository
+import my.id.rakyzumusic.core.data.artist.UnavailableArtistWorkspaceRepository
 import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.admin.AuthenticatedAdminRepository
 import my.id.rakyzumusic.core.data.admin.UnavailableAdminRepository
@@ -94,6 +97,7 @@ object RakyzuAuthFactory {
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
             adminRepository = UnavailableAdminRepository,
+            artistWorkspaceRepository = UnavailableArtistWorkspaceRepository,
         )
 
         val localDataSources = createRakyzuLocalDataSources(context)
@@ -160,6 +164,10 @@ object RakyzuAuthFactory {
                 apiConfiguration,
                 AccessTokenProvider(client.auth::currentAccessTokenOrNull),
             ),
+            artistWorkspaceRepository = AuthenticatedArtistWorkspaceRepository(
+                apiConfiguration,
+                AccessTokenProvider(client.auth::currentAccessTokenOrNull),
+            ),
         )
     }
 }
@@ -175,6 +183,7 @@ data class RakyzuRepositories(
     val connectivityMonitor: ConnectivityMonitor,
     val recentSearchRepository: RecentSearchRepository,
     val adminRepository: AdminRepository,
+    val artistWorkspaceRepository: ArtistWorkspaceRepository,
 )
 
 private data object UnavailablePlaybackQueueRepository : PlaybackQueueRepository {

@@ -10,6 +10,7 @@ import {
   AdminRequestRejected,
   AdminUpstreamUnavailable,
   callAdminRpc,
+  callServiceRpc,
   getStaffContext,
 } from "./admin";
 import { parseRange } from "./range";
@@ -18,12 +19,13 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 
-const API_VERSION = "0.5.25";
+const API_VERSION = "0.5.30";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
 const PROFILE_AVATAR_ROUTE = /^\/v1\/profiles\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/avatar\/?$/i;
 const ARTIST_BIOGRAPHY_ROUTE = /^\/v1\/artists\/me\/biography\/?$/i;
+const ARTIST_PROFILE_ARTWORK_ROUTE = /^\/v1\/artists\/me\/artwork\/?$/i;
 const RECOMMENDATION_ARTWORK_ROUTE = /^\/v1\/recommendations\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
@@ -37,9 +39,17 @@ const ADMIN_RECOMMENDATION_ARTWORK_ROUTE = new RegExp(
 const ADMIN_ALBUM_SCHEDULE_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/schedule/?$`, "i");
 const ADMIN_ARTWORK_UPLOAD_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/artwork/?$`, "i");
 const ADMIN_AUDIO_ROUTE = new RegExp(`^/v1/admin/tracks/${UUID}/audio/(low|standard|high)/?$`, "i");
+const ARTIST_ARTWORK_ROUTE = new RegExp(`^/v1/artists/${UUID}/artwork/?$`, "i");
+const ARTIST_ALBUM_ARTWORK_ROUTE = new RegExp(`^/v1/artist/albums/${UUID}/artwork/?$`, "i");
+const ARTIST_AUDIO_ROUTE = new RegExp(`^/v1/artist/tracks/${UUID}/audio/(low|standard|high)/?$`, "i");
+const ARTIST_ANALYTICS_ROUTE = new RegExp(`^/v1/artists/${UUID}/analytics/?$`, "i");
 const ADMIN_MODERATION_ACTION_ROUTE = new RegExp(`^/v1/admin/moderation/${UUID}/?$`, "i");
 const ADMIN_STAFF_ASSIGNMENT_ROUTE = new RegExp(`^/v1/admin/staff/${UUID}/?$`, "i");
 const ADMIN_REVIEW_ACTION_ROUTE = new RegExp(`^/v1/admin/reviews/${UUID}/?$`, "i");
+const ADMIN_ACCOUNT_ENFORCEMENT_ROUTE = new RegExp(`^/v1/admin/accounts/${UUID}/enforcement/?$`, "i");
+const ADMIN_APPEAL_ROUTE = new RegExp(`^/v1/admin/appeals/${UUID}/?$`, "i");
+const ADMIN_DELETION_APPROVAL_ROUTE = new RegExp(`^/v1/admin/deletions/${UUID}/approval/?$`, "i");
+const ADMIN_SECURITY_ALERT_ROUTE = new RegExp(`^/v1/admin/security/alerts/${UUID}/?$`, "i");
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 const MAX_ARTWORK_BYTES = 5 * 1024 * 1024;
 const ARTWORK_CACHE_CONTROL = "private, max-age=86400";
@@ -52,6 +62,7 @@ const dependencies: RequestDependencies = {
   playlistAccess,
   staffContext: getStaffContext,
   adminRpc: callAdminRpc,
+  serviceRpc: callServiceRpc,
 };
 
 export function createWorker(
@@ -79,6 +90,14 @@ export function createWorker(
             origin,
           );
         }
+        if (url.pathname === "/v1/events/play" || url.pathname === "/v1/webhooks/commerce") {
+          if (request.method !== "POST") {
+            return errorResponse("method_not_allowed", "Method not allowed.", 405,
+              requestId, origin, { allow: "POST, OPTIONS" });
+          }
+          return await signedIngestionRequest(request, env, url.pathname,
+            requestDependencies, requestId, origin);
+        }
 
         const isAdminRoute = url.pathname === "/v1/admin/context" ||
           url.pathname === "/v1/admin/staff" ||
@@ -96,6 +115,9 @@ export function createWorker(
           url.pathname === "/v1/admin/albums" ||
           url.pathname === "/v1/admin/tracks" ||
           url.pathname === "/v1/admin/moderation" ||
+          url.pathname === "/v1/admin/commerce" ||
+          url.pathname === "/v1/admin/accounts" ||
+          url.pathname === "/v1/admin/security" ||
           ADMIN_ALBUM_PUBLISH_ROUTE.test(url.pathname) ||
           ADMIN_ARTIST_ROUTE.test(url.pathname) ||
           ADMIN_ALBUM_ROUTE.test(url.pathname) ||
@@ -106,19 +128,38 @@ export function createWorker(
           ADMIN_AUDIO_ROUTE.test(url.pathname) ||
           ADMIN_MODERATION_ACTION_ROUTE.test(url.pathname) ||
           ADMIN_STAFF_ASSIGNMENT_ROUTE.test(url.pathname) ||
-          ADMIN_REVIEW_ACTION_ROUTE.test(url.pathname);
+          ADMIN_REVIEW_ACTION_ROUTE.test(url.pathname) ||
+          ADMIN_ACCOUNT_ENFORCEMENT_ROUTE.test(url.pathname) ||
+          ADMIN_APPEAL_ROUTE.test(url.pathname) ||
+          ADMIN_DELETION_APPROVAL_ROUTE.test(url.pathname) ||
+          ADMIN_SECURITY_ALERT_ROUTE.test(url.pathname);
         const trackRoute = url.pathname.match(TRACK_ROUTE);
         const artworkRoute = url.pathname.match(ALBUM_ARTWORK_ROUTE);
         const playlistRoute = url.pathname.match(PLAYLIST_ARTWORK_ROUTE);
         const profileAvatarRoute = url.pathname.match(PROFILE_AVATAR_ROUTE);
         const isArtistBiographyRoute = ARTIST_BIOGRAPHY_ROUTE.test(url.pathname);
+        const artistArtworkRoute = url.pathname.match(ARTIST_ARTWORK_ROUTE);
+        const isArtistRoute = url.pathname === "/v1/artists/me/workspace" ||
+          url.pathname === "/v1/artists/me/team" ||
+          url.pathname === "/v1/artists/me/albums" ||
+          url.pathname === "/v1/artists/me/tracks" ||
+          url.pathname === "/v1/artists/me/reviews" ||
+          ARTIST_PROFILE_ARTWORK_ROUTE.test(url.pathname) ||
+          ARTIST_ALBUM_ARTWORK_ROUTE.test(url.pathname) ||
+          ARTIST_AUDIO_ROUTE.test(url.pathname) || ARTIST_ANALYTICS_ROUTE.test(url.pathname) ||
+          !!artistArtworkRoute;
+        const isAccountRoute = url.pathname === "/v1/account/lifecycle" ||
+          url.pathname === "/v1/account/appeals" ||
+          url.pathname === "/v1/account/deletion" ||
+          url.pathname === "/v1/account/export";
         const recommendationArtworkRoute = url.pathname.match(RECOMMENDATION_ARTWORK_ROUTE);
         if (!trackRoute?.[1] && !artworkRoute?.[1] && !playlistRoute?.[1] &&
           !profileAvatarRoute?.[1] && !isArtistBiographyRoute &&
-          !recommendationArtworkRoute?.[1] && !isAdminRoute) {
+          !recommendationArtworkRoute?.[1] && !isAdminRoute && !isArtistRoute && !isAccountRoute) {
           return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
         }
-        if (!isAdminRoute && request.method !== "GET" && request.method !== "HEAD" &&
+        if (!isAdminRoute && !isArtistRoute && !isAccountRoute &&
+          request.method !== "GET" && request.method !== "HEAD" &&
           !(playlistRoute && (request.method === "PUT" || request.method === "DELETE")) &&
           !(profileAvatarRoute && (request.method === "PUT" || request.method === "DELETE")) &&
           !(isArtistBiographyRoute && request.method === "PUT")) {
@@ -157,6 +198,11 @@ export function createWorker(
           return await profileAvatar(request, env, profileId, token, requestDependencies, requestId, origin);
         }
 
+        if (isAccountRoute) {
+          return await accountRequest(request, env, url.pathname, listener.userId, token,
+            requestDependencies, requestId, origin);
+        }
+
         if (isArtistBiographyRoute) {
           if (request.method !== "PUT") {
             return errorResponse("method_not_allowed", "Method not allowed.", 405,
@@ -167,6 +213,11 @@ export function createWorker(
           const result = await requestDependencies.adminRpc("artist_update_biography",
             { requested_biography: biography }, token, env);
           return jsonResponse(result, 200, requestId, origin);
+        }
+
+        if (isArtistRoute) {
+          return await artistRequest(request, env, url.pathname, token,
+            requestDependencies, requestId, origin);
         }
 
         if (recommendationArtworkRoute?.[1]) {
@@ -277,6 +328,240 @@ export function createWorker(
       }
     },
   };
+}
+
+async function signedIngestionRequest(
+  request: Request,
+  env: RakyzuApiEnv,
+  path: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  if (!requestDependencies.serviceRpc) {
+    return errorResponse("ingestion_unavailable", "Event ingestion is unavailable.",
+      503, requestId, origin, { "retry-after": "30" });
+  }
+  const raw = await readBoundedJsonBody(request, 32_768);
+  if (raw === null) {
+    return errorResponse("invalid_event", "The event payload is invalid.", 422, requestId, origin);
+  }
+  const secret = path === "/v1/events/play"
+    ? env.PLAY_EVENT_WEBHOOK_SECRET : env.COMMERCE_WEBHOOK_SECRET;
+  if (!await verifyWebhookSignature(request.headers, raw.text, secret)) {
+    return errorResponse("invalid_signature", "The event signature is invalid.",
+      401, requestId, origin);
+  }
+  try {
+    if (path === "/v1/events/play") {
+      const body = raw.value;
+      const result = await requestDependencies.serviceRpc("service_record_play_event", {
+        requested_source_event_id: readString(body, "eventId", 160),
+        requested_user_id: readOptionalUuid(body, "userId"),
+        requested_track_id: readUuid(body, "trackId"),
+        requested_occurred_at: readInstant(body, "occurredAt"),
+        requested_listening_ms: readInteger(body, "listeningMs", 10_000, 86_400_000),
+        requested_completed: readBoolean(body, "completed"),
+        requested_country_code: readNullableCountryCode(body, "countryCode"),
+      }, env);
+      return jsonResponse(result, 202, requestId, origin);
+    }
+    const body = raw.value;
+    const payloadHash = await sha256Hex(raw.text);
+    const result = await requestDependencies.serviceRpc("service_ingest_commerce_event", {
+      requested_provider: readString(body, "provider", 32).toLowerCase(),
+      requested_event_id: readString(body, "eventId", 160),
+      requested_event_type: readString(body, "type", 40),
+      requested_user_id: readOptionalUuid(body, "userId"),
+      requested_customer_ref: readNullableString(body, "customerReference", 160),
+      requested_product_ref: readNullableString(body, "productReference", 160),
+      requested_amount_minor: readNullableInteger(body, "amountMinor", 0, Number.MAX_SAFE_INTEGER),
+      requested_currency: readNullableCurrency(body, "currency"),
+      requested_occurred_at: readInstant(body, "occurredAt"),
+      requested_payload_sha256: payloadHash,
+      requested_payload: body,
+    }, env);
+    return jsonResponse(result, 202, requestId, origin);
+  } catch (error) {
+    if (error instanceof AdminRequestRejected) {
+      return errorResponse("invalid_event", "The event payload is invalid.",
+        422, requestId, origin);
+    }
+    if (error instanceof AdminUpstreamUnavailable) {
+      return errorResponse("ingestion_unavailable", "Event ingestion is unavailable.",
+        503, requestId, origin, { "retry-after": "30" });
+    }
+    throw error;
+  }
+}
+
+async function accountRequest(
+  request: Request,
+  env: RakyzuApiEnv,
+  path: string,
+  userId: string,
+  token: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  try {
+    if (path === "/v1/account/lifecycle" && request.method === "GET") {
+      return jsonResponse(await requestDependencies.adminRpc(
+        "account_lifecycle_context", {}, token, env), 200, requestId, origin);
+    }
+    if (path === "/v1/account/appeals" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return jsonResponse(await requestDependencies.adminRpc("account_submit_appeal", {
+        target_enforcement_id: readUuid(body, "enforcementId"),
+        requested_statement: readString(body, "statement", 2_000),
+      }, token, env), 201, requestId, origin);
+    }
+    if (path === "/v1/account/deletion" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return jsonResponse(await requestDependencies.adminRpc("account_request_deletion", {
+        requested_reason: readString(body, "reason", 1_000),
+      }, token, env), 201, requestId, origin);
+    }
+    if (path === "/v1/account/export" && request.method === "GET") {
+      return jsonResponse(await requestDependencies.adminRpc("admin_export_account_data", {
+        target_user_id: userId,
+      }, token, env), 200, requestId, origin);
+    }
+    return errorResponse("method_not_allowed", "Method not allowed.", 405, requestId, origin);
+  } catch (error) {
+    if (error instanceof AdminRequestRejected) {
+      return errorResponse(error.status === 403 ? "forbidden" : "invalid_account_request",
+        error.status === 403 ? "This account action is not available." :
+          "The account request is invalid.", error.status, requestId, origin);
+    }
+    if (error instanceof AdminUpstreamUnavailable) {
+      return errorResponse("account_unavailable", "Account services are temporarily unavailable.",
+        503, requestId, origin, { "retry-after": "30" });
+    }
+    throw error;
+  }
+}
+
+async function artistRequest(
+  request: Request,
+  env: RakyzuApiEnv,
+  path: string,
+  token: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  try {
+    const analytics = path.match(ARTIST_ANALYTICS_ROUTE);
+    if (analytics?.[1] && request.method === "GET") {
+      const url = new URL(request.url);
+      const from = readQueryDate(url.searchParams.get("from"));
+      const to = readQueryDate(url.searchParams.get("to"));
+      const value = await requestDependencies.adminRpc("artist_analytics", {
+        target_artist_id: analytics[1].toLowerCase(), range_start: from, range_end: to,
+      }, token, env);
+      return jsonResponse(value, 200, requestId, origin);
+    }
+    if (path === "/v1/artists/me/workspace" && request.method === "GET") {
+      const value = await requestDependencies.adminRpc("artist_workspace_context", {}, token, env);
+      return jsonResponse(value, 200, requestId, origin);
+    }
+    if (path === "/v1/artists/me/team" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      const value = await requestDependencies.adminRpc("artist_assign_team_by_email", {
+        target_email: readString(body, "email", 254),
+        target_access_level: readString(body, "accessLevel", 20),
+        target_active: readBoolean(body, "active"),
+      }, token, env);
+      return jsonResponse(value, 200, requestId, origin);
+    }
+    if (path === "/v1/artists/me/albums" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      const value = await requestDependencies.adminRpc("artist_create_album_draft", {
+        target_artist_id: readUuid(body, "artistId"),
+        album_title: readString(body, "title", 160),
+        album_release_date: readOptionalDate(body, "releaseDate"),
+      }, token, env);
+      return jsonResponse(value, 201, requestId, origin);
+    }
+    if (path === "/v1/artists/me/tracks" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      const value = await requestDependencies.adminRpc("artist_create_track_draft", {
+        target_album_id: readUuid(body, "albumId"),
+        track_title: readString(body, "title", 160),
+        duration_ms: readInteger(body, "durationMs", 1_000, 86_400_000),
+        disc_number: readOptionalInteger(body, "discNumber", 1, 100, 1),
+        track_number: readOptionalInteger(body, "trackNumber", 1, 1_000, 1),
+        explicit_content: readBoolean(body, "explicit"),
+      }, token, env);
+      return jsonResponse(value, 201, requestId, origin);
+    }
+    if (path === "/v1/artists/me/reviews" && request.method === "POST") {
+      const body = await readJsonObject(request);
+      const value = await requestDependencies.adminRpc("artist_submit_catalog_review", {
+        requested_review_type: readString(body, "type", 20),
+        target_album_id: readUuid(body, "albumId"),
+        requested_notes: readOptionalString(body, "notes", 500),
+      }, token, env);
+      return jsonResponse(value, 201, requestId, origin);
+    }
+    if (ARTIST_PROFILE_ARTWORK_ROUTE.test(path) && request.method === "PUT") {
+      const scope = await requestDependencies.adminRpc("artist_artwork_upload_scope", {}, token, env);
+      if (typeof scope !== "string" || !new RegExp(`^${UUID}$`, "i").test(scope)) {
+        return errorResponse("artist_unavailable", "Artist identity is unavailable.",
+          503, requestId, origin);
+      }
+      return await uploadArtistProfileArtwork(request, env, scope.toLowerCase(), token,
+        requestDependencies, requestId, origin);
+    }
+    const albumArtwork = path.match(ARTIST_ALBUM_ARTWORK_ROUTE);
+    if (albumArtwork?.[1] && request.method === "PUT") {
+      const albumId = albumArtwork[1].toLowerCase();
+      const allowed = await requestDependencies.adminRpc("artist_can_edit_album",
+        { target_album_id: albumId }, token, env);
+      if (allowed !== true) return artistForbidden(requestId, origin);
+      return await uploadAlbumArtwork(request, env, albumId, null, token,
+        requestDependencies, requestId, origin, "artist_record_album_artwork");
+    }
+    const audio = path.match(ARTIST_AUDIO_ROUTE);
+    if (audio?.[1] && audio[2] && request.method === "PUT") {
+      const trackId = audio[1].toLowerCase();
+      const allowed = await requestDependencies.adminRpc("artist_can_edit_track",
+        { target_track_id: trackId }, token, env);
+      if (allowed !== true) return artistForbidden(requestId, origin);
+      return await uploadTrackAudio(request, env, trackId, audio[2].toLowerCase(),
+        null, token, requestDependencies, requestId, origin, "artist_record_track_media");
+    }
+    const artwork = path.match(ARTIST_ARTWORK_ROUTE);
+    if (artwork?.[1] && (request.method === "GET" || request.method === "HEAD")) {
+      const artistId = artwork[1].toLowerCase();
+      const allowed = await requestDependencies.adminRpc("artist_can_view_artwork",
+        { target_artist_id: artistId }, token, env);
+      if (allowed !== true) return errorResponse("artwork_not_found", "Artwork not found.",
+        404, requestId, origin);
+      return await serveArtistArtwork(request, env, artistId, requestId, origin);
+    }
+    return errorResponse("method_not_allowed", "Method not allowed.", 405,
+      requestId, origin);
+  } catch (error) {
+    if (error instanceof AdminRequestRejected) {
+      const status = error.status === 401 ? 401 : error.status === 403 ? 403 : 422;
+      return errorResponse(status === 403 ? "forbidden" : "invalid_artist_request",
+        status === 403 ? "Artist access is required for this action." :
+          "The Artist request is invalid.", status, requestId, origin);
+    }
+    if (error instanceof AdminUpstreamUnavailable) {
+      return errorResponse("artist_unavailable", "Artist services are temporarily unavailable.",
+        503, requestId, origin, { "retry-after": "30" });
+    }
+    throw error;
+  }
+}
+
+function artistForbidden(requestId: string, origin: string | null): Response {
+  return errorResponse("forbidden", "Artist access is required for this action.",
+    403, requestId, origin);
 }
 
 async function adminRequest(
@@ -513,6 +798,51 @@ async function adminRequest(
         review_notes: readString(body, "notes", 500),
       }, "catalog.review", context, token, env, requestDependencies, requestId, origin);
     }
+    if (path === "/v1/admin/commerce" && request.method === "GET") {
+      return await rpcResponse("admin_commerce_dashboard", {}, "commerce.view", context,
+        token, env, requestDependencies, requestId, origin);
+    }
+    if (path === "/v1/admin/accounts" && request.method === "GET") {
+      return await rpcResponse("admin_account_dashboard", {}, "account.enforce", context,
+        token, env, requestDependencies, requestId, origin);
+    }
+    if (path === "/v1/admin/security" && request.method === "GET") {
+      return await rpcResponse("admin_security_dashboard", {}, "security.manage", context,
+        token, env, requestDependencies, requestId, origin);
+    }
+    const enforcementMatch = path.match(ADMIN_ACCOUNT_ENFORCEMENT_ROUTE);
+    if (enforcementMatch?.[1] && request.method === "POST") {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_enforce_account", {
+        target_user_id: enforcementMatch[1].toLowerCase(),
+        requested_action: readString(body, "action", 20),
+        requested_reason: readString(body, "reason", 1_000),
+        requested_expires_at: readNullableInstant(body, "expiresAt"),
+      }, "account.enforce", context, token, env, requestDependencies, requestId, origin, 201);
+    }
+    const appealMatch = path.match(ADMIN_APPEAL_ROUTE);
+    if (appealMatch?.[1] && (request.method === "PATCH" || request.method === "PUT")) {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_decide_appeal", {
+        target_appeal_id: appealMatch[1].toLowerCase(),
+        decision: readString(body, "decision", 20),
+        requested_notes: readString(body, "notes", 1_000),
+      }, "appeal.review", context, token, env, requestDependencies, requestId, origin);
+    }
+    const deletionMatch = path.match(ADMIN_DELETION_APPROVAL_ROUTE);
+    if (deletionMatch?.[1] && request.method === "POST") {
+      return await rpcResponse("admin_approve_deletion", {
+        target_request_id: deletionMatch[1].toLowerCase(),
+      }, "deletion.approve", context, token, env, requestDependencies, requestId, origin);
+    }
+    const securityAlertMatch = path.match(ADMIN_SECURITY_ALERT_ROUTE);
+    if (securityAlertMatch?.[1] && (request.method === "PATCH" || request.method === "PUT")) {
+      const body = await readJsonObject(request);
+      return await rpcResponse("admin_acknowledge_security_alert", {
+        target_alert_id: securityAlertMatch[1].toLowerCase(),
+        resolved: readBoolean(body, "resolved"),
+      }, "security.manage", context, token, env, requestDependencies, requestId, origin);
+    }
     if (path === "/v1/admin/audit/export" && request.method === "POST") {
       const body = await readJsonObject(request);
       return await rpcResponse("admin_export_audit", {
@@ -551,13 +881,16 @@ async function uploadAlbumArtwork(
   request: Request,
   env: RakyzuApiEnv,
   albumId: string,
-  context: StaffContext,
+  context: StaffContext | null,
   token: string,
   requestDependencies: RequestDependencies,
   requestId: string,
   origin: string | null,
+  recordRpc: "admin_record_album_artwork" | "artist_record_album_artwork" = "admin_record_album_artwork",
 ): Promise<Response> {
-  if (!context.permissions.includes("catalog.upload_artwork")) return adminForbidden(requestId, origin);
+  if (context && !context.permissions.includes("catalog.upload_artwork")) {
+    return adminForbidden(requestId, origin);
+  }
   if (request.headers.get("content-type")?.split(";", 1)[0]?.trim() !== "image/webp") {
     return errorResponse("invalid_artwork", "Upload WebP artwork.", 415, requestId, origin);
   }
@@ -576,8 +909,48 @@ async function uploadAlbumArtwork(
     httpMetadata: { contentType: "image/webp", cacheControl: "private, no-store" },
   });
   try {
-    const result = await requestDependencies.adminRpc("admin_record_album_artwork", {
+    const result = await requestDependencies.adminRpc(recordRpc, {
       target_album_id: albumId,
+      media_object_key: objectKey,
+      media_size_bytes: bytes.length,
+      media_content_type: "image/webp",
+      media_etag: uploaded.etag,
+    }, token, env);
+    return jsonResponse(result, 201, requestId, origin);
+  } catch (error) {
+    await env.MEDIA.delete(objectKey);
+    throw error;
+  }
+}
+
+async function uploadArtistProfileArtwork(
+  request: Request,
+  env: RakyzuApiEnv,
+  artistId: string,
+  token: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  if (request.headers.get("content-type")?.split(";", 1)[0]?.trim() !== "image/webp") {
+    return errorResponse("invalid_artwork", "Upload WebP artwork.", 415, requestId, origin);
+  }
+  const claimedLength = Number(request.headers.get("content-length"));
+  if (!Number.isInteger(claimedLength) || claimedLength < 12 || claimedLength > MAX_ARTWORK_BYTES) {
+    return errorResponse("invalid_artwork_size", "Artwork must be at most 5 MiB.", 413,
+      requestId, origin);
+  }
+  const bytes = await readExactBody(request, claimedLength);
+  if (bytes === null || !looksLikeWebp(bytes)) {
+    return errorResponse("invalid_artwork", "The file is not valid WebP artwork.", 422,
+      requestId, origin);
+  }
+  const objectKey = `media/artists/${artistId}/artwork.webp`;
+  const uploaded = await env.MEDIA.put(objectKey, bytes, {
+    httpMetadata: { contentType: "image/webp", cacheControl: "private, no-store" },
+  });
+  try {
+    const result = await requestDependencies.adminRpc("artist_record_profile_artwork", {
       media_object_key: objectKey,
       media_size_bytes: bytes.length,
       media_content_type: "image/webp",
@@ -655,13 +1028,14 @@ async function uploadTrackAudio(
   env: RakyzuApiEnv,
   trackId: string,
   quality: string,
-  context: StaffContext,
+  context: StaffContext | null,
   token: string,
   requestDependencies: RequestDependencies,
   requestId: string,
   origin: string | null,
+  recordRpc: "admin_record_track_media" | "artist_record_track_media" = "admin_record_track_media",
 ): Promise<Response> {
-  if (!context.permissions.includes("catalog.upload_audio")) {
+  if (context && !context.permissions.includes("catalog.upload_audio")) {
     return adminForbidden(requestId, origin);
   }
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim();
@@ -684,7 +1058,7 @@ async function uploadTrackAudio(
     httpMetadata: { contentType, cacheControl: "private, no-store" },
   });
   try {
-    const result = await requestDependencies.adminRpc("admin_record_track_media", {
+    const result = await requestDependencies.adminRpc(recordRpc, {
       target_track_id: trackId,
       media_quality: quality,
       media_object_key: objectKey,
@@ -771,6 +1145,57 @@ async function readJsonObject(request: Request): Promise<Record<string, unknown>
   return value as Record<string, unknown>;
 }
 
+async function readBoundedJsonBody(
+  request: Request,
+  maximumBytes: number,
+): Promise<{ text: string; value: Record<string, unknown> } | null> {
+  if (request.headers.get("content-type")?.split(";", 1)[0]?.trim() !== "application/json") {
+    return null;
+  }
+  const claimed = Number(request.headers.get("content-length"));
+  if (Number.isFinite(claimed) && claimed > maximumBytes) return null;
+  const text = await request.text();
+  if (new TextEncoder().encode(text).length > maximumBytes) return null;
+  try {
+    const value: unknown = JSON.parse(text);
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+    return { text, value: value as Record<string, unknown> };
+  } catch {
+    return null;
+  }
+}
+
+async function verifyWebhookSignature(
+  headers: Headers,
+  body: string,
+  secret: string,
+): Promise<boolean> {
+  const timestamp = headers.get("x-rakyzu-timestamp");
+  const signature = headers.get("x-rakyzu-signature")?.toLowerCase();
+  if (!timestamp || !signature || !/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/.test(signature) ||
+    typeof secret !== "string" || secret.length < 32) return false;
+  const seconds = Number(timestamp);
+  if (!Number.isSafeInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  return crypto.subtle.verify("HMAC", key, hexToBytes(signature),
+    new TextEncoder().encode(`${timestamp}.${body}`));
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256",
+    new TextEncoder().encode(value)));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(value: string): Uint8Array {
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
+  }
+  return bytes;
+}
+
 function readString(body: Record<string, unknown>, key: string, max: number): string {
   const value = body[key];
   if (typeof value !== "string" || value.trim().length < 1 || value.trim().length > max) {
@@ -826,6 +1251,13 @@ function readOptionalInteger(
   return readInteger(body, key, minimum, maximum);
 }
 
+function readNullableInteger(
+  body: Record<string, unknown>, key: string, minimum: number, maximum: number,
+): number | null {
+  if (body[key] === undefined || body[key] === null) return null;
+  return readInteger(body, key, minimum, maximum);
+}
+
 function readInstant(body: Record<string, unknown>, key: string): string {
   const value = readString(body, key, 40);
   const timestamp = Date.parse(value);
@@ -846,6 +1278,31 @@ function readOptionalDate(body: Record<string, unknown>, key: string): string | 
     throw new AdminRequestRejected(422);
   }
   return value;
+}
+
+function readQueryDate(value: string | null): string {
+  if (value === null || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new AdminRequestRejected(422);
+  }
+  return value;
+}
+
+function readNullableCountryCode(body: Record<string, unknown>, key: string): string | null {
+  const value = body[key];
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^[a-z]{2}$/i.test(value)) {
+    throw new AdminRequestRejected(422);
+  }
+  return value.toUpperCase();
+}
+
+function readNullableCurrency(body: Record<string, unknown>, key: string): string | null {
+  const value = body[key];
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^[a-z]{3}$/i.test(value)) {
+    throw new AdminRequestRejected(422);
+  }
+  return value.toUpperCase();
 }
 
 function adminForbidden(requestId: string, origin: string | null): Response {
@@ -881,6 +1338,34 @@ async function serveAlbumArtwork(
     return new Response(null, { status: 200, headers });
   }
 
+  const object = await env.MEDIA.get(objectKey);
+  if (object === null) {
+    return errorResponse("artwork_not_found", "Artwork is unavailable.", 404, requestId, origin);
+  }
+  return new Response(object.body, { status: 200, headers });
+}
+
+async function serveArtistArtwork(
+  request: Request,
+  env: RakyzuApiEnv,
+  artistId: string,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  const objectKey = `media/artists/${artistId}/artwork.webp`;
+  const metadata = await env.MEDIA.head(objectKey);
+  if (metadata === null || metadata.httpMetadata?.contentType !== "image/webp") {
+    return errorResponse("artwork_not_found", "Artwork is unavailable.", 404, requestId, origin);
+  }
+  const headers = responseHeaders(requestId, origin);
+  metadata.writeHttpMetadata(headers);
+  headers.set("cache-control", ARTWORK_CACHE_CONTROL);
+  headers.set("etag", metadata.httpEtag);
+  headers.set("content-length", metadata.size.toString());
+  if (request.headers.get("if-none-match") === metadata.httpEtag) {
+    return new Response(null, { status: 304, headers });
+  }
+  if (request.method === "HEAD") return new Response(null, { status: 200, headers });
   const object = await env.MEDIA.get(objectKey);
   if (object === null) {
     return errorResponse("artwork_not_found", "Artwork is unavailable.", 404, requestId, origin);

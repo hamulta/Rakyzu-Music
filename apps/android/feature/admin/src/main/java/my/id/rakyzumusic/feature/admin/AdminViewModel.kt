@@ -156,6 +156,20 @@ class AdminViewModel(
         repository.uploadRecommendationArtwork(id, bytes)
     }
 
+    fun enforceAccount(userId: String, action: String, reason: String, expiresAt: String?) = runAction {
+        repository.enforceAccount(userId, action, reason, expiresAt)
+    }
+
+    fun decideAppeal(id: String, decision: String, notes: String) = runAction {
+        repository.decideAppeal(id, decision, notes)
+    }
+
+    fun approveDeletion(id: String) = runAction { repository.approveDeletion(id) }
+
+    fun acknowledgeSecurityAlert(id: String, resolved: Boolean) = runAction {
+        repository.acknowledgeSecurityAlert(id, resolved)
+    }
+
     fun exportAudit(operation: String?, targetType: String?) {
         if (mutableUiState.value.isWorking) return
         viewModelScope.launch {

@@ -17,6 +17,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -52,7 +53,15 @@ enum class StaffPermission(val wireName: String) {
     AuditView("audit.view"),
     AuditExport("audit.export"),
     GovernanceManage("governance.manage"),
-    EditorialManage("editorial.manage");
+    EditorialManage("editorial.manage"),
+    AnalyticsView("analytics.view"),
+    AnalyticsExport("analytics.export"),
+    CommerceView("commerce.view"),
+    AccountEnforce("account.enforce"),
+    AppealReview("appeal.review"),
+    DataExport("data.export"),
+    DeletionApprove("deletion.approve"),
+    SecurityManage("security.manage");
 
     companion object {
         fun fromWire(value: String): StaffPermission? = entries.firstOrNull { it.wireName == value }
@@ -162,6 +171,79 @@ data class GovernanceDashboard(
     val auditSummary: AuditSummary? = null,
 )
 
+data class CommerceEventSummary(
+    val id: String,
+    val type: String,
+    val product: String?,
+    val amountMinor: Long?,
+    val currency: String?,
+    val occurredAt: String,
+    val userReference: String?,
+)
+
+data class CommerceDashboard(
+    val activeEntitlements: Int = 0,
+    val grossMinor30d: Long = 0,
+    val refunds30d: Int = 0,
+    val disputes30d: Int = 0,
+    val recent: List<CommerceEventSummary> = emptyList(),
+)
+
+data class AccountEnforcementSummary(
+    val id: String,
+    val userId: String,
+    val action: String,
+    val reason: String,
+    val expiresAt: String?,
+    val createdAt: String,
+)
+
+data class AccountAppealSummary(
+    val id: String,
+    val userId: String,
+    val status: String,
+    val statement: String,
+    val createdAt: String,
+)
+
+data class AccountDeletionSummary(
+    val id: String,
+    val userId: String,
+    val status: String,
+    val executeAfter: String?,
+    val createdAt: String,
+)
+
+data class AccountGovernanceDashboard(
+    val enforcements: List<AccountEnforcementSummary> = emptyList(),
+    val appeals: List<AccountAppealSummary> = emptyList(),
+    val deletions: List<AccountDeletionSummary> = emptyList(),
+)
+
+data class SecurityAlertSummary(
+    val id: String,
+    val severity: String,
+    val category: String,
+    val summary: String,
+    val status: String,
+    val createdAt: String,
+)
+
+data class SecurityApprovalSummary(
+    val id: String,
+    val actionType: String,
+    val targetType: String,
+    val targetId: String,
+    val reason: String,
+    val status: String,
+    val expiresAt: String,
+)
+
+data class SecurityDashboard(
+    val alerts: List<SecurityAlertSummary> = emptyList(),
+    val approvals: List<SecurityApprovalSummary> = emptyList(),
+)
+
 data class AdminDashboard(
     val context: StaffAccessContext,
     val moderationCases: List<ModerationCase> = emptyList(),
@@ -169,6 +251,9 @@ data class AdminDashboard(
     val staff: List<StaffAssignment> = emptyList(),
     val governance: GovernanceDashboard = GovernanceDashboard(),
     val recommendations: List<RecommendationCard> = emptyList(),
+    val commerce: CommerceDashboard? = null,
+    val accounts: AccountGovernanceDashboard? = null,
+    val security: SecurityDashboard? = null,
 )
 
 sealed interface AdminDashboardResult {
@@ -253,6 +338,10 @@ interface AdminRepository {
     ): AdminActionResult
     suspend fun deleteRecommendation(id: String): AdminActionResult
     suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray): AdminActionResult
+    suspend fun enforceAccount(userId: String, action: String, reason: String, expiresAt: String?): AdminActionResult
+    suspend fun decideAppeal(id: String, decision: String, notes: String): AdminActionResult
+    suspend fun approveDeletion(id: String): AdminActionResult
+    suspend fun acknowledgeSecurityAlert(id: String, resolved: Boolean): AdminActionResult
 }
 
 internal class AuthenticatedAdminRepository(
@@ -302,6 +391,29 @@ internal class AuthenticatedAdminRepository(
             }
             parseRecommendations(response.body)
         } else emptyList()
+        val commerce = if (context.can(StaffPermission.CommerceView)) {
+            val response = request("GET", "/v1/admin/commerce")
+            if (response.status !in 200..299 || response.body == null) {
+                return@withContext AdminDashboardResult.Unavailable
+            }
+            parseCommerce(response.body)
+        } else null
+        val accounts = if (context.can(StaffPermission.AccountEnforce) ||
+            context.can(StaffPermission.AppealReview)
+        ) {
+            val response = request("GET", "/v1/admin/accounts")
+            if (response.status !in 200..299 || response.body == null) {
+                return@withContext AdminDashboardResult.Unavailable
+            }
+            parseAccounts(response.body)
+        } else null
+        val security = if (context.can(StaffPermission.SecurityManage)) {
+            val response = request("GET", "/v1/admin/security")
+            if (response.status !in 200..299 || response.body == null) {
+                return@withContext AdminDashboardResult.Unavailable
+            }
+            parseSecurity(response.body)
+        } else null
         AdminDashboardResult.Success(
             AdminDashboard(
                 context = context,
@@ -310,6 +422,9 @@ internal class AuthenticatedAdminRepository(
                 staff = staff,
                 governance = parseGovernance(governanceResponse.body),
                 recommendations = recommendations,
+                commerce = commerce,
+                accounts = accounts,
+                security = security,
             ),
         )
     }
@@ -591,6 +706,44 @@ internal class AuthenticatedAdminRepository(
         "Audit retention policy updated",
     )
 
+    override suspend fun enforceAccount(
+        userId: String,
+        action: String,
+        reason: String,
+        expiresAt: String?,
+    ): AdminActionResult = action(
+        "POST", "/v1/admin/accounts/${userId.trim().lowercase()}/enforcement", buildJsonObject {
+            put("action", action)
+            put("reason", reason.trim())
+            if (expiresAt.isNullOrBlank()) put("expiresAt", JsonNull) else put("expiresAt", expiresAt.trim())
+        }, "Account enforcement recorded",
+    )
+
+    override suspend fun decideAppeal(
+        id: String,
+        decision: String,
+        notes: String,
+    ): AdminActionResult = action(
+        "PUT", "/v1/admin/appeals/${id.trim().lowercase()}", buildJsonObject {
+            put("decision", decision)
+            put("notes", notes.trim())
+        }, "Appeal decision recorded",
+    )
+
+    override suspend fun approveDeletion(id: String): AdminActionResult = action(
+        "POST", "/v1/admin/deletions/${id.trim().lowercase()}/approval", buildJsonObject {},
+        "Deletion approval recorded",
+    )
+
+    override suspend fun acknowledgeSecurityAlert(
+        id: String,
+        resolved: Boolean,
+    ): AdminActionResult = action(
+        "PUT", "/v1/admin/security/alerts/${id.trim().lowercase()}", buildJsonObject {
+            put("resolved", resolved)
+        }, if (resolved) "Security alert resolved" else "Security alert acknowledged",
+    )
+
     private suspend fun action(
         method: String,
         path: String,
@@ -806,6 +959,93 @@ internal class AuthenticatedAdminRepository(
             )
         }
 
+    private fun parseCommerce(element: JsonElement): CommerceDashboard? {
+        val root = element as? JsonObject ?: return null
+        val recent = root.array("recent").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            CommerceEventSummary(
+                id = item.string("id") ?: return@mapNotNull null,
+                type = item.string("type") ?: return@mapNotNull null,
+                product = item.string("product"),
+                amountMinor = item.long("amountMinor"),
+                currency = item.string("currency"),
+                occurredAt = item.string("occurredAt") ?: return@mapNotNull null,
+                userReference = item.string("userReference"),
+            )
+        }
+        return CommerceDashboard(
+            activeEntitlements = root.int("activeEntitlements") ?: 0,
+            grossMinor30d = root.long("grossMinor30d") ?: 0,
+            refunds30d = root.int("refunds30d") ?: 0,
+            disputes30d = root.int("disputes30d") ?: 0,
+            recent = recent,
+        )
+    }
+
+    private fun parseAccounts(element: JsonElement): AccountGovernanceDashboard? {
+        val root = element as? JsonObject ?: return null
+        val enforcements = root.array("enforcements").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            AccountEnforcementSummary(
+                id = item.string("id") ?: return@mapNotNull null,
+                userId = item.string("userId") ?: return@mapNotNull null,
+                action = item.string("action") ?: return@mapNotNull null,
+                reason = item.string("reason") ?: return@mapNotNull null,
+                expiresAt = item.string("expiresAt"),
+                createdAt = item.string("createdAt") ?: return@mapNotNull null,
+            )
+        }
+        val appeals = root.array("appeals").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            AccountAppealSummary(
+                id = item.string("id") ?: return@mapNotNull null,
+                userId = item.string("userId") ?: return@mapNotNull null,
+                status = item.string("status") ?: return@mapNotNull null,
+                statement = item.string("statement") ?: return@mapNotNull null,
+                createdAt = item.string("createdAt") ?: return@mapNotNull null,
+            )
+        }
+        val deletions = root.array("deletions").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            AccountDeletionSummary(
+                id = item.string("id") ?: return@mapNotNull null,
+                userId = item.string("userId") ?: return@mapNotNull null,
+                status = item.string("status") ?: return@mapNotNull null,
+                executeAfter = item.string("executeAfter"),
+                createdAt = item.string("createdAt") ?: return@mapNotNull null,
+            )
+        }
+        return AccountGovernanceDashboard(enforcements, appeals, deletions)
+    }
+
+    private fun parseSecurity(element: JsonElement): SecurityDashboard? {
+        val root = element as? JsonObject ?: return null
+        val alerts = root.array("alerts").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            SecurityAlertSummary(
+                id = item.string("id") ?: return@mapNotNull null,
+                severity = item.string("severity") ?: return@mapNotNull null,
+                category = item.string("category") ?: return@mapNotNull null,
+                summary = item.string("summary") ?: return@mapNotNull null,
+                status = item.string("status") ?: return@mapNotNull null,
+                createdAt = item.string("createdAt") ?: return@mapNotNull null,
+            )
+        }
+        val approvals = root.array("approvals").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            SecurityApprovalSummary(
+                id = item.string("id") ?: return@mapNotNull null,
+                actionType = item.string("actionType") ?: return@mapNotNull null,
+                targetType = item.string("targetType") ?: return@mapNotNull null,
+                targetId = item.string("targetId") ?: return@mapNotNull null,
+                reason = item.string("reason") ?: return@mapNotNull null,
+                status = item.string("status") ?: return@mapNotNull null,
+                expiresAt = item.string("expiresAt") ?: return@mapNotNull null,
+            )
+        }
+        return SecurityDashboard(alerts, approvals)
+    }
+
     private fun ApiResponse.toFailure(): AdminFailure = when (status) {
         400, 404, 409, 422 -> AdminFailure.InvalidInput
         401 -> AdminFailure.NotAuthenticated
@@ -889,6 +1129,10 @@ internal data object UnavailableAdminRepository : AdminRepository {
     ) = unavailable()
     override suspend fun deleteRecommendation(id: String) = unavailable()
     override suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = unavailable()
+    override suspend fun enforceAccount(userId: String, action: String, reason: String, expiresAt: String?) = unavailable()
+    override suspend fun decideAppeal(id: String, decision: String, notes: String) = unavailable()
+    override suspend fun approveDeletion(id: String) = unavailable()
+    override suspend fun acknowledgeSecurityAlert(id: String, resolved: Boolean) = unavailable()
     private fun unavailable() = AdminActionResult.Failure(AdminFailure.ServiceUnavailable)
 }
 
@@ -898,5 +1142,7 @@ private fun JsonObject.string(key: String): String? =
 private fun JsonObject.boolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
 
 private fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
+
+private fun JsonObject.long(key: String): Long? = this[key]?.jsonPrimitive?.longOrNull
 
 private fun JsonObject.array(key: String): JsonArray = this[key] as? JsonArray ?: JsonArray(emptyList())

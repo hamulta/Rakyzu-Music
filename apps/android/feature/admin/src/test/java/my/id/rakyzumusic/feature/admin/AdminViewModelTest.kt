@@ -121,6 +121,10 @@ class AdminViewModelTest {
         ) = ok()
         override suspend fun deleteRecommendation(id: String) = ok()
         override suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = ok()
+        override suspend fun enforceAccount(userId: String, action: String, reason: String, expiresAt: String?) = ok()
+        override suspend fun decideAppeal(id: String, decision: String, notes: String) = ok()
+        override suspend fun approveDeletion(id: String) = ok()
+        override suspend fun acknowledgeSecurityAlert(id: String, resolved: Boolean) = ok()
         private fun ok() = AdminActionResult.Success("Updated")
     }
 }

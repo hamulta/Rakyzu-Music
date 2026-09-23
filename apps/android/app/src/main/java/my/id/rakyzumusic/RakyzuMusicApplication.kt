@@ -12,6 +12,7 @@ import coil3.network.cachecontrol.CacheControlCacheStrategy
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import my.id.rakyzumusic.core.data.auth.AuthRepository
+import my.id.rakyzumusic.core.data.artist.ArtistWorkspaceRepository
 import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
@@ -157,6 +158,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
 
     val adminRepository: AdminRepository
         get() = repositories.adminRepository
+
+    val artistWorkspaceRepository: ArtistWorkspaceRepository
+        get() = repositories.artistWorkspaceRepository
 
     val playbackPreferences: AndroidPlaybackPreferences by lazy {
         AndroidPlaybackPreferences(this)

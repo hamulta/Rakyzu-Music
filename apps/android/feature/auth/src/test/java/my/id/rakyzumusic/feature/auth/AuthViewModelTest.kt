@@ -78,8 +78,29 @@ class AuthViewModelTest {
 
         assertEquals(AuthMode.SignIn, viewModel.uiState.value.mode)
         assertEquals(1, repository.signUpCalls)
-        assertTrue(viewModel.uiState.value.message?.contains("Check your email") == true)
+        assertTrue(viewModel.uiState.value.message?.contains("check your email") == true)
         assertFalse(viewModel.uiState.value.messageIsError)
+    }
+
+    @Test
+    fun registeredEmailSignUpReturnsActionableError() = runTest(dispatcher) {
+        val repository = FakeAuthRepository(
+            signUpResult = AuthActionResult.Failure(
+                my.id.rakyzumusic.core.data.auth.AuthFailure.EmailAlreadyRegistered,
+            ),
+        )
+        val viewModel = AuthViewModel(repository)
+
+        viewModel.switchMode()
+        viewModel.updateEmail("listener@rakyzu.my.id")
+        viewModel.updatePassword("Secure-Password1")
+        viewModel.updatePasswordConfirmation("Secure-Password1")
+        viewModel.submit()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repository.signUpCalls)
+        assertTrue(viewModel.uiState.value.message?.contains("Sign in or reset") == true)
+        assertTrue(viewModel.uiState.value.messageIsError)
     }
 
     @Test

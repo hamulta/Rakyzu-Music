@@ -8,6 +8,7 @@ const TRACK_ID = "a3000000-0000-4000-8000-000000000001";
 const ALBUM_ID = "a2000000-0000-4000-8000-000000000001";
 const PLAYLIST_ID = "a4000000-0000-4000-8000-000000000001";
 const PROFILE_ID = "b1000000-0000-4000-8000-000000000001";
+const ARTIST_ID = "b2000000-0000-4000-8000-000000000001";
 const AUDIO = new TextEncoder().encode("rakyzu-audio");
 const ARTWORK = new Uint8Array([0x52, 0x41, 0x4b, 0x59, 0x5a, 0x55]);
 
@@ -16,7 +17,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.25" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.30" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -548,17 +549,162 @@ describe("Rakyzu Music API", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("requires authentication for the Artist workspace", async () => {
+    const response = await execute("/v1/artists/me/workspace");
+    expect(response.status).toBe(401);
+  });
+
+  it("routes Artist drafts to the scoped database RPC, not staff permissions", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/artists/me/albums", {
+      method: "POST",
+      headers: { authorization: "Bearer artist-token", "content-type": "application/json" },
+      body: JSON.stringify({ artistId: ARTIST_ID, title: "Artist Draft", releaseDate: null }),
+      adminCalls: calls,
+      rpcResults: { artist_create_album_draft: { id: ALBUM_ID, title: "Artist Draft" } },
+    });
+    expect(response.status).toBe(201);
+    expect(calls).toEqual([{ name: "artist_create_album_draft", payload: {
+      target_artist_id: ARTIST_ID, album_title: "Artist Draft", album_release_date: null,
+    } }]);
+  });
+
+  it("blocks Artist media uploads before writing R2 when scoped edit is denied", async () => {
+    const calls: Array<{ name: AdminRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/artist/albums/${ALBUM_ID}/artwork`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer listener-token", "content-type": "image/webp", "content-length": "12",
+      },
+      body: new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]),
+      adminCalls: calls,
+      rpcResults: { artist_can_edit_album: false },
+    });
+    expect(response.status).toBe(403);
+    expect(calls).toEqual([{ name: "artist_can_edit_album", payload: { target_album_id: ALBUM_ID } }]);
+  });
+
+  it("serves Artist artwork only after scoped authorization", async () => {
+    const denied = await execute(`/v1/artists/${ARTIST_ID}/artwork`, {
+      headers: { authorization: "Bearer listener-token" },
+      rpcResults: { artist_can_view_artwork: false },
+    });
+    expect(denied.status).toBe(404);
+    const allowed = await execute(`/v1/artists/${ARTIST_ID}/artwork`, {
+      method: "HEAD", headers: { authorization: "Bearer artist-token" },
+      rpcResults: { artist_can_view_artwork: true },
+    });
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get("content-type")).toBe("image/webp");
+  });
+
+  it("accepts only signed, bounded trusted play events", async () => {
+    const body = JSON.stringify({ eventId: "play-event-00000001", userId: PROFILE_ID,
+      trackId: TRACK_ID, occurredAt: new Date().toISOString(), listeningMs: 30_000,
+      completed: true, countryCode: "id" });
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/events/play", {
+      method: "POST", body, adminCalls: calls,
+      headers: await signedHeaders(body, "play-event-test-secret-at-least-32-bytes"),
+      adminResult: { accepted: true },
+    });
+    expect(response.status).toBe(202);
+    expect(calls[0]?.name).toBe("service_record_play_event");
+    expect(calls[0]?.payload).toMatchObject({ requested_track_id: TRACK_ID,
+      requested_user_id: PROFILE_ID, requested_country_code: "ID" });
+
+    const denied = await execute("/v1/events/play", {
+      method: "POST", body, headers: { "content-type": "application/json",
+        "x-rakyzu-timestamp": Math.floor(Date.now() / 1000).toString(),
+        "x-rakyzu-signature": "0".repeat(64) },
+    });
+    expect(denied.status).toBe(401);
+  });
+
+  it("verifies commerce webhook signatures before the service-role RPC", async () => {
+    const body = JSON.stringify({ provider: "rakyzu_test", eventId: "payment-event-0001",
+      type: "purchase_completed", userId: PROFILE_ID, customerReference: "cus_123456",
+      productReference: "premium_monthly", amountMinor: 49000, currency: "idr",
+      occurredAt: new Date().toISOString() });
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/webhooks/commerce", {
+      method: "POST", body, adminCalls: calls,
+      headers: await signedHeaders(body, "commerce-test-secret-at-least-32-bytes"),
+      adminResult: { accepted: true },
+    });
+    expect(response.status).toBe(202);
+    expect(calls[0]?.name).toBe("service_ingest_commerce_event");
+    expect(calls[0]?.payload).toMatchObject({ requested_currency: "IDR",
+      requested_amount_minor: 49000 });
+    expect(calls[0]?.payload.requested_payload_sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("routes privacy-scoped Artist analytics", async () => {
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/artists/${ARTIST_ID}/analytics?from=2026-09-01&to=2026-09-23`, {
+      headers: { authorization: "Bearer artist-token" }, adminCalls: calls,
+      adminResult: { privacyThresholdMet: false },
+    });
+    expect(response.status).toBe(200);
+    expect(calls[0]).toEqual({ name: "artist_analytics", payload: {
+      target_artist_id: ARTIST_ID, range_start: "2026-09-01", range_end: "2026-09-23",
+    } });
+  });
+
+  it("enforces commerce and account governance permissions", async () => {
+    const commerceDenied = await execute("/v1/admin/commerce", {
+      headers: { authorization: "Bearer officer-token" },
+      staff: staffContext("officer", ["admin.access"]),
+    });
+    expect(commerceDenied.status).toBe(403);
+
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const enforced = await execute(`/v1/admin/accounts/${PROFILE_ID}/enforcement`, {
+      method: "POST", headers: { authorization: "Bearer manager-token",
+        "content-type": "application/json" },
+      body: JSON.stringify({ action: "suspend", reason: "Repeated verified policy violations",
+        expiresAt: "2026-10-01T00:00:00.000Z" }),
+      staff: staffContext("manager", ["admin.access", "account.enforce"]),
+      adminCalls: calls,
+    });
+    expect(enforced.status).toBe(201);
+    expect(calls[0]?.name).toBe("admin_enforce_account");
+  });
+
+  it("keeps deletion approval behind the dedicated executive permission", async () => {
+    const requestId = "c1000000-0000-4000-8000-000000000001";
+    const denied = await execute(`/v1/admin/deletions/${requestId}/approval`, {
+      method: "POST", headers: { authorization: "Bearer manager-token" },
+      staff: staffContext("manager", ["admin.access", "account.enforce"]),
+    });
+    expect(denied.status).toBe(403);
+  });
 });
 
 interface ExecuteOptions {
-  adminCalls?: Array<{ name: AdminRpcName; payload: Record<string, unknown> }>;
+  adminCalls?: Array<{ name: TestRpcName; payload: Record<string, unknown> }>;
   adminResult?: unknown;
   body?: BodyInit;
   catalogError?: Error;
   headers?: HeadersInit;
   method?: string;
   published?: boolean;
+  rpcResults?: Partial<Record<TestRpcName, unknown>>;
   staff?: StaffContext;
+}
+
+type TestRpcName = AdminRpcName | "service_record_play_event" | "service_ingest_commerce_event";
+
+async function signedHeaders(body: string, secret: string): Promise<HeadersInit> {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const bytes = new Uint8Array(await crypto.subtle.sign("HMAC", key,
+    new TextEncoder().encode(`${timestamp}.${body}`)));
+  const signature = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return { "content-type": "application/json", "x-rakyzu-timestamp": timestamp,
+    "x-rakyzu-signature": signature };
 }
 
 async function execute(path: string, options: ExecuteOptions = {}): Promise<Response> {
@@ -601,7 +747,11 @@ async function execute(path: string, options: ExecuteOptions = {}): Promise<Resp
     },
     async adminRpc(name, payload) {
       options.adminCalls?.push({ name, payload });
-      return options.adminResult ?? {};
+      return options.rpcResults?.[name] ?? options.adminResult ?? {};
+    },
+    async serviceRpc(name, payload) {
+      options.adminCalls?.push({ name, payload });
+      return options.rpcResults?.[name] ?? options.adminResult ?? {};
     },
   };
   const worker = createWorker(dependencies);
@@ -623,6 +773,9 @@ function testEnv(): RakyzuApiEnv {
     ALLOWED_ORIGINS: "https://rakyzu.my.id",
     SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_PUBLISHABLE_KEY: "public-test-key",
+    SUPABASE_SERVICE_ROLE_KEY: "service-test-key",
+    PLAY_EVENT_WEBHOOK_SECRET: "play-event-test-secret-at-least-32-bytes",
+    COMMERCE_WEBHOOK_SECRET: "commerce-test-secret-at-least-32-bytes",
   };
 }
 

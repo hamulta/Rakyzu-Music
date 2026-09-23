@@ -47,12 +47,16 @@ internal class SupabaseAuthRepository(
 
     override suspend fun signUp(email: String, password: String): AuthActionResult = authRequest {
         callbackState.value = AuthCallbackState.Idle
-        auth.signUpWith(Email, redirectUrl = EMAIL_CONFIRMATION_REDIRECT) {
+        val user = auth.signUpWith(Email, redirectUrl = EMAIL_CONFIRMATION_REDIRECT) {
             this.email = email
             this.password = password
         }
         if (auth.currentSessionOrNull() == null) {
-            AuthActionResult.ConfirmationRequired(email)
+            if (user != null && user.identities.isNullOrEmpty()) {
+                AuthActionResult.Failure(AuthFailure.EmailAlreadyRegistered)
+            } else {
+                AuthActionResult.ConfirmationRequired(email)
+            }
         } else {
             AuthActionResult.Success
         }

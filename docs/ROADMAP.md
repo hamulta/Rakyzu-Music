@@ -143,15 +143,15 @@ remains a separately approved maintenance operation.
   audio upload/streaming; album and recommendation images accept JPEG, PNG, or WebP selection.
 - [x] `0.5.25` — CEO-requested staff email bootstrap, existing/new Artist and album edit/archive,
   and full seeded/new Home recommendation edit/order/target/image/delete controls.
-- [ ] `0.5.26` — expand Artist workspace to scoped imagery, team, catalog drafts, and release
+- [x] `0.5.26` — expand Artist workspace to scoped imagery, team, catalog drafts, and release
   submissions without organization-global staff permissions or self-publication.
-- [ ] `0.5.27` — privacy-thresholded Artist/Admin analytics for streams, listeners, followers,
+- [x] `0.5.27` — privacy-thresholded Artist/Admin analytics for streams, listeners, followers,
   releases, geography, date ranges, and CSV export; add trusted event collection first.
-- [ ] `0.5.28` — Admin commerce dashboard for user subscriptions and purchases, provider-signed
+- [x] `0.5.28` — Admin commerce dashboard for user subscriptions and purchases, provider-signed
   webhook ledger, entitlements, receipts, refunds, disputes, and least-privilege visibility.
-- [ ] `0.5.29` — reasoned listener/Artist suspension or ban, appeal, badge/privilege revocation,
+- [x] `0.5.29` — reasoned listener/Artist suspension or ban, appeal, badge/privilege revocation,
   reinstatement, and retention-aware account-deletion requests with dual control.
-- [ ] `0.5.30` — strengthened Admin security alerts, destructive-action approval, scoped export,
+- [x] `0.5.30` — strengthened Admin security alerts, destructive-action approval, scoped export,
   accessibility, performance, resilience, and Artist lifecycle release gate.
 
 Spotify's current public wording distinguishes a profile-management registration mark from broader
@@ -159,6 +159,10 @@ quality endorsement. Rakyzu's badge will therefore state exactly what was verifi
 only by trusted server state, and be revocable. An optional Artist account email is an exact
 account match, not a second confirmation step; privileges activate only after the matched
 authenticated account accepts the current terms.
+
+The cumulative `0.5.26`–`0.5.30` Android artifact uses versionCode `76`. Signed event ingestion,
+privacy thresholds, commerce evidence, account enforcement, dual-control deletion, and security
+approval stay server-authoritative; no provider secret or Supabase service key enters Android.
 
 - [ ] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
 - [ ] `0.6.1` — explicit album and playlist download actions with per-item progress.

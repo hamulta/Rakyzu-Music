@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
                     onSessionEnded = rakyzuApplication::stopPlaybackIfRunning,
                     playbackPreferences = rakyzuApplication.playbackPreferences,
                     adminRepository = rakyzuApplication.adminRepository,
+                    artistWorkspaceRepository = rakyzuApplication.artistWorkspaceRepository,
                 )
             }
         }

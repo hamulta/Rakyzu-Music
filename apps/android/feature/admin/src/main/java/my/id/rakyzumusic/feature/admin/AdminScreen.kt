@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -110,6 +111,10 @@ fun AdminRoute(
         onUpsertRecommendation = viewModel::upsertRecommendation,
         onDeleteRecommendation = viewModel::deleteRecommendation,
         onUploadRecommendationArtwork = viewModel::uploadRecommendationArtwork,
+        onEnforceAccount = viewModel::enforceAccount,
+        onDecideAppeal = viewModel::decideAppeal,
+        onApproveDeletion = viewModel::approveDeletion,
+        onAcknowledgeSecurityAlert = viewModel::acknowledgeSecurityAlert,
         modifier = modifier,
     )
 }
@@ -143,6 +148,10 @@ internal fun AdminScreen(
     onUpsertRecommendation: (String?, String, String?, Int, String?, Boolean) -> Unit,
     onDeleteRecommendation: (String) -> Unit,
     onUploadRecommendationArtwork: (String, ByteArray) -> Unit,
+    onEnforceAccount: (String, String, String, String?) -> Unit,
+    onDecideAppeal: (String, String, String) -> Unit,
+    onApproveDeletion: (String) -> Unit,
+    onAcknowledgeSecurityAlert: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dashboard = state.dashboard
@@ -180,6 +189,10 @@ internal fun AdminScreen(
             onUpsertRecommendation = onUpsertRecommendation,
             onDeleteRecommendation = onDeleteRecommendation,
             onUploadRecommendationArtwork = onUploadRecommendationArtwork,
+            onEnforceAccount = onEnforceAccount,
+            onDecideAppeal = onDecideAppeal,
+            onApproveDeletion = onApproveDeletion,
+            onAcknowledgeSecurityAlert = onAcknowledgeSecurityAlert,
             modifier = modifier,
         )
     }
@@ -215,6 +228,10 @@ private fun StaffAdminPanel(
     onUpsertRecommendation: (String?, String, String?, Int, String?, Boolean) -> Unit,
     onDeleteRecommendation: (String) -> Unit,
     onUploadRecommendationArtwork: (String, ByteArray) -> Unit,
+    onEnforceAccount: (String, String, String, String?) -> Unit,
+    onDecideAppeal: (String, String, String) -> Unit,
+    onApproveDeletion: (String) -> Unit,
+    onAcknowledgeSecurityAlert: (String, Boolean) -> Unit,
     modifier: Modifier,
 ) {
     val access = dashboard.context
@@ -257,6 +274,98 @@ private fun StaffAdminPanel(
             }
         }
         if (state.isWorking) item { CircularProgressIndicator(color = RakyzuAqua) }
+
+        dashboard.commerce?.let { commerce ->
+            item {
+                SectionHeading(
+                    "Commerce overview",
+                    "${commerce.activeEntitlements} active • ${commerce.refunds30d} refunds • ${commerce.disputes30d} disputes",
+                )
+            }
+            item {
+                InfoCard(
+                    title = "30-day verified gross",
+                    detail = "${commerce.grossMinor30d} minor currency units from signed provider events",
+                    id = "Customer and raw provider references remain hidden",
+                )
+            }
+            items(commerce.recent.take(10), key = { "commerce-${it.id}" }) { event ->
+                InfoCard(
+                    title = event.type.replace('_', ' ').replaceFirstChar(Char::uppercase),
+                    detail = listOfNotNull(event.product, event.amountMinor?.toString(), event.currency)
+                        .joinToString(" • "),
+                    id = event.userReference?.let { "Account $it…" } ?: "Unlinked provider event",
+                )
+            }
+        }
+
+        dashboard.accounts?.let { accounts ->
+            if (access.can(StaffPermission.AccountEnforce)) {
+                item {
+                    AccountEnforcementComposer(
+                        enabled = !state.isWorking,
+                        onEnforce = onEnforceAccount,
+                    )
+                }
+            }
+            item {
+                SectionHeading(
+                    "Account lifecycle",
+                    "${accounts.enforcements.size} actions • ${accounts.appeals.size} appeals • ${accounts.deletions.size} deletion requests",
+                )
+            }
+            items(accounts.enforcements, key = { "account-${it.id}" }) { event ->
+                InfoCard(
+                    title = event.action.replaceFirstChar(Char::uppercase),
+                    detail = event.reason,
+                    id = event.userId,
+                )
+            }
+            if (access.can(StaffPermission.AppealReview)) {
+                items(accounts.appeals.filter { it.status == "pending" }, key = { "appeal-${it.id}" }) { appeal ->
+                    AppealCard(appeal.id, appeal.userId, appeal.statement, !state.isWorking, onDecideAppeal)
+                }
+            }
+            if (access.can(StaffPermission.DeletionApprove)) {
+                items(accounts.deletions.filter { it.status in setOf("pending", "first_approved") },
+                    key = { "deletion-${it.id}" }) { deletion ->
+                    ApprovalCard(
+                        title = "Account deletion • ${deletion.status.replace('_', ' ')}",
+                        detail = "A distinct second executive and 14-day cooling period are required.",
+                        id = deletion.userId,
+                        enabled = !state.isWorking,
+                        actionLabel = "Record approval",
+                        onAction = { onApproveDeletion(deletion.id) },
+                    )
+                }
+            }
+        }
+
+        dashboard.security?.let { security ->
+            item {
+                SectionHeading(
+                    "Security center",
+                    "${security.alerts.count { it.status == "open" }} open alerts • ${security.approvals.size} protected actions",
+                )
+            }
+            items(security.alerts, key = { "alert-${it.id}" }) { alert ->
+                SecurityAlertCard(
+                    severity = alert.severity,
+                    summary = alert.summary,
+                    category = alert.category,
+                    enabled = !state.isWorking && alert.status != "resolved",
+                    onAcknowledge = { onAcknowledgeSecurityAlert(alert.id, false) },
+                    onResolve = { onAcknowledgeSecurityAlert(alert.id, true) },
+                )
+            }
+            items(security.approvals, key = { "approval-${it.id}" }) { approval ->
+                InfoCard(
+                    title = "${approval.actionType} • ${approval.status}",
+                    detail = approval.reason,
+                    id = "${approval.targetType}: ${approval.targetId}",
+                )
+            }
+        }
 
         if (access.can(StaffPermission.ModerationView)) {
             item {
@@ -1071,6 +1180,117 @@ private fun PrimaryAction(label: String, enabled: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
+private fun AdminCard(
+    title: String,
+    subtitle: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = RakyzuSurface),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun AccountEnforcementComposer(
+    enabled: Boolean,
+    onEnforce: (String, String, String, String?) -> Unit,
+) {
+    var userId by remember { mutableStateOf("") }
+    var action by remember { mutableStateOf("suspend") }
+    var reason by remember { mutableStateOf("") }
+    var expiresAt by remember { mutableStateOf("") }
+    AdminCard("Account enforcement", "Reasoned, reversible, server-audited action") {
+        OutlinedTextField(userId, { userId = it }, label = { Text("Account UUID") },
+            singleLine = true, modifier = Modifier.fillMaxWidth())
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("suspend", "ban", "reinstate").forEach { option ->
+                FilterChip(selected = action == option, onClick = { action = option },
+                    label = { Text(option.replaceFirstChar(Char::uppercase)) })
+            }
+        }
+        OutlinedTextField(reason, { reason = it }, label = { Text("Required reason") },
+            minLines = 2, modifier = Modifier.fillMaxWidth())
+        if (action == "suspend") {
+            OutlinedTextField(expiresAt, { expiresAt = it },
+                label = { Text("Expiry (ISO-8601)") }, singleLine = true,
+                modifier = Modifier.fillMaxWidth())
+        }
+        Button(
+            onClick = { onEnforce(userId.trim(), action, reason.trim(), expiresAt.trim().ifBlank { null }) },
+            enabled = enabled && userId.length == 36 && reason.trim().length >= 12 &&
+                (action != "suspend" || expiresAt.isNotBlank()),
+        ) { Text("Record account action") }
+    }
+}
+
+@Composable
+private fun AppealCard(
+    id: String,
+    userId: String,
+    statement: String,
+    enabled: Boolean,
+    onDecision: (String, String, String) -> Unit,
+) {
+    var notes by remember(id) { mutableStateOf("") }
+    AdminCard("Pending appeal", statement) {
+        Text(userId, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(notes, { notes = it }, label = { Text("Decision notes") },
+            minLines = 2, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onDecision(id, "accepted", notes.trim()) },
+                enabled = enabled && notes.trim().length >= 12) { Text("Accept") }
+            OutlinedButton(onClick = { onDecision(id, "rejected", notes.trim()) },
+                enabled = enabled && notes.trim().length >= 12) { Text("Reject") }
+        }
+    }
+}
+
+@Composable
+private fun ApprovalCard(
+    title: String,
+    detail: String,
+    id: String,
+    enabled: Boolean,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    AdminCard(title, detail) {
+        Text(id, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick = onAction, enabled = enabled) { Text(actionLabel) }
+    }
+}
+
+@Composable
+private fun SecurityAlertCard(
+    severity: String,
+    summary: String,
+    category: String,
+    enabled: Boolean,
+    onAcknowledge: () -> Unit,
+    onResolve: () -> Unit,
+) {
+    AdminCard("${severity.uppercase()} • $category", summary) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onAcknowledge, enabled = enabled) { Text("Acknowledge") }
+            Button(onClick = onResolve, enabled = enabled) { Text("Resolve") }
+        }
+    }
+}
+
+@Composable
 private fun SectionHeading(title: String, subtitle: String) {
     Column {
         Text(
@@ -1174,12 +1394,17 @@ internal fun readBoundedArtwork(context: android.content.Context, uri: Uri): Byt
     ) ?: return null
     return try {
         val encoded = ByteArrayOutputStream()
-        if (!bitmap.compress(Bitmap.CompressFormat.WEBP, 82, encoded)) null else
+        if (!bitmap.compress(webpLossyFormat(), 82, encoded)) null else
             encoded.toByteArray().takeIf { it.size in 12..MAX_ARTWORK_BYTES }
     } finally {
         bitmap.recycle()
     }
 }
+
+@Suppress("DEPRECATION")
+private fun webpLossyFormat(): Bitmap.CompressFormat =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
+    else Bitmap.CompressFormat.WEBP
 
 private const val MAX_AUDIO_BYTES = 50 * 1024 * 1024
 private const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
