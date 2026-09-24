@@ -4,14 +4,14 @@
 
 - [x] Audit clean `v0.5.25` baseline, released APK, Android startup path, and Appetize capability.
 - [x] Run released `0.5.25` APK on Appetize Android 13, 15, and 16 with debug logs.
-- [ ] Complete startup correction and confirm an Android 16 launch with the final APK.
+- [x] Complete startup correction and confirm an Android 16 launch with the final APK.
 - [x] `0.5.26`: scoped Artist imagery, team, catalog drafts, and review-only submissions.
 - [x] `0.5.27`: trusted play-event foundation and privacy-thresholded Artist/Admin analytics.
 - [x] `0.5.28`: signed commerce event ingestion, entitlement/receipt ledger, and scoped Admin dashboard.
 - [x] `0.5.29`: reasoned suspension/ban, appeal, reinstatement, and dual-control deletion requests.
 - [x] `0.5.30`: security alerts/approval, scoped export, accessibility/performance/resilience,
   Android 8–17 compatibility review, and cumulative release gate.
-- [ ] Validate Worker, PostgreSQL, Android CI, production deployment, Appetize final APK,
+- [x] Validate Worker, PostgreSQL, Android CI, production deployment, Appetize final APK,
   GitHub tag/release/artifact, and final worktree audit.
 
 The CEO reports a force close on a fresh Android 16 install from GitHub Release `v0.5.25`.
@@ -26,11 +26,15 @@ the repository graph deterministically, isolates optional background failures, a
 playback creation until authenticated use.
 
 The exact published APK had previously started on Appetize Android 13, 15, and 16 without a
-captured `FATAL EXCEPTION`; the race was timing/device dependent. The Appetize ADB tunnel confirmed
-that a separate candidate APK from successful Android CI run `35714776254` resumed `MainActivity`,
-rendered the sign-in screen on Android 16, kept its process alive, and emitted no fatal crash.
+captured `FATAL EXCEPTION`; the race was timing/device dependent. During diagnosis, the Appetize
+ADB tunnel confirmed that a candidate APK from successful Android CI run `35714776254` resumed
+`MainActivity`, rendered the sign-in screen on Android 16, kept its process alive, and emitted no
+fatal crash.
 The physical stack trace matches the removed old-code path exactly, so the startup correction is
-now evidence-backed; the final `0.5.30` APK still requires the same runtime check. Android Studio
+now evidence-backed. The final APK from main Android CI run `35938741526` was uploaded unchanged
+to Appetize build `psxswm4fnm55qa7v6pk2gfbjbi`. On Android 16 its process remained alive,
+`my.id.rakyzumusic/.MainActivity` was resumed, the sign-in screen rendered, and captured logcat
+contained no fatal exception. Android Studio
 IDE is unavailable on this Linux ARM64 host and unsupported by its official Linux system
 requirements; the official SDK/Gradle CI and Appetize ADB/logcat are the available diagnostics.
 Appetize offers selected Android versions from 8.1 through 16.0, not Android 17; Android 17
@@ -74,6 +78,20 @@ isolated R8/resource-shrunk release build. The debug artifact identifies as
 valid APK Signature Scheme v2 signer. Worker validation regenerated and checked its bindings,
 type-checked both TypeScript targets, passed all 71 tests, and completed a no-write deploy dry-run.
 An exact-value scan found no configured credential in tracked or pending source.
+
+PR `#2` merged as `565d3687d65ab738120d8b4809f169d6e4a39138`. Its Android
+`35937418130`, database `35937418179`, and Worker `35937418127` checks passed. The resulting main
+Android `35938741526`, database `35938741533`, and Worker `35938741540` workflows also passed,
+including production deployment. Production health reports Worker `0.5.30`; the three migration
+records `20260922100000`, `20260923100000`, and `20260923110000` and their new trusted-play,
+commerce, and profile-context objects are present.
+
+Annotated tag and GitHub Release `v0.5.30` point to the validated merge commit. The downloaded
+release APK is byte-identical to the main CI artifact: 28,821,044 bytes with SHA-256
+`184a4cb8c5dc188cb74c652522849f146780cbd0f5e340ccf5e860ce0c14d0f7`. It identifies as
+`my.id.rakyzumusic`, versionName `0.5.30`, versionCode `76`, min SDK 26, target SDK 37, and has one
+valid APK Signature Scheme v2 signer. Release URL:
+<https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.30>.
 
 ## Active cumulative 0.5.16–0.5.20 batch — 2026-09-15
 
