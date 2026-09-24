@@ -47,6 +47,15 @@ insert into auth.users(id, email) values
   ('b5000000-0000-4000-8000-000000000001', 'lifecycle-listener@rakyzu.test'),
   ('b5000000-0000-4000-8000-000000000002', 'lifecycle-listener-two@rakyzu.test');
 
+-- Production already has the bootstrapped CEO account, while an isolated replay does not.
+-- Creating it only when absent keeps this test deterministic in both environments and lets the
+-- staff-assignment trigger exercise the real email-to-role bootstrap path.
+insert into auth.users(id, email)
+select 'b5000000-0000-4000-8000-000000000003', 'rakyzudev@gmail.com'
+where not exists (
+  select 1 from auth.users where lower(email) = 'rakyzudev@gmail.com'
+);
+
 insert into public.artists(id, name) values
   ('b5000000-0000-4000-8000-000000000010', 'Lifecycle Test Artist');
 insert into public.albums(id, artist_id, title) values
