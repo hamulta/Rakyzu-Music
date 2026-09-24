@@ -93,6 +93,10 @@ class AdminAccessibilityTest {
                     onUpsertRecommendation = { _, _, _, _, _, _ -> },
                     onDeleteRecommendation = {},
                     onUploadRecommendationArtwork = { _, _ -> },
+                    onEnforceAccount = { _, _, _, _ -> },
+                    onDecideAppeal = { _, _, _ -> },
+                    onApproveDeletion = {},
+                    onAcknowledgeSecurityAlert = { _, _ -> },
                 )
             }
         }

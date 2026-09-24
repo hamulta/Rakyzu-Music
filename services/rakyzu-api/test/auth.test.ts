@@ -56,5 +56,8 @@ function environment(): RakyzuApiEnv {
     ALLOWED_ORIGINS: "https://rakyzu.my.id",
     SUPABASE_URL: PROJECT_URL,
     SUPABASE_PUBLISHABLE_KEY: "public-test-key",
+    SUPABASE_SERVICE_ROLE_KEY: "service-test-key",
+    PLAY_EVENT_WEBHOOK_SECRET: "play-event-test-secret-at-least-32-bytes",
+    COMMERCE_WEBHOOK_SECRET: "commerce-test-secret-at-least-32-bytes",
   };
 }

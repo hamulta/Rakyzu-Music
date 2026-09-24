@@ -26,9 +26,11 @@ class MainActivity : ComponentActivity() {
                     mediaDeliveryRepository = rakyzuApplication.mediaDeliveryRepository,
                     connectivityMonitor = rakyzuApplication.connectivityMonitor,
                     recentSearchRepository = rakyzuApplication.recentSearchRepository,
-                    playbackController = rakyzuApplication.playbackController,
+                    playbackControllerProvider = { rakyzuApplication.playbackController },
+                    onSessionEnded = rakyzuApplication::stopPlaybackIfRunning,
                     playbackPreferences = rakyzuApplication.playbackPreferences,
                     adminRepository = rakyzuApplication.adminRepository,
+                    artistWorkspaceRepository = rakyzuApplication.artistWorkspaceRepository,
                 )
             }
         }

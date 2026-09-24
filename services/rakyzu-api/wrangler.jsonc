@@ -16,7 +16,10 @@
   "secrets": {
     "required": [
       "SUPABASE_URL",
-      "SUPABASE_PUBLISHABLE_KEY"
+      "SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "PLAY_EVENT_WEBHOOK_SECRET",
+      "COMMERCE_WEBHOOK_SECRET"
     ]
   },
   "observability": {

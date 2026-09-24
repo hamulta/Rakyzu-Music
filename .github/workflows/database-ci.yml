@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: database-${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +25,7 @@ jobs:
   validate:
     name: pgTAP, lint, and migration replay
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout Rakyzu Music
@@ -36,8 +37,25 @@ jobs:
           version: 2.115.0
           github-token: ${{ github.token }}
 
+      - name: Authenticate Supabase image registry
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
       - name: Start isolated Postgres
-        run: supabase db start
+        shell: bash
+        run: |
+          for attempt in $(seq 1 12); do
+            if supabase db start; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              echo "::error::Unable to start isolated Postgres after $attempt attempts"
+              exit 1
+            fi
+            echo "::warning::Postgres image pull failed; retrying in 30s (attempt $((attempt + 1))/12)"
+            sleep 30
+          done
 
       - name: Test database policies
         run: supabase test db --local

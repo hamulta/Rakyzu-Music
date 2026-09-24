@@ -53,11 +53,21 @@ export async function callAdminRpc(
   return callSupabaseRpc(name, payload, token, env);
 }
 
+export async function callServiceRpc(
+  name: "service_record_play_event" | "service_ingest_commerce_event",
+  payload: Record<string, unknown>,
+  env: RakyzuApiEnv,
+): Promise<unknown> {
+  return callSupabaseRpc(name, payload, env.SUPABASE_SERVICE_ROLE_KEY, env,
+    env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 async function callSupabaseRpc(
   name: string,
   payload: Record<string, unknown>,
   token: string,
   env: RakyzuApiEnv,
+  apiKey: string = env.SUPABASE_PUBLISHABLE_KEY,
 ): Promise<unknown> {
   const url = new URL(`/rest/v1/rpc/${name}`, env.SUPABASE_URL);
   let response: Response;
@@ -66,7 +76,7 @@ async function callSupabaseRpc(
       method: "POST",
       headers: {
         accept: "application/json",
-        apikey: env.SUPABASE_PUBLISHABLE_KEY,
+        apikey: apiKey,
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
       },

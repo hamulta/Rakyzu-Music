@@ -214,7 +214,7 @@ class AuthViewModel(
                     password = "",
                     passwordConfirmation = "",
                     isSubmitting = false,
-                    message = "Check your email to confirm your Rakyzu Music account, then sign in.",
+                    message = "If this is a new account, check your email to confirm it, then sign in.",
                     messageIsError = false,
                 )
             }
@@ -262,7 +262,8 @@ private fun AuthFailure.toSafeMessage(): String = when (this) {
     AuthFailure.InvalidConfiguration -> "Rakyzu Music sign-in is not configured for this build."
     AuthFailure.InvalidCredentials -> "The email or password is incorrect."
     AuthFailure.EmailNotConfirmed -> "Confirm your email before signing in."
-    AuthFailure.EmailAlreadyRegistered -> "Unable to create this account. Try signing in instead."
+    AuthFailure.EmailAlreadyRegistered ->
+        "This email cannot be registered. Sign in or reset its password instead."
     AuthFailure.WeakPassword -> "Choose a stronger password and try again."
     AuthFailure.RateLimited -> "Too many attempts. Wait a moment and try again."
     AuthFailure.NetworkUnavailable -> "No connection. Check your network and try again."

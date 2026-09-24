@@ -155,3 +155,32 @@ checks. `get_track_media_key` selects the authoritative current audio variant on
 available track; it prevents stale MP3 keys from shadowing a newly uploaded format. Artist/album
 archive markers hide records without deleting them; recommendation rows can be reordered or
 removed through permission-checked RPCs with staff audit entries.
+
+### Artist Studio and lifecycle control — 0.5.26–0.5.30
+
+`artist_artwork_assets` and scoped Artist RPCs provide profile/album imagery, viewer/editor team
+membership, album and track drafts, six validated source-audio formats, and review submissions.
+Every mutation resolves the active linked Artist or exact catalog scope again in PostgreSQL. Artist
+accounts cannot publish, approve their own review, assign staff, or acquire organization permissions.
+
+`trusted_play_events` accepts only service-role calls from the HMAC-verified Worker boundary and
+deduplicates a provider event ID. Artist analytics bound date ranges to 367 days and suppress both
+listener totals and each geography group until at least five distinct listeners are present. Raw
+user-level events are never selectable by Android.
+
+`commerce_event_ledger` stores idempotent signed-provider evidence and derives entitlement and
+receipt state. Android receives only its own entitlement/receipt rows; authorized staff receive
+aggregate totals, masked account references, and a bounded recent-event view. Raw payload and
+customer references remain behind forced RLS and the service role.
+
+`account_enforcement_events`, `account_appeals`, and `account_deletion_requests` form a reasoned,
+append-only lifecycle. Suspensions and bans remove effective staff/Artist permission at the database
+helper boundary. Appeals may reinstate access. Deletion needs two distinct executive approvals and
+a 14-day cooling period; approval creates evidence but never physically deletes Auth, catalog,
+commerce, or audit records.
+
+`security_alerts` and `privileged_action_requests` expose a permission-filtered Security Center.
+Protected operations keep requester/approver separation, bounded reasons, expiry, and staff-audit
+evidence. The profile context now self-repairs only the authenticated account's missing legacy row
+and always emits non-null identity flags, preventing a valid listener from being stranded at the
+profile gate.

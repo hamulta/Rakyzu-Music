@@ -3,6 +3,9 @@ export interface RakyzuApiEnv {
   ALLOWED_ORIGINS: string;
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+  PLAY_EVENT_WEBHOOK_SECRET: string;
+  COMMERCE_WEBHOOK_SECRET: string;
 }
 
 export interface ListenerIdentity {
@@ -48,6 +51,30 @@ export type AdminRpcName =
   | "record_profile_avatar"
   | "delete_profile_avatar"
   | "artist_update_biography"
+  | "artist_workspace_context"
+  | "artist_assign_team_by_email"
+  | "artist_create_album_draft"
+  | "artist_create_track_draft"
+  | "artist_submit_catalog_review"
+  | "artist_artwork_upload_scope"
+  | "artist_can_edit_album"
+  | "artist_can_edit_track"
+  | "artist_can_view_artwork"
+  | "artist_record_profile_artwork"
+  | "artist_record_album_artwork"
+  | "artist_record_track_media"
+  | "artist_analytics"
+  | "account_lifecycle_context"
+  | "account_submit_appeal"
+  | "account_request_deletion"
+  | "admin_commerce_dashboard"
+  | "admin_account_dashboard"
+  | "admin_security_dashboard"
+  | "admin_enforce_account"
+  | "admin_decide_appeal"
+  | "admin_approve_deletion"
+  | "admin_acknowledge_security_alert"
+  | "admin_export_account_data"
   | "admin_upsert_editorial_shelf"
   | "admin_schedule_album"
   | "admin_set_audit_retention"
@@ -70,6 +97,11 @@ export interface RequestDependencies {
     name: AdminRpcName,
     payload: Record<string, unknown>,
     token: string,
+    env: RakyzuApiEnv,
+  ): Promise<unknown>;
+  serviceRpc?(
+    name: "service_record_play_event" | "service_ingest_commerce_event",
+    payload: Record<string, unknown>,
     env: RakyzuApiEnv,
   ): Promise<unknown>;
 }
