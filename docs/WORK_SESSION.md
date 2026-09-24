@@ -1,5 +1,40 @@
 # Rakyzu Music — engineering work sessions
 
+## 0.5.30 profile-context hotfix — 2026-09-24
+
+- [x] Reproduce the production RPC with a temporary authenticated listener and inspect its safe
+  response shape without logging credentials.
+- [x] Correct Android scalar JSON decoding and add listener/staff regression coverage.
+- [x] Run the complete Android unit, lint, debug, instrumentation-compile, and R8 release gate.
+- [x] Push the hotfix, verify main CI, and inspect the exact CI APK.
+- [x] Log in as temporary listener and staff accounts on Appetize Android 16 and reach Home.
+- [x] Delete both temporary accounts and restore Appetize ADB/debug access to authenticated.
+- [x] Replace the broken v0.5.30 release asset with the verified build 77 APK and re-download it.
+
+The production `get_my_profile_context()` RPC was healthy: an authenticated temporary listener
+received HTTP 200 with a scalar JSON object and correctly typed nullable, Boolean, and string
+fields. The Android client nevertheless called supabase-kt 3.8.0 `decodeSingle()`. Local inspection
+of that dependency confirmed that `decodeSingle()` first decodes a `List<T>` and then selects its
+first element, so every valid scalar RPC response failed before reaching the Home gate. The
+repository now decodes the scalar object directly with a forward-compatible serializer.
+
+The local gate passed 221 unit tests, all 14 lint reports with zero errors, debug and every
+instrumentation APK assembly, and the isolated R8/resource-shrunk release build. Main Android CI
+run `35988277445` completed successfully. Its exact APK identifies as `my.id.rakyzumusic`,
+versionName `0.5.30`, versionCode `77`, min SDK 26, target SDK 37, and has one valid v2 signer.
+
+That CI APK was uploaded unchanged to Appetize build `vcb637t7azifwabsyiyh3lx6ly`. On Android 16,
+both a temporary ordinary listener and a temporary Officer signed in and rendered Home; the staff
+session additionally exposed its authorized Admin destination. Both processes remained alive with
+`MainActivity` resumed, neither showed Profile unavailable, and neither logcat contained an
+application fatal block. Both Auth users were deleted after their sessions and Appetize access was
+returned to authenticated.
+
+The corrected release APK is 28,821,044 bytes with SHA-256
+`87823927a4820af08491f0f5b9e98e136ec71ba404c782ca5da0e7e58895d07e`. It replaces only the
+broken APK asset under the existing v0.5.30 prerelease; the old build remains recoverable from its
+historical CI artifact. Hotfix commit: `9d95ce1`.
+
 ## Active cumulative 0.5.26–0.5.30 batch — 2026-09-22
 
 - [x] Audit clean `v0.5.25` baseline, released APK, Android startup path, and Appetize capability.
