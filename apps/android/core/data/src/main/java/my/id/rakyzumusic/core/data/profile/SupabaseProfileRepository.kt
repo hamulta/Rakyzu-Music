@@ -12,6 +12,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
@@ -136,9 +138,8 @@ internal class SupabaseProfileRepository(
 
     private suspend fun fetchContext(): ProfileResult {
         if (activeUserId() == null) return noSession()
-        return ProfileResult.Success(
-            postgrest.rpc("get_my_profile_context").decodeSingle<ProfileContextRow>().toDomain(),
-        )
+        val response = postgrest.rpc("get_my_profile_context")
+        return ProfileResult.Success(decodeProfileContextPayload(response.data))
     }
 
     private fun activeUserId(): String? = auth.currentUserOrNull()?.id?.takeIf(String::isNotBlank)
@@ -158,6 +159,10 @@ internal class SupabaseProfileRepository(
 }
 
 private const val MAX_AVATAR_BYTES = 5 * 1024 * 1024
+private val PROFILE_CONTEXT_JSON = Json { ignoreUnknownKeys = true }
+
+internal fun decodeProfileContextPayload(payload: String): ListenerProfile =
+    PROFILE_CONTEXT_JSON.decodeFromString<ProfileContextRow>(payload).toDomain()
 
 @Serializable
 private data class ProfileContextRow(

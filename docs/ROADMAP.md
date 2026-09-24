@@ -160,7 +160,7 @@ only by trusted server state, and be revocable. An optional Artist account email
 account match, not a second confirmation step; privileges activate only after the matched
 authenticated account accepts the current terms.
 
-The cumulative `0.5.26`–`0.5.30` Android artifact uses versionCode `76`. Signed event ingestion,
+The cumulative `0.5.26`–`0.5.30` Android artifact originally used versionCode `76`; its profile-context hotfix uses versionCode `77`. Signed event ingestion,
 privacy thresholds, commerce evidence, account enforcement, dual-control deletion, and security
 approval stay server-authoritative; no provider secret or Supabase service key enters Android.
 

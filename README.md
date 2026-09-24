@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current Android source version: **0.5.30** (Artist workspace, privacy analytics, commerce, account lifecycle, and security controls; versionCode 76). Release status is recorded in [WORK_SESSION.md](docs/WORK_SESSION.md).
+Current Android source version: **0.5.30** (Artist workspace, privacy analytics, commerce, account lifecycle, security controls, and the scalar profile-context hotfix; versionCode 77). Release status is recorded in [WORK_SESSION.md](docs/WORK_SESSION.md).
 
 ## Technology baseline
 
