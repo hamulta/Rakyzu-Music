@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Test, lint, and build 0.5.30
+    name: Test, lint, and build 0.6.5
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -67,7 +67,7 @@ jobs:
         run: |
           payload="$RUNNER_TEMP/rakyzu-apk-strings.txt"
           trap 'rm -f "$payload"' EXIT
-          unzip -p app/build/outputs/apk/debug/Rakyzu-Music-0.5.30-debug.apk 'classes*.dex' |
+          unzip -p app/build/outputs/apk/debug/Rakyzu-Music-0.6.5-debug.apk 'classes*.dex' |
             strings > "$payload"
           grep -Fq "$SUPABASE_URL" "$payload"
           grep -Fq "$SUPABASE_PUBLISHABLE_KEY" "$payload"
@@ -77,14 +77,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: Rakyzu-Music-0.5.30-verification
+          name: Rakyzu-Music-0.6.5-verification
           path: apps/android/**/build/reports/
           retention-days: 14
 
       - name: Upload Rakyzu Music debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: Rakyzu-Music-0.5.30-debug
-          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.5.30-debug.apk
+          name: Rakyzu-Music-0.6.5-debug
+          path: apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.6.5-debug.apk
           if-no-files-found: error
           retention-days: 14

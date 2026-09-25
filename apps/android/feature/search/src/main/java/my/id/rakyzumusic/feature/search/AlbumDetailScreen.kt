@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -57,6 +59,8 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.Track
+import my.id.rakyzumusic.core.model.OfflineDownloadItem
+import my.id.rakyzumusic.core.model.OfflineDownloadStatus
 import my.id.rakyzumusic.core.model.formattedDuration
 
 @Composable
@@ -74,6 +78,8 @@ fun AlbumDetailRoute(
     likedTrackIds: Set<String> = emptySet(),
     pendingTrackIds: Set<String> = emptySet(),
     onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
+    downloadItems: List<OfflineDownloadItem> = emptyList(),
+    onDownloadAlbum: ((Album, List<Track>) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +97,8 @@ fun AlbumDetailRoute(
         likedTrackIds = likedTrackIds,
         pendingTrackIds = pendingTrackIds,
         onTrackLikeChange = onTrackLikeChange,
+        downloadItems = downloadItems,
+        onDownloadAlbum = onDownloadAlbum,
         modifier = modifier,
     )
 }
@@ -110,6 +118,8 @@ fun AlbumDetailScreen(
     likedTrackIds: Set<String> = emptySet(),
     pendingTrackIds: Set<String> = emptySet(),
     onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
+    downloadItems: List<OfflineDownloadItem> = emptyList(),
+    onDownloadAlbum: ((Album, List<Track>) -> Unit)? = null,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 96.dp),
 ) {
@@ -212,6 +222,10 @@ fun AlbumDetailScreen(
                         isSaved = isSaved,
                         isSavePending = isSavePending,
                         onSaveChange = onSaveChange,
+                        downloadItems = downloadItems,
+                        onDownload = onDownloadAlbum?.let { action ->
+                            { action(album, state.tracks) }
+                        },
                     )
                 }
 
@@ -261,6 +275,8 @@ private fun AlbumHeader(
     isSaved: Boolean,
     isSavePending: Boolean,
     onSaveChange: ((Boolean) -> Unit)?,
+    downloadItems: List<OfflineDownloadItem>,
+    onDownload: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -320,6 +336,37 @@ private fun AlbumHeader(
                 )
                 Text(
                     if (isSaved) "Saved" else "Save album",
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+        onDownload?.let { action ->
+            val completed = downloadItems.count { it.status == OfflineDownloadStatus.Completed }
+            val active = downloadItems.any {
+                it.status == OfflineDownloadStatus.Queued ||
+                    it.status == OfflineDownloadStatus.Downloading
+            }
+            val hasFailure = downloadItems.any { it.status == OfflineDownloadStatus.Failed }
+            OutlinedButton(
+                onClick = action,
+                enabled = trackCount > 0 && !active && completed < trackCount,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Icon(
+                    if (completed == trackCount && trackCount > 0) {
+                        Icons.Rounded.CheckCircle
+                    } else {
+                        Icons.Rounded.Download
+                    },
+                    contentDescription = null,
+                )
+                Text(
+                    when {
+                        completed == trackCount && trackCount > 0 -> "Downloaded"
+                        active -> "Downloading $completed of $trackCount"
+                        hasFailure -> "Retry album download"
+                        else -> "Download album"
+                    },
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }

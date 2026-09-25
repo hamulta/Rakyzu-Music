@@ -23,6 +23,93 @@ internal data class CatalogEntitySnapshot(
 @Dao
 internal interface CatalogDao {
     @Query(
+        "SELECT * FROM offline_downloads WHERE user_id = :userId " +
+            "ORDER BY updated_at_epoch_ms DESC, track_id",
+    )
+    fun observeOfflineDownloads(
+        userId: String,
+    ): kotlinx.coroutines.flow.Flow<List<OfflineDownloadEntity>>
+
+    @Query(
+        "SELECT * FROM offline_download_collections WHERE user_id = :userId " +
+            "ORDER BY collection_kind, collection_id, track_id",
+    )
+    fun observeOfflineDownloadCollections(
+        userId: String,
+    ): kotlinx.coroutines.flow.Flow<List<OfflineDownloadCollectionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOfflineDownloadCollections(items: List<OfflineDownloadCollectionEntity>)
+
+    @Query("SELECT * FROM offline_downloads WHERE user_id = :userId AND track_id = :trackId")
+    suspend fun getOfflineDownload(userId: String, trackId: String): OfflineDownloadEntity?
+
+    @Query("SELECT * FROM offline_downloads WHERE user_id = :userId")
+    suspend fun getOfflineDownloads(userId: String): List<OfflineDownloadEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOfflineDownloads(items: List<OfflineDownloadEntity>)
+
+    @Query(
+        "UPDATE offline_downloads SET status = :status, failure_code = :failureCode, " +
+            "attempt_count = attempt_count + :attemptIncrement, updated_at_epoch_ms = :updatedAt " +
+            "WHERE user_id = :userId AND track_id = :trackId",
+    )
+    suspend fun updateOfflineDownloadStatus(
+        userId: String,
+        trackId: String,
+        status: String,
+        failureCode: String?,
+        attemptIncrement: Int,
+        updatedAt: Long,
+    ): Int
+
+    @Query(
+        "UPDATE offline_downloads SET status = :status, downloaded_bytes = :downloadedBytes, " +
+            "total_bytes = :totalBytes, failure_code = NULL, updated_at_epoch_ms = :updatedAt " +
+            "WHERE user_id = :userId AND track_id = :trackId",
+    )
+    suspend fun updateOfflineDownloadProgress(
+        userId: String,
+        trackId: String,
+        status: String,
+        downloadedBytes: Long,
+        totalBytes: Long?,
+        updatedAt: Long,
+    ): Int
+
+    @Query(
+        "UPDATE offline_downloads SET status = :status, downloaded_bytes = :totalBytes, " +
+            "total_bytes = :totalBytes, file_token = :fileToken, content_type = :contentType, " +
+            "license_expires_at_epoch_ms = :licenseExpiresAt, failure_code = NULL, " +
+            "updated_at_epoch_ms = :updatedAt WHERE user_id = :userId AND track_id = :trackId",
+    )
+    suspend fun completeOfflineDownload(
+        userId: String,
+        trackId: String,
+        status: String,
+        totalBytes: Long,
+        fileToken: String,
+        contentType: String,
+        licenseExpiresAt: Long,
+        updatedAt: Long,
+    ): Int
+
+    @Query(
+        "DELETE FROM offline_downloads WHERE user_id = :userId AND status = :status",
+    )
+    suspend fun deleteOfflineDownloadsWithStatus(userId: String, status: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOfflineDownloadPreference(preference: OfflineDownloadPreferenceEntity)
+
+    @Query("SELECT allow_mobile FROM offline_download_preferences WHERE user_id = :userId")
+    suspend fun getAllowMobileDownloads(userId: String): Boolean?
+
+    @Query("SELECT allow_mobile FROM offline_download_preferences WHERE user_id = :userId")
+    fun observeAllowMobileDownloads(userId: String): kotlinx.coroutines.flow.Flow<Boolean?>
+
+    @Query(
         "SELECT * FROM playback_queue_entries WHERE user_id = :userId " +
             "ORDER BY position ASC",
     )

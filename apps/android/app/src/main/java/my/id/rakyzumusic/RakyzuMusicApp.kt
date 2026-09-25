@@ -86,6 +86,7 @@ import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.library.LibraryRepository
+import my.id.rakyzumusic.core.data.download.OfflineDownloadRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
@@ -98,6 +99,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.core.model.LibraryItemKind
+import my.id.rakyzumusic.core.model.DownloadCollectionKind
 import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
@@ -109,6 +111,7 @@ import my.id.rakyzumusic.feature.admin.AdminViewModel
 import my.id.rakyzumusic.feature.home.HomeRoute
 import my.id.rakyzumusic.feature.library.LibraryRoute
 import my.id.rakyzumusic.feature.library.LibraryViewModel
+import my.id.rakyzumusic.feature.library.OfflineDownloadsViewModel
 import my.id.rakyzumusic.feature.player.NowPlayingScreen
 import my.id.rakyzumusic.feature.playlist.PlaylistRoute
 import my.id.rakyzumusic.feature.playlist.PlaylistDetailRoute
@@ -181,6 +184,7 @@ fun RakyzuMusicApp(
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
     artistWorkspaceRepository: ArtistWorkspaceRepository,
+    offlineDownloadRepository: OfflineDownloadRepository,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -223,6 +227,7 @@ fun RakyzuMusicApp(
             playbackPreferences = playbackPreferences,
             adminRepository = adminRepository,
             artistWorkspaceRepository = artistWorkspaceRepository,
+            offlineDownloadRepository = offlineDownloadRepository,
             modifier = modifier,
         )
     }
@@ -245,6 +250,7 @@ private fun ProfileGatedRakyzuMusicApp(
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
     artistWorkspaceRepository: ArtistWorkspaceRepository,
+    offlineDownloadRepository: OfflineDownloadRepository,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -296,6 +302,7 @@ private fun ProfileGatedRakyzuMusicApp(
             playbackPreferences = playbackPreferences,
             adminRepository = adminRepository,
             artistWorkspaceRepository = artistWorkspaceRepository,
+            offlineDownloadRepository = offlineDownloadRepository,
             modifier = modifier,
         )
     }
@@ -332,6 +339,7 @@ private fun AuthenticatedRakyzuMusicApp(
     playbackPreferences: AndroidPlaybackPreferences,
     adminRepository: AdminRepository,
     artistWorkspaceRepository: ArtistWorkspaceRepository,
+    offlineDownloadRepository: OfflineDownloadRepository,
     modifier: Modifier = Modifier,
 ) {
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
@@ -355,6 +363,11 @@ private fun AuthenticatedRakyzuMusicApp(
             connectivityMonitor = connectivityMonitor,
         ),
     )
+    val offlineDownloadsViewModel: OfflineDownloadsViewModel = viewModel(
+        key = "offline-downloads-$userId",
+        factory = OfflineDownloadsViewModel.factory(userId, offlineDownloadRepository),
+    )
+    val offlineDownloadsState by offlineDownloadsViewModel.uiState.collectAsStateWithLifecycle()
     val playlistViewModel: PlaylistViewModel = viewModel(
         key = "playlists-$userId",
         factory = PlaylistViewModel.factory(userId, playlistRepository),
@@ -603,6 +616,17 @@ private fun AuthenticatedRakyzuMusicApp(
                                     saved,
                                 )
                             },
+                            downloadItems = offlineDownloadsState.snapshot.collectionItems(
+                                DownloadCollectionKind.Album,
+                                route.albumId,
+                            ),
+                            onDownloadAlbum = { album, tracks ->
+                                offlineDownloadsViewModel.downloadAlbum(
+                                    album.id,
+                                    album.title,
+                                    tracks,
+                                )
+                            },
                         )
                     }
                     entry<RakyzuRoute.Library> {
@@ -619,6 +643,14 @@ private fun AuthenticatedRakyzuMusicApp(
                             onBrowseMusic = {
                                 selectTopLevelRoute(backStack, RakyzuRoute.Search)
                             },
+                            downloadState = offlineDownloadsState,
+                            onAllowMobileDownloads =
+                                offlineDownloadsViewModel::setAllowMobileDownloads,
+                            onPauseDownload = offlineDownloadsViewModel::pause,
+                            onResumeDownload = offlineDownloadsViewModel::resume,
+                            onCancelDownload = offlineDownloadsViewModel::cancel,
+                            onRetryDownload = offlineDownloadsViewModel::retry,
+                            onClearDownloads = offlineDownloadsViewModel::clearCompleted,
                         )
                     }
                     entry<RakyzuRoute.Create> {
@@ -648,7 +680,12 @@ private fun AuthenticatedRakyzuMusicApp(
                         )
                         PlaylistDetailRoute(detailViewModel,
                             onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
-                            onPlay = playbackController::playQueue)
+                            onPlay = playbackController::playQueue,
+                            downloadItems = offlineDownloadsState.snapshot.collectionItems(
+                                DownloadCollectionKind.Playlist,
+                                route.playlistId,
+                            ),
+                            onDownloadPlaylist = offlineDownloadsViewModel::downloadPlaylist)
                     }
                     entry<RakyzuRoute.NowPlaying> {
                         NowPlayingScreen(

@@ -21,6 +21,7 @@ data class RakyzuApiConfiguration(
 
 interface MediaDeliveryRepository {
     fun streamRequest(trackId: String): MediaStreamRequestResult
+    fun downloadRequest(trackId: String): OfflineDownloadRequestResult
 
     fun artworkRequest(albumId: String): ArtworkRequestResult
     fun recommendationArtworkRequest(shelfId: String): ArtworkRequestResult
@@ -37,6 +38,11 @@ enum class MediaStreamRequestFailure {
     InvalidConfiguration,
     InvalidTrackId,
     NotAuthenticated,
+}
+
+sealed interface OfflineDownloadRequestResult {
+    data class Ready(val request: MediaStreamRequest) : OfflineDownloadRequestResult
+    data class Failure(val reason: MediaStreamRequestFailure) : OfflineDownloadRequestResult
 }
 
 sealed interface ArtworkRequestResult {
@@ -105,6 +111,25 @@ internal class AuthenticatedMediaDeliveryRepository(
         )
     }
 
+    override fun downloadRequest(trackId: String): OfflineDownloadRequestResult {
+        val origin = apiOrigin
+            ?: return OfflineDownloadRequestResult.Failure(
+                MediaStreamRequestFailure.InvalidConfiguration,
+            )
+        if (!mediaIdPattern.matches(trackId)) {
+            return OfflineDownloadRequestResult.Failure(MediaStreamRequestFailure.InvalidTrackId)
+        }
+        val accessToken = accessTokenProvider.currentAccessTokenOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: return OfflineDownloadRequestResult.Failure(MediaStreamRequestFailure.NotAuthenticated)
+        return OfflineDownloadRequestResult.Ready(
+            MediaStreamRequest(
+                url = "$origin/v1/tracks/${trackId.lowercase()}/download",
+                accessToken = accessToken,
+            ),
+        )
+    }
+
     override fun artworkRequest(albumId: String): ArtworkRequestResult {
         val origin = apiOrigin
             ?: return ArtworkRequestResult.Failure(
@@ -168,6 +193,9 @@ internal class AuthenticatedMediaDeliveryRepository(
 internal data object UnavailableMediaDeliveryRepository : MediaDeliveryRepository {
     override fun streamRequest(trackId: String): MediaStreamRequestResult =
         MediaStreamRequestResult.Failure(MediaStreamRequestFailure.InvalidConfiguration)
+
+    override fun downloadRequest(trackId: String): OfflineDownloadRequestResult =
+        OfflineDownloadRequestResult.Failure(MediaStreamRequestFailure.InvalidConfiguration)
 
     override fun artworkRequest(albumId: String): ArtworkRequestResult =
         ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)

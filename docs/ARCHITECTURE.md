@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.5.30` Android source adds the scoped Artist Studio, privacy analytics, signed commerce ingestion, account lifecycle governance, and strengthened security controls to the verified `0.5.25` baseline; publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.6.5` Android source adds encrypted account-scoped offline downloads, durable Wi-Fi-first transfer work, offline-first Media3 resolution, and listener storage controls to the verified `0.5.30` baseline; publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -19,10 +19,10 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 ## Android modules
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
-- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog, Library, and Playlist synchronization, session state mapping, and encrypted Android persistence.
-- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, Library selections and mutation outbox, playlist metadata, transactional replacement DAOs, schema history, and observable local data sources.
+- `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog, Library, Playlist, and WorkManager-backed offline-download orchestration, session state mapping, and encrypted Android persistence.
+- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, Library selections and mutation outbox, playlist metadata, offline-transfer state/preferences, transactional replacement DAOs, schema history, and observable local data sources.
 - `core:model`: platform-independent product models and formatting rules.
-- `core:playback`: Media3 player/session ownership, authenticated stream resolution, audio focus, system controls, and playback state.
+- `core:playback`: Media3 player/session ownership, encrypted offline-first and authenticated network resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.
 - `feature:auth`: email sign-in/sign-up UI and its unidirectional state holder.
 - `feature:admin`: role-gated moderation, reversible enforcement, scoped catalog teams, independent review, commerce/account/security dashboards, dual-control deletion, scheduled publication, and audit controls.
@@ -30,7 +30,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 - `feature:player`: branded Now Playing, seek controls, transport actions, and the current Media3 queue surface.
 - `feature:profile`: required display-name onboarding, profile loading/edit state, distinct Artist Studio and analytics, and degraded profile UI.
 - `feature:search`: offline-first catalog discovery, deterministic local relevance, browse states, detail navigation, and Library mutation entry points.
-- `feature:library`: liked songs, saved albums, followed artists, account-scoped cached state, collection playback, and navigation back into catalog detail.
+- `feature:library`: liked songs, saved albums, followed artists, account-scoped cached state, collection playback, offline-download/storage controls, and navigation back into catalog detail.
 - `feature:playlist`: account-scoped playlist creation, cached collection state, accessible feedback, and the starting revision boundary for ordered playlist work.
 
 A planned boundary remains `core:network`.
@@ -56,6 +56,23 @@ Published catalog and editorial tables expose only metadata to the authenticated
 `services/rakyzu-api` is the Cloudflare Worker delivery boundary. `GET /v1/health` is public; `GET` and `HEAD` requests to `/v1/tracks/{uuid}/stream` and `/v1/albums/{uuid}/artwork` require a Supabase bearer JWT. The Worker verifies ES256 signatures against the project's remote JWKS with a fixed issuer, `authenticated` audience and role, and a UUID subject. It then queries the requested catalog resource through PostgREST using that same session, so the database's published-only RLS policy is re-evaluated before any R2 access.
 
 The client supplies only a validated track UUID. The Worker derives `media/tracks/{uuid}/source.mp3`, reads the private `MEDIA` R2 binding, and streams the object body without buffering it. Full responses, `HEAD`, open-ended ranges, bounded ranges, suffix ranges, and `416` responses share strict private/no-store, CORS, request-ID, and security-header behavior. R2 S3 credentials and Supabase privileged keys never enter the Worker bundle or APK.
+
+Offline delivery uses the separate `GET /v1/tracks/{uuid}/download` route. It repeats JWT and
+catalog-RLS authorization before R2 access and adds an explicit, bounded offline license; the
+client rejects responses that omit either the allow marker or a future expiry. WorkManager stores
+only account/track identifiers in its input, defaults to an unmetered-network constraint, honors a
+persisted listener opt-in before using a metered network, requires storage-not-low, and retries
+transient delivery failures with exponential backoff. Room schema 9 persists track-level status,
+progress, attempt count, collection context, MIME type, opaque file token, and expiry so pause,
+resume, cancel, retry, and process recreation do not depend on Compose state.
+
+Downloaded bytes are streamed through AES-256-GCM before entering application-private storage.
+Each account receives a distinct non-exportable Android Keystore key alias; filenames are SHA-256
+tokens derived from account and track identity. The one-gigabyte reserve is checked before queueing
+and again against the authorized content length. Media3 first asks the account-bound offline
+provider for an unexpired decrypted stream, then falls back to the existing authenticated HTTPS
+resolver. Neither path exposes an R2 object key, local plaintext path, persisted access token, or
+credential-bearing URL.
 
 Album artwork uses the deterministic private key `media/albums/{uuid}/artwork.webp` after the same JWT and RLS checks. The Worker accepts only AVIF, JPEG, PNG, or WebP metadata, returns an ETag, honors exact `If-None-Match` requests with `304`, and applies `private, max-age=86400`; missing or unauthorized albums remain non-disclosing `404` responses. Android builds each Coil request from the authenticated media boundary, holds the bearer value only in request headers, and redacts it from object diagnostics. A process-wide Coil loader uses a bounded 25% memory cache, a 128 MiB disk cache under the application cache directory, HTTP cache-control semantics, and crossfades. Cache keys use normalized album UUIDs rather than credential-bearing URLs or headers.
 

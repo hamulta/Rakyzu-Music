@@ -16,6 +16,9 @@ import my.id.rakyzumusic.core.model.PlaylistSummary
 import my.id.rakyzumusic.core.model.PersistedPlaybackQueue
 import my.id.rakyzumusic.core.model.PlaybackQueueItem
 import my.id.rakyzumusic.core.model.Track
+import my.id.rakyzumusic.core.model.DownloadCollectionKind
+import my.id.rakyzumusic.core.model.OfflineDownloadItem
+import my.id.rakyzumusic.core.model.OfflineDownloadStatus
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -30,6 +33,7 @@ class RakyzuDatabaseTest {
     private lateinit var libraryDataSource: LibraryLocalDataSource
     private lateinit var playlistDataSource: PlaylistLocalDataSource
     private lateinit var playbackQueueDataSource: PlaybackQueueLocalDataSource
+    private lateinit var downloadDataSource: OfflineDownloadLocalDataSource
 
     @Before
     fun setUp() {
@@ -43,6 +47,7 @@ class RakyzuDatabaseTest {
         libraryDataSource = RoomLibraryLocalDataSource(database)
         playlistDataSource = RoomPlaylistLocalDataSource(database)
         playbackQueueDataSource = RoomPlaybackQueueLocalDataSource(database)
+        downloadDataSource = RoomOfflineDownloadLocalDataSource(database)
     }
 
     @After
@@ -173,6 +178,40 @@ class RakyzuDatabaseTest {
         playbackQueueDataSource.replace("listener-1", replacement)
 
         assertEquals(replacement, playbackQueueDataSource.read("listener-1"))
+    }
+
+    @Test
+    fun offlineDownloadStateAndMobilePreferenceAreAccountScoped() = runTest {
+        val stored = StoredOfflineDownload(
+            item = OfflineDownloadItem(
+                userId = "listener-1",
+                trackId = "track-1",
+                title = "Midnight Signal",
+                artist = "Rakyzu Sessions",
+                collectionKind = DownloadCollectionKind.Album,
+                collectionId = "album-1",
+                collectionTitle = "Signal Zero",
+                status = OfflineDownloadStatus.Queued,
+                downloadedBytes = 0,
+                totalBytes = null,
+                updatedAtEpochMillis = 10,
+            ),
+            fileToken = null,
+            contentType = null,
+            licenseExpiresAtEpochMillis = null,
+            attemptCount = 0,
+            requestedAtEpochMillis = 10,
+        )
+        downloadDataSource.upsert(listOf(stored))
+        downloadDataSource.setAllowMobileDownloads("listener-1", true)
+
+        val owner = downloadDataSource.observe("listener-1").first { it.items.isNotEmpty() }
+        val other = downloadDataSource.observe("listener-2").first()
+
+        assertEquals("track-1", owner.items.single().item.trackId)
+        assertEquals(true, owner.allowMobileDownloads)
+        assertEquals(emptyList<StoredOfflineDownload>(), other.items)
+        assertEquals(false, other.allowMobileDownloads)
     }
 
     private fun queueItem(id: String) = PlaybackQueueItem(

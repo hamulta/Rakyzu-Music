@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -55,10 +57,15 @@ import kotlinx.coroutines.launch
 import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.PlaylistRole
 import my.id.rakyzumusic.core.model.PlaylistVisibility
+import my.id.rakyzumusic.core.model.OfflineDownloadItem
+import my.id.rakyzumusic.core.model.OfflineDownloadStatus
 
 @Composable
 fun PlaylistDetailRoute(viewModel: PlaylistDetailViewModel, onBack: () -> Unit,
-    onPlay: (List<Track>, Int) -> Unit, modifier: Modifier = Modifier) {
+    onPlay: (List<Track>, Int) -> Unit,
+    downloadItems: List<OfflineDownloadItem> = emptyList(),
+    onDownloadPlaylist: ((String, String, List<Track>) -> Unit)? = null,
+    modifier: Modifier = Modifier) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val resolver = LocalContext.current.contentResolver
     val context = LocalContext.current
@@ -96,7 +103,8 @@ fun PlaylistDetailRoute(viewModel: PlaylistDetailViewModel, onBack: () -> Unit,
         onToggleDiagnostics = viewModel::toggleDiagnostics,
         onChooseArtwork = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
         onRemoveArtwork = { viewModel.updateArtwork(null) }, onRetryArtwork = viewModel::loadArtwork,
-        preparingArtwork = preparingArtwork, modifier = modifier)
+        preparingArtwork = preparingArtwork, downloadItems = downloadItems,
+        onDownloadPlaylist = onDownloadPlaylist, modifier = modifier)
 }
 
 @Composable
@@ -111,7 +119,10 @@ internal fun PlaylistDetailScreen(
     onLeave: () -> Unit = {}, onVisibility: (PlaylistVisibility) -> Unit = {},
     onFollowing: (Boolean) -> Unit = {}, onToggleDiagnostics: () -> Unit = {},
     onChooseArtwork: () -> Unit, onRemoveArtwork: () -> Unit, onRetryArtwork: () -> Unit,
-    preparingArtwork: Boolean = false, modifier: Modifier = Modifier,
+    preparingArtwork: Boolean = false,
+    downloadItems: List<OfflineDownloadItem> = emptyList(),
+    onDownloadPlaylist: ((String, String, List<Track>) -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -176,6 +187,43 @@ internal fun PlaylistDetailScreen(
                 }
                 Button(onClick = { onPlay(queue, 0) }, enabled = queue.isNotEmpty() && state.pendingOrder == null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Play playlist") }
+                onDownloadPlaylist?.let { download ->
+                    val completed = downloadItems.count {
+                        it.status == OfflineDownloadStatus.Completed
+                    }
+                    val active = downloadItems.any {
+                        it.status == OfflineDownloadStatus.Queued ||
+                            it.status == OfflineDownloadStatus.Downloading
+                    }
+                    val hasFailure = downloadItems.any {
+                        it.status == OfflineDownloadStatus.Failed
+                    }
+                    Button(
+                        onClick = {
+                            download(detail.playlist.id, detail.playlist.name, queue)
+                        },
+                        enabled = queue.isNotEmpty() && !active && completed < queue.size,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Icon(
+                            if (completed == queue.size && queue.isNotEmpty()) {
+                                Icons.Rounded.CheckCircle
+                            } else {
+                                Icons.Rounded.Download
+                            },
+                            contentDescription = null,
+                        )
+                        Text(
+                            when {
+                                completed == queue.size && queue.isNotEmpty() -> "Downloaded"
+                                active -> "Downloading $completed of ${queue.size}"
+                                hasFailure -> "Retry playlist download"
+                                else -> "Download playlist"
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
                 TextButton(onClick = onEdit, enabled = state.canEditMetadata,
                     modifier = Modifier.heightIn(min = 48.dp)) { Text("Edit playlist details") }
             }

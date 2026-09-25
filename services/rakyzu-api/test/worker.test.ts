@@ -17,7 +17,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.5.30" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.6.5" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -48,6 +48,28 @@ describe("Rakyzu Music API", () => {
     expect(response.headers.get("content-type")).toBe("audio/mpeg");
     expect(response.headers.get("x-rakyzu-audio-quality")).toBe("standard");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(AUDIO);
+  });
+
+  it("issues a bounded offline license only after catalog authorization", async () => {
+    const response = await execute(`/v1/tracks/${TRACK_ID}/download`, {
+      headers: { authorization: "Bearer listener-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-rakyzu-offline-allowed")).toBe("true");
+    expect(Date.parse(response.headers.get("x-rakyzu-offline-license-expires") ?? "")).toBeGreaterThan(Date.now());
+    expect(response.headers.get("content-disposition")).toBe("attachment");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(AUDIO);
+  });
+
+  it("does not issue an offline license for unavailable catalog rights", async () => {
+    const response = await execute(`/v1/tracks/${TRACK_ID}/download`, {
+      headers: { authorization: "Bearer listener-token" },
+      published: false,
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("x-rakyzu-offline-allowed")).toBeNull();
   });
 
   it.each([

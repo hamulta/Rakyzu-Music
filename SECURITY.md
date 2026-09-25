@@ -55,5 +55,9 @@ Report vulnerabilities privately to the repository owner. Do not open a public i
   explicit approval.
 - The media Worker verifies Supabase ES256 JWT issuer, audience, role, and UUID subject through JWKS, then forwards the same bearer session to PostgREST so catalog RLS remains authoritative.
 - Media responses support one validated byte range, stream the R2 body without application buffering, use private/no-store caching, and return bounded errors that do not expose upstream details.
+- Offline media uses a separate authenticated Worker route that rechecks catalog RLS before
+  returning audio with a bounded license. Android stores the response only as AES-256-GCM
+  ciphertext under an account-derived non-exportable Keystore key; Room retains an opaque file
+  token, state, byte counts, MIME type, and expiry rather than a bearer token, R2 key, or URL.
 - Schema changes use reviewed, reversible migrations.
 - Dependency, lint, unit, debug/test APK, and minified R8 release-build checks must pass before a push is considered releasable.

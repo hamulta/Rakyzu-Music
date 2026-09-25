@@ -25,20 +25,27 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 import my.id.rakyzumusic.core.data.media.ArtworkRequestFailure
 import my.id.rakyzumusic.core.data.media.ArtworkRequestResult
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
@@ -74,6 +82,8 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.LibraryItemKind
+import my.id.rakyzumusic.core.model.OfflineDownloadItem
+import my.id.rakyzumusic.core.model.OfflineDownloadStatus
 import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.formattedDuration
 
@@ -116,6 +126,13 @@ fun LibraryRoute(
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
     onBrowseMusic: () -> Unit,
+    downloadState: OfflineDownloadsUiState,
+    onAllowMobileDownloads: (Boolean) -> Unit,
+    onPauseDownload: (String) -> Unit,
+    onResumeDownload: (String) -> Unit,
+    onCancelDownload: (String) -> Unit,
+    onRetryDownload: (String) -> Unit,
+    onClearDownloads: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,6 +149,13 @@ fun LibraryRoute(
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
         onBrowseMusic = onBrowseMusic,
+        downloadState = downloadState,
+        onAllowMobileDownloads = onAllowMobileDownloads,
+        onPauseDownload = onPauseDownload,
+        onResumeDownload = onResumeDownload,
+        onCancelDownload = onCancelDownload,
+        onRetryDownload = onRetryDownload,
+        onClearDownloads = onClearDownloads,
         artworkRequestProvider = artworkRequestProvider,
         onRemoveTrack = { viewModel.setSaved(LibraryItemKind.Track, it.id, false) },
         onRemoveAlbum = { viewModel.setSaved(LibraryItemKind.Album, it.id, false) },
@@ -155,6 +179,13 @@ fun LibraryScreen(
     onRemoveAlbum: (Album) -> Unit,
     onUnfollowArtist: (Artist) -> Unit,
     onBrowseMusic: () -> Unit = {},
+    downloadState: OfflineDownloadsUiState = OfflineDownloadsUiState(),
+    onAllowMobileDownloads: (Boolean) -> Unit = {},
+    onPauseDownload: (String) -> Unit = {},
+    onResumeDownload: (String) -> Unit = {},
+    onCancelDownload: (String) -> Unit = {},
+    onRetryDownload: (String) -> Unit = {},
+    onClearDownloads: () -> Unit = {},
     artworkRequestProvider: LibraryArtworkRequestProvider = {
         ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidConfiguration)
     },
@@ -198,6 +229,19 @@ fun LibraryScreen(
                     isOnline = state.isOnline,
                     horizontalPadding = layoutSpec.horizontalPadding,
                     onRefresh = onRefresh,
+                )
+            }
+
+            item(key = "offline-downloads") {
+                OfflineDownloadsPanel(
+                    state = downloadState,
+                    onAllowMobileDownloads = onAllowMobileDownloads,
+                    onPause = onPauseDownload,
+                    onResume = onResumeDownload,
+                    onCancel = onCancelDownload,
+                    onRetry = onRetryDownload,
+                    onClear = onClearDownloads,
+                    horizontalPadding = layoutSpec.horizontalPadding,
                 )
             }
 
@@ -386,6 +430,177 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OfflineDownloadsPanel(
+    state: OfflineDownloadsUiState,
+    onAllowMobileDownloads: (Boolean) -> Unit,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onClear: () -> Unit,
+    horizontalPadding: Dp,
+) {
+    val snapshot = state.snapshot
+    Surface(
+        color = RakyzuSurface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding, vertical = 8.dp),
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Download, contentDescription = null, tint = RakyzuAqua)
+                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    Text(
+                        "Offline downloads",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        "${snapshot.completedCount} ready · " +
+                            "${snapshot.storage.encryptedBytes.toStorageLabel()} used · " +
+                            "${snapshot.storage.availableBytes.toStorageLabel()} free",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (snapshot.completedCount > 0) {
+                    IconButton(
+                        onClick = onClear,
+                        enabled = !state.isWorking,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Remove all downloads")
+                    }
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Download over mobile data", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Off by default. Wi-Fi downloads continue automatically.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = snapshot.allowMobileDownloads,
+                    onCheckedChange = onAllowMobileDownloads,
+                    enabled = !state.isWorking,
+                )
+            }
+            if (!snapshot.storage.hasDownloadCapacity) {
+                Text(
+                    "Free at least 1 GB before adding downloads.",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            state.message?.let {
+                Text(
+                    it,
+                    color = if (state.messageIsError) MaterialTheme.colorScheme.error else RakyzuAqua,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            if (snapshot.items.isEmpty()) {
+                Text(
+                    "Open an album or playlist and choose Download for offline listening.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                snapshot.items.distinctBy(OfflineDownloadItem::trackId).forEach { item ->
+                    OfflineDownloadRow(item, onPause, onResume, onCancel, onRetry)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineDownloadRow(
+    item: OfflineDownloadItem,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+    onRetry: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    "${item.artist} · ${item.status.toDownloadLabel()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            when (item.status) {
+                OfflineDownloadStatus.Queued,
+                OfflineDownloadStatus.Downloading,
+                -> IconButton(onClick = { onPause(item.trackId) }) {
+                    Icon(Icons.Rounded.Pause, "Pause ${item.title}")
+                }
+                OfflineDownloadStatus.Paused -> IconButton(onClick = { onResume(item.trackId) }) {
+                    Icon(Icons.Rounded.PlayArrow, "Resume ${item.title}")
+                }
+                OfflineDownloadStatus.Failed -> IconButton(onClick = { onRetry(item.trackId) }) {
+                    Icon(Icons.Rounded.Replay, "Retry ${item.title}")
+                }
+                OfflineDownloadStatus.Cancelled -> IconButton(onClick = { onResume(item.trackId) }) {
+                    Icon(Icons.Rounded.Replay, "Download ${item.title} again")
+                }
+                OfflineDownloadStatus.Completed -> Unit
+            }
+            if (item.status != OfflineDownloadStatus.Completed &&
+                item.status != OfflineDownloadStatus.Cancelled
+            ) {
+                IconButton(onClick = { onCancel(item.trackId) }) {
+                    Icon(Icons.Rounded.Close, "Cancel ${item.title}")
+                }
+            }
+        }
+        val progress = item.progressFraction
+        if (progress != null && item.status != OfflineDownloadStatus.Completed) {
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().semantics {
+                    stateDescription = "${(progress * 100).toInt()} percent downloaded"
+                },
+            )
+        }
+    }
+}
+
+private fun OfflineDownloadStatus.toDownloadLabel(): String = when (this) {
+    OfflineDownloadStatus.Queued -> "Waiting for allowed network"
+    OfflineDownloadStatus.Downloading -> "Downloading"
+    OfflineDownloadStatus.Paused -> "Paused"
+    OfflineDownloadStatus.Completed -> "Available offline"
+    OfflineDownloadStatus.Failed -> "Needs retry"
+    OfflineDownloadStatus.Cancelled -> "Cancelled"
+}
+
+private fun Long.toStorageLabel(): String {
+    val bytes = coerceAtLeast(0L).toDouble()
+    val gigabyte = 1024.0 * 1024.0 * 1024.0
+    val megabyte = 1024.0 * 1024.0
+    return if (bytes >= gigabyte) {
+        "%.1f GB".format(Locale.US, bytes / gigabyte)
+    } else {
+        "%.0f MB".format(Locale.US, bytes / megabyte)
     }
 }
 

@@ -226,3 +226,58 @@ internal data class PlaybackQueueStateEntity(
     @ColumnInfo(name = "current_index") val currentIndex: Int,
     @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
 )
+
+@Entity(
+    tableName = "offline_downloads",
+    primaryKeys = ["user_id", "track_id"],
+    indices = [
+        Index(value = ["user_id", "collection_kind", "collection_id"]),
+        Index(value = ["user_id", "status", "updated_at_epoch_ms"]),
+    ],
+)
+internal data class OfflineDownloadEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    val title: String,
+    val artist: String,
+    @ColumnInfo(name = "collection_kind") val collectionKind: String,
+    @ColumnInfo(name = "collection_id") val collectionId: String,
+    @ColumnInfo(name = "collection_title") val collectionTitle: String,
+    val status: String,
+    @ColumnInfo(name = "downloaded_bytes") val downloadedBytes: Long,
+    @ColumnInfo(name = "total_bytes") val totalBytes: Long?,
+    @ColumnInfo(name = "file_token") val fileToken: String?,
+    @ColumnInfo(name = "content_type") val contentType: String?,
+    @ColumnInfo(name = "license_expires_at_epoch_ms") val licenseExpiresAtEpochMillis: Long?,
+    @ColumnInfo(name = "attempt_count") val attemptCount: Int,
+    @ColumnInfo(name = "failure_code") val failureCode: String?,
+    @ColumnInfo(name = "requested_at_epoch_ms") val requestedAtEpochMillis: Long,
+    @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "offline_download_collections",
+    primaryKeys = ["user_id", "collection_kind", "collection_id", "track_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = OfflineDownloadEntity::class,
+            parentColumns = ["user_id", "track_id"],
+            childColumns = ["user_id", "track_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["user_id", "track_id"])],
+)
+internal data class OfflineDownloadCollectionEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "collection_kind") val collectionKind: String,
+    @ColumnInfo(name = "collection_id") val collectionId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    @ColumnInfo(name = "collection_title") val collectionTitle: String,
+)
+
+@Entity(tableName = "offline_download_preferences")
+internal data class OfflineDownloadPreferenceEntity(
+    @PrimaryKey @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "allow_mobile") val allowMobile: Boolean,
+)

@@ -19,10 +19,11 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 
-const API_VERSION = "0.5.30";
+const API_VERSION = "0.6.5";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
+const TRACK_DOWNLOAD_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/download\/?$/i;
 const PROFILE_AVATAR_ROUTE = /^\/v1\/profiles\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/avatar\/?$/i;
 const ARTIST_BIOGRAPHY_ROUTE = /^\/v1\/artists\/me\/biography\/?$/i;
 const ARTIST_PROFILE_ARTWORK_ROUTE = /^\/v1\/artists\/me\/artwork\/?$/i;
@@ -134,6 +135,7 @@ export function createWorker(
           ADMIN_DELETION_APPROVAL_ROUTE.test(url.pathname) ||
           ADMIN_SECURITY_ALERT_ROUTE.test(url.pathname);
         const trackRoute = url.pathname.match(TRACK_ROUTE);
+        const trackDownloadRoute = url.pathname.match(TRACK_DOWNLOAD_ROUTE);
         const artworkRoute = url.pathname.match(ALBUM_ARTWORK_ROUTE);
         const playlistRoute = url.pathname.match(PLAYLIST_ARTWORK_ROUTE);
         const profileAvatarRoute = url.pathname.match(PROFILE_AVATAR_ROUTE);
@@ -153,7 +155,7 @@ export function createWorker(
           url.pathname === "/v1/account/deletion" ||
           url.pathname === "/v1/account/export";
         const recommendationArtworkRoute = url.pathname.match(RECOMMENDATION_ARTWORK_ROUTE);
-        if (!trackRoute?.[1] && !artworkRoute?.[1] && !playlistRoute?.[1] &&
+        if (!trackRoute?.[1] && !trackDownloadRoute?.[1] && !artworkRoute?.[1] && !playlistRoute?.[1] &&
           !profileAvatarRoute?.[1] && !isArtistBiographyRoute &&
           !recommendationArtworkRoute?.[1] && !isAdminRoute && !isArtistRoute && !isAccountRoute) {
           return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
@@ -256,8 +258,8 @@ export function createWorker(
           }
         }
 
-        if (trackRoute?.[1]) {
-          const trackId = trackRoute[1].toLowerCase();
+        if (trackRoute?.[1] || trackDownloadRoute?.[1]) {
+          const trackId = (trackRoute?.[1] ?? trackDownloadRoute?.[1])!.toLowerCase();
           try {
             if (!(await requestDependencies.canStreamTrack(trackId, token, env))) {
               return errorResponse("track_not_found", "Track not found.", 404, requestId, origin);
@@ -294,7 +296,15 @@ export function createWorker(
           if (objectKey === null) {
             return errorResponse("media_not_found", "Track media is unavailable.", 404, requestId, origin);
           }
-          return await streamTrack(request, env, objectKey, quality, requestId, origin);
+          return await streamTrack(
+            request,
+            env,
+            objectKey,
+            quality,
+            requestId,
+            origin,
+            trackDownloadRoute?.[1] !== undefined,
+          );
         }
 
         const albumId = artworkRoute?.[1]?.toLowerCase();
@@ -1411,6 +1421,7 @@ async function streamTrack(
   quality: AudioQuality,
   requestId: string,
   origin: string | null,
+  offlineDownload = false,
 ): Promise<Response> {
   const metadata = await env.MEDIA.head(objectKey);
   if (metadata === null) {
@@ -1435,9 +1446,16 @@ async function streamTrack(
   headers.set("cache-control", "private, no-store");
   headers.set("etag", metadata.httpEtag);
   headers.set("x-rakyzu-audio-quality", quality);
+  if (offlineDownload) {
+    const expires = new Date(Date.now() + OFFLINE_LICENSE_MILLIS).toISOString();
+    headers.set("content-disposition", "attachment");
+    headers.set("x-rakyzu-offline-allowed", "true");
+    headers.set("x-rakyzu-offline-license-expires", expires);
+  }
   headers.set(
     "access-control-expose-headers",
-    "Accept-Ranges, Content-Length, Content-Range, ETag, X-Rakyzu-Audio-Quality, X-Request-ID",
+    "Accept-Ranges, Content-Length, Content-Range, ETag, X-Rakyzu-Audio-Quality, " +
+      "X-Rakyzu-Offline-Allowed, X-Rakyzu-Offline-License-Expires, X-Request-ID",
   );
 
   if (request.method === "HEAD") {
@@ -1465,6 +1483,8 @@ async function streamTrack(
 }
 
 type AudioQuality = "low" | "standard" | "high";
+
+const OFFLINE_LICENSE_MILLIS = 30 * 24 * 60 * 60 * 1000;
 
 function readAudioQuality(value: string | null): AudioQuality | null {
   if (value === null || value === "standard") return "standard";

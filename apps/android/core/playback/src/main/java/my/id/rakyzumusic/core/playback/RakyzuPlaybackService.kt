@@ -37,10 +37,14 @@ class RakyzuPlaybackService : MediaSessionService() {
                         ),
                 )
         }
+        val offlineFirstDataSourceFactory = OfflineFirstPlaybackDataSource.Factory(
+            networkFactory = resolvingDataSourceFactory,
+            offlineProvider = dependencies.offlinePlaybackAssetProvider,
+        )
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(this)
-                    .setDataSourceFactory(resolvingDataSourceFactory),
+                    .setDataSourceFactory(offlineFirstDataSourceFactory),
             )
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -83,6 +87,6 @@ class RakyzuPlaybackService : MediaSessionService() {
 
     private companion object {
         const val SESSION_ACTIVITY_REQUEST_CODE = 800
-        const val USER_AGENT = "Rakyzu Music Android/0.5.10"
+        const val USER_AGENT = "Rakyzu Music Android/0.6.5"
     }
 }

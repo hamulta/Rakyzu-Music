@@ -20,6 +20,8 @@ import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.library.LibraryRepository
+import my.id.rakyzumusic.core.data.download.ExecutableOfflineDownloadRepository
+import my.id.rakyzumusic.core.data.download.OfflineDownloadWorkerDependencies
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.media.RakyzuApiConfiguration
 import my.id.rakyzumusic.core.data.media.MediaStreamRequestFailure
@@ -30,6 +32,7 @@ import my.id.rakyzumusic.core.data.profile.ProfileRepository
 import my.id.rakyzumusic.core.data.queue.PlaybackQueueRepository
 import my.id.rakyzumusic.core.data.search.RecentSearchRepository
 import my.id.rakyzumusic.core.playback.PlaybackDependencies
+import my.id.rakyzumusic.core.playback.OfflinePlaybackAssetProvider
 import my.id.rakyzumusic.core.playback.BoundedPlaybackDiagnosticSink
 import my.id.rakyzumusic.core.playback.PlaybackNetworkRequest
 import my.id.rakyzumusic.core.playback.PlaybackQualityProvider
@@ -49,7 +52,8 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import okio.Path.Companion.toOkioPath
 
-class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonImageLoader.Factory {
+class RakyzuMusicApplication : Application(), PlaybackDependencies,
+    OfflineDownloadWorkerDependencies, SingletonImageLoader.Factory {
     private val backgroundFailureHandler = CoroutineExceptionHandler { _, failure ->
         // A failed optional background task must not kill the listener's foreground UI.
         Log.e("RakyzuBackground", "Background task failed: ${failure.javaClass.simpleName}")
@@ -162,6 +166,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
     val artistWorkspaceRepository: ArtistWorkspaceRepository
         get() = repositories.artistWorkspaceRepository
 
+    override val executableOfflineDownloadRepository: ExecutableOfflineDownloadRepository
+        get() = repositories.offlineDownloadRepository
+
     val playbackPreferences: AndroidPlaybackPreferences by lazy {
         AndroidPlaybackPreferences(this)
     }
@@ -174,6 +181,14 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies, SingletonIma
 
     override val playbackQualityProvider: PlaybackQualityProvider by lazy {
         PlaybackQualityProvider(playbackPreferences::effectiveQuality)
+    }
+
+    override val offlinePlaybackAssetProvider: OfflinePlaybackAssetProvider by lazy {
+        OfflinePlaybackAssetProvider { trackId ->
+            val userId = (authRepository.sessionState.value as? AuthSessionState.SignedIn)?.userId
+                ?: return@OfflinePlaybackAssetProvider null
+            executableOfflineDownloadRepository.openForPlayback(userId, trackId)
+        }
     }
 
     private val playbackControllerDelegate = lazy {

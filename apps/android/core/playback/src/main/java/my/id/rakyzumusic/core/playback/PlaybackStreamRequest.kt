@@ -46,7 +46,7 @@ internal class PlaybackRequestException(
     val reason: PlaybackRequestFailure,
 ) : java.io.IOException("Playback request failed: ${reason.name}")
 
-private fun String.trackIdOrNull(): String? {
+internal fun String.trackIdOrNull(): String? {
     val uri = runCatching { URI(this) }.getOrNull() ?: return null
     if (uri.scheme != PLAYBACK_SCHEME || uri.host != PLAYBACK_HOST) return null
     if (uri.rawQuery != null || uri.rawFragment != null || uri.rawUserInfo != null) return null

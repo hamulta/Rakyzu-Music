@@ -164,12 +164,12 @@ The cumulative `0.5.26`–`0.5.30` Android artifact originally used versionCode 
 privacy thresholds, commerce evidence, account enforcement, dual-control deletion, and security
 approval stay server-authoritative; no provider secret or Supabase service key enters Android.
 
-- [ ] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
-- [ ] `0.6.1` — explicit album and playlist download actions with per-item progress.
-- [ ] `0.6.2` — Wi-Fi-first scheduler plus an opt-in mobile-download setting.
-- [ ] `0.6.3` — offline playback resolution without exposing raw R2 objects or credentials.
-- [ ] `0.6.4` — storage usage summary, available-space guard, and clear-download controls.
-- [ ] `0.6.5` — pause, resume, cancel, retry, and process-death-safe download work.
+- [x] `0.6.0` — encrypted, account-scoped download foundation with rights/entitlement boundary.
+- [x] `0.6.1` — explicit album and playlist download actions with per-item progress.
+- [x] `0.6.2` — Wi-Fi-first scheduler plus an opt-in mobile-download setting.
+- [x] `0.6.3` — offline playback resolution without exposing raw R2 objects or credentials.
+- [x] `0.6.4` — storage usage summary, available-space guard, and clear-download controls.
+- [x] `0.6.5` — pause, resume, cancel, retry, and process-death-safe download work.
 - [ ] `0.6.6` — catalog revision and removed-content reconciliation with non-destructive cleanup.
 - [ ] `0.6.7` — per-account/device download isolation and sign-out retention policy.
 - [ ] `0.6.8` — adaptive Download UI, large-text layout, TalkBack status and action regression.
@@ -181,6 +181,11 @@ The 0.6 plan takes only public concepts from Spotify's
 [storage guidance](https://support.spotify.com/us/article/storage-information/): explicit status,
 Wi-Fi-first transfer, storage visibility, and listener controls. Rakyzu limits, entitlements,
 encryption, expiry, and rights policy will be defined by its own licensed catalog and backend.
+
+The cumulative `0.6.0`–`0.6.5` source uses Android versionCode `83`. A dedicated authenticated
+Worker route rechecks catalog rights before issuing a bounded offline license; Android encrypts
+the response with an account-derived, non-exportable Keystore key and stores only opaque local
+file tokens. Room 9 and WorkManager persist transfer state and network policy across process death.
 - `0.7.x`: Lyrics, credits, social sharing, notifications.
 - `0.8.x`: Personalization, radio, mixes, history, recommendations.
 - `0.9.x`: subscriptions/entitlements, privacy, and advanced trust-and-safety governance.

@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
                     playbackPreferences = rakyzuApplication.playbackPreferences,
                     adminRepository = rakyzuApplication.adminRepository,
                     artistWorkspaceRepository = rakyzuApplication.artistWorkspaceRepository,
+                    offlineDownloadRepository = rakyzuApplication.executableOfflineDownloadRepository,
                 )
             }
         }

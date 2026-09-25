@@ -25,8 +25,11 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         PlaylistMutationOutboxEntity::class,
         PlaybackQueueEntryEntity::class,
         PlaybackQueueStateEntity::class,
+        OfflineDownloadEntity::class,
+        OfflineDownloadCollectionEntity::class,
+        OfflineDownloadPreferenceEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -36,6 +39,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8),
+        AutoMigration(from = 8, to = 9),
     ],
 )
 internal abstract class RakyzuDatabase : RoomDatabase() {

@@ -29,6 +29,9 @@ import my.id.rakyzumusic.core.data.library.LibraryFailure
 import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.library.OfflineFirstLibraryRepository
 import my.id.rakyzumusic.core.data.library.SupabaseLibraryRemoteDataSource
+import my.id.rakyzumusic.core.data.download.AuthenticatedOfflineDownloadRepository
+import my.id.rakyzumusic.core.data.download.ExecutableOfflineDownloadRepository
+import my.id.rakyzumusic.core.data.download.UnavailableOfflineDownloadRepository
 import my.id.rakyzumusic.core.data.media.AccessTokenProvider
 import my.id.rakyzumusic.core.data.media.AuthenticatedMediaDeliveryRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
@@ -98,6 +101,7 @@ object RakyzuAuthFactory {
             recentSearchRepository = recentSearchRepository,
             adminRepository = UnavailableAdminRepository,
             artistWorkspaceRepository = UnavailableArtistWorkspaceRepository,
+            offlineDownloadRepository = UnavailableOfflineDownloadRepository,
         )
 
         val localDataSources = createRakyzuLocalDataSources(context)
@@ -123,6 +127,14 @@ object RakyzuAuthFactory {
             install(Postgrest) {
                 requireValidSession = true
             }
+        }
+        val mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
+            UnavailableMediaDeliveryRepository
+        } else {
+            AuthenticatedMediaDeliveryRepository(
+                configuration = apiConfiguration,
+                accessTokenProvider = AccessTokenProvider(client.auth::currentAccessTokenOrNull),
+            )
         }
         return RakyzuRepositories(
             authRepository = SupabaseAuthRepository(
@@ -150,14 +162,7 @@ object RakyzuAuthFactory {
             playbackQueueRepository = OfflineFirstPlaybackQueueRepository(
                 localDataSource = localDataSources.playbackQueue,
             ),
-            mediaDeliveryRepository = if (apiConfiguration.normalizedOriginOrNull() == null) {
-                UnavailableMediaDeliveryRepository
-            } else {
-                AuthenticatedMediaDeliveryRepository(
-                    configuration = apiConfiguration,
-                    accessTokenProvider = AccessTokenProvider(client.auth::currentAccessTokenOrNull),
-                )
-            },
+            mediaDeliveryRepository = mediaDeliveryRepository,
             connectivityMonitor = connectivityMonitor,
             recentSearchRepository = recentSearchRepository,
             adminRepository = AuthenticatedAdminRepository(
@@ -167,6 +172,12 @@ object RakyzuAuthFactory {
             artistWorkspaceRepository = AuthenticatedArtistWorkspaceRepository(
                 apiConfiguration,
                 AccessTokenProvider(client.auth::currentAccessTokenOrNull),
+            ),
+            offlineDownloadRepository = AuthenticatedOfflineDownloadRepository(
+                context = context,
+                local = localDataSources.downloads,
+                mediaDelivery = mediaDeliveryRepository,
+                activeUserId = { client.auth.currentUserOrNull()?.id },
             ),
         )
     }
@@ -184,6 +195,7 @@ data class RakyzuRepositories(
     val recentSearchRepository: RecentSearchRepository,
     val adminRepository: AdminRepository,
     val artistWorkspaceRepository: ArtistWorkspaceRepository,
+    val offlineDownloadRepository: ExecutableOfflineDownloadRepository,
 )
 
 private data object UnavailablePlaybackQueueRepository : PlaybackQueueRepository {

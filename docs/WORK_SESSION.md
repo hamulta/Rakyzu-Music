@@ -1,5 +1,36 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.6.0–0.6.5 batch — 2026-09-24
+
+- [x] Audit the clean v0.5.30 hotfix baseline, release train, current architecture, and official
+  Spotify offline/storage references.
+- [x] `0.6.0`: encrypted account-scoped download foundation with an authenticated
+  rights/entitlement boundary.
+- [x] `0.6.1`: explicit album and playlist download actions with per-track progress.
+- [x] `0.6.2`: Wi-Fi-first persistent scheduling and an explicit mobile-download opt-in.
+- [x] `0.6.3`: offline-first Media3 resolution without exposing R2 keys, raw object URLs, or
+  credentials.
+- [x] `0.6.4`: storage usage, free-space guard, and clear-download controls.
+- [x] `0.6.5`: pause, resume, cancel, retry, and process-death-safe execution.
+- [x] Run the cumulative Android, Worker, security, release-candidate, and final local worktree
+  gates once after all six versions are implemented.
+
+This batch remains Android-only. Spotify's public offline-listening behavior informs the visible
+album/playlist action, per-item state, Wi-Fi default, and storage controls; encryption, entitlement,
+account isolation, persistence, and delivery are original Rakyzu Music infrastructure.
+
+The final local Android gate passed 227 unit tests, all 14 lint reports with zero errors, the
+debug APK, every instrumentation APK, and the minified/resource-shrunk release APK. The debug
+candidate identifies as `my.id.rakyzumusic` versionName `0.6.5`/versionCode `83`, has one v2
+debug signer, and has SHA-256
+`136b79e299c26f184a39b88cdc9f1ce0a3603ddad14c7547bd430f6a00bd152a`. Worker validation
+passed 73 tests, TypeScript/generated-binding checks, and deployment dry-run. Room schema 9 and
+its v8 migration compiled into the instrumentation gate; the Supabase CLI confirmed all 18 local
+migrations match production, so this Android-only batch requires no PostgreSQL migration. Both
+pattern and exact-value scans found no tracked credential, and `credential.env` remains ignored.
+GitHub CI/CD, production Worker health, exact downloaded artifact, Appetize launch, tag, and
+release evidence are attached to the `v0.6.5` GitHub prerelease after the main-branch gates pass.
+
 ## 0.5.30 profile-context hotfix — 2026-09-24
 
 - [x] Reproduce the production RPC with a temporary authenticated listener and inspect its safe

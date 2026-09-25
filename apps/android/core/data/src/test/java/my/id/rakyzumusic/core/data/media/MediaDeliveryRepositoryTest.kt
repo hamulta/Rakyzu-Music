@@ -22,6 +22,30 @@ class MediaDeliveryRepositoryTest {
     }
 
     @Test
+    fun offlineDownloadUsesDedicatedAuthorizedEndpoint() {
+        val result = repository(accessToken = "listener-token")
+            .downloadRequest(TRACK_ID.uppercase())
+
+        assertTrue(result is OfflineDownloadRequestResult.Ready)
+        val request = (result as OfflineDownloadRequestResult.Ready).request
+        assertEquals("https://api.rakyzu.my.id/v1/tracks/$TRACK_ID/download", request.url)
+        assertEquals("Bearer listener-token", request.requestHeaders()["Authorization"])
+        assertFalse(request.toString().contains("listener-token"))
+    }
+
+    @Test
+    fun offlineDownloadFailsClosedWithoutSessionOrCanonicalTrackId() {
+        assertEquals(
+            OfflineDownloadRequestResult.Failure(MediaStreamRequestFailure.NotAuthenticated),
+            repository(accessToken = null).downloadRequest(TRACK_ID),
+        )
+        assertEquals(
+            OfflineDownloadRequestResult.Failure(MediaStreamRequestFailure.InvalidTrackId),
+            repository(accessToken = "listener-token").downloadRequest("../object"),
+        )
+    }
+
+    @Test
     fun accessTokenIsRedactedFromStringRepresentation() {
         val result = repository(accessToken = "listener-token").streamRequest(TRACK_ID)
         val request = (result as MediaStreamRequestResult.Ready).request
