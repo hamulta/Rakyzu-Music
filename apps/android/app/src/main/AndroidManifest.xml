@@ -35,6 +35,17 @@
                     android:host="auth"
                     android:scheme="my.id.rakyzumusic" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="track"
+                    android:pathPattern="/.*"
+                    android:scheme="my.id.rakyzumusic" />
+            </intent-filter>
         </activity>
     </application>
 

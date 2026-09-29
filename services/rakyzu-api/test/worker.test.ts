@@ -17,7 +17,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.6.5" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.7.0" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -59,6 +59,7 @@ describe("Rakyzu Music API", () => {
     expect(response.headers.get("x-rakyzu-offline-allowed")).toBe("true");
     expect(Date.parse(response.headers.get("x-rakyzu-offline-license-expires") ?? "")).toBeGreaterThan(Date.now());
     expect(response.headers.get("content-disposition")).toBe("attachment");
+    expect(response.headers.get("x-rakyzu-content-revision")).toBeTruthy();
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(AUDIO);
   });
 

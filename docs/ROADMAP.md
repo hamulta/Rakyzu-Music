@@ -170,11 +170,13 @@ approval stay server-authoritative; no provider secret or Supabase service key e
 - [x] `0.6.3` — offline playback resolution without exposing raw R2 objects or credentials.
 - [x] `0.6.4` — storage usage summary, available-space guard, and clear-download controls.
 - [x] `0.6.5` — pause, resume, cancel, retry, and process-death-safe download work.
-- [ ] `0.6.6` — catalog revision and removed-content reconciliation with non-destructive cleanup.
-- [ ] `0.6.7` — per-account/device download isolation and sign-out retention policy.
-- [ ] `0.6.8` — adaptive Download UI, large-text layout, TalkBack status and action regression.
-- [ ] `0.6.9` — privacy-safe download diagnostics, bounded concurrency, and performance hardening.
-- [ ] `0.6.10` — final Offline/storage resilience, runtime, security, accessibility, and quota gate.
+- [x] `0.6.6` — catalog revision and removed-content reconciliation with non-destructive cleanup.
+- [x] `0.6.7` — per-account/device download isolation and sign-out retention policy.
+- [x] `0.6.8` — adaptive Download UI, large-text layout, TalkBack status and action regression.
+- [x] `0.6.9` — privacy-safe download diagnostics, bounded concurrency, and performance hardening.
+- [x] `0.6.10` — final Offline/storage resilience, runtime, security, accessibility, and quota gate.
+- [x] `0.7.0` — bounded track-context models for licensed lyrics and credits, canonical app-share
+  contract, notification preference foundation, and an adaptive Android Sharesheet entry point.
 
 The 0.6 plan takes only public concepts from Spotify's
 [offline listening](https://support.spotify.com/us/article/listen-offline/) and
@@ -182,11 +184,40 @@ The 0.6 plan takes only public concepts from Spotify's
 Wi-Fi-first transfer, storage visibility, and listener controls. Rakyzu limits, entitlements,
 encryption, expiry, and rights policy will be defined by its own licensed catalog and backend.
 
-The cumulative `0.6.0`–`0.6.5` source uses Android versionCode `83`. A dedicated authenticated
+The cumulative `0.6.0`–`0.7.0` source uses Android versionCode `89`. A dedicated authenticated
 Worker route rechecks catalog rights before issuing a bounded offline license; Android encrypts
 the response with an account-derived, non-exportable Keystore key and stores only opaque local
-file tokens. Room 9 and WorkManager persist transfer state and network policy across process death.
-- `0.7.x`: Lyrics, credits, social sharing, notifications.
+file tokens. Room 10 persists content revisions and an explicit per-account sign-out policy;
+WorkManager persists transfer state and network policy across process death.
+
+### Lyrics, credits, sharing, and notifications — `0.7.x`
+
+- [ ] `0.7.1` — authenticated, rights-aware track-context API and local cache with explicit
+  unavailable, plain-lyrics, and time-synced-lyrics states.
+- [ ] `0.7.2` — accessible lyrics sheet, current-line focus, manual scrolling, provider attribution,
+  and fail-closed licensing behavior.
+- [ ] `0.7.3` — normalized songwriter, producer, performer, featured-artist, and primary-artist
+  credits with source attribution and bounded contributor lists.
+- [ ] `0.7.4` — canonical share-link resolution, validated inbound track deep links, preview-safe
+  metadata, and graceful unavailable-track handling.
+- [ ] `0.7.5` — Android notification permission education, stable channel taxonomy, and per-channel
+  device controls without dark patterns.
+- [ ] `0.7.6` — followed-Artist and saved-Artist release preferences, server-authoritative delivery,
+  deduplication, quiet behavior, and direct preference revocation.
+- [ ] `0.7.7` — offline lyrics/credits caching with account isolation, revision reconciliation,
+  bounded retention, and explicit storage visibility.
+- [ ] `0.7.8` — adaptive phone/tablet layouts, large-text reflow, TalkBack traversal/actions,
+  reduced-motion behavior, and RTL/localization preparation.
+- [ ] `0.7.9` — privacy-safe interaction telemetry, notification abuse/rate limits, deep-link threat
+  modeling, performance budgets, and resilience tests.
+- [ ] `0.7.10` — cumulative lyrics/credits/share/notification security, accessibility, runtime,
+  database migration, Worker, and release gate.
+
+This plan uses only the public product concepts described by Spotify's
+[lyrics guidance](https://support.spotify.com/article/lyrics/) and
+[song-credit guidance](https://support.spotify.com/article/song-credits/). Lyrics text, credit
+records, provider attribution, notification policy, and sharing infrastructure must be licensed
+or owned by Rakyzu; no Spotify catalog data, code, assets, or private behavior is copied.
 - `0.8.x`: Personalization, radio, mixes, history, recommendations.
 - `0.9.x`: subscriptions/entitlements, privacy, and advanced trust-and-safety governance.
 - `0.10.x`: release candidate hardening, accessibility, localization, performance, security, Play readiness.

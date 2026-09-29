@@ -1,5 +1,6 @@
 package my.id.rakyzumusic
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -100,6 +101,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
+import my.id.rakyzumusic.core.model.rakyzuTrackShareUri
 import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
@@ -342,6 +344,7 @@ private fun AuthenticatedRakyzuMusicApp(
     offlineDownloadRepository: OfflineDownloadRepository,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
     val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
@@ -368,6 +371,13 @@ private fun AuthenticatedRakyzuMusicApp(
         factory = OfflineDownloadsViewModel.factory(userId, offlineDownloadRepository),
     )
     val offlineDownloadsState by offlineDownloadsViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(userId, catalogRepository, offlineDownloadsViewModel) {
+        catalogRepository.observeCatalog().collect { catalog ->
+            if (catalog.lastSyncedAtEpochMillis != null) {
+                offlineDownloadsViewModel.reconcileCatalog(catalog.tracks)
+            }
+        }
+    }
     val playlistViewModel: PlaylistViewModel = viewModel(
         key = "playlists-$userId",
         factory = PlaylistViewModel.factory(userId, playlistRepository),
@@ -433,6 +443,12 @@ private fun AuthenticatedRakyzuMusicApp(
                     coroutineScope.launch {
                         isSigningOut = true
                         signOutMessage = null
+                        val downloadPreparation = offlineDownloadRepository.prepareForSignOut(userId)
+                        if (downloadPreparation is my.id.rakyzumusic.core.data.download.OfflineDownloadActionResult.Rejected) {
+                            signOutMessage = "Unable to apply the download sign-out policy. Try again."
+                            isSigningOut = false
+                            return@launch
+                        }
                         when (val result = authRepository.signOut()) {
                             AuthActionResult.Success -> showAccount = false
                             is AuthActionResult.ConfirmationRequired -> showAccount = false
@@ -646,6 +662,8 @@ private fun AuthenticatedRakyzuMusicApp(
                             downloadState = offlineDownloadsState,
                             onAllowMobileDownloads =
                                 offlineDownloadsViewModel::setAllowMobileDownloads,
+                            onKeepDownloadsAfterSignOut =
+                                offlineDownloadsViewModel::setKeepDownloadsAfterSignOut,
                             onPauseDownload = offlineDownloadsViewModel::pause,
                             onResumeDownload = offlineDownloadsViewModel::resume,
                             onCancelDownload = offlineDownloadsViewModel::cancel,
@@ -745,6 +763,23 @@ private fun AuthenticatedRakyzuMusicApp(
                             onQueueItemRemove = playbackController::removeQueueItem,
                             onClearQueue = playbackController::clearQueue,
                             onRetryPlayback = playbackController::retryPlayback,
+                            onShareTrack = { item ->
+                                val shareUri = rakyzuTrackShareUri(item.mediaId)
+                                val shareText = buildString {
+                                    append(item.title)
+                                    append(" — ")
+                                    append(item.artist)
+                                    shareUri?.let { append("\n").append(it) }
+                                }
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "Listen on Rakyzu Music")
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(intent, "Share from Rakyzu Music"),
+                                )
+                            },
                         )
                     }
                 },

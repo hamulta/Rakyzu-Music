@@ -19,7 +19,7 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 
-const API_VERSION = "0.6.5";
+const API_VERSION = "0.7.0";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
@@ -1446,6 +1446,7 @@ async function streamTrack(
   headers.set("cache-control", "private, no-store");
   headers.set("etag", metadata.httpEtag);
   headers.set("x-rakyzu-audio-quality", quality);
+  headers.set("x-rakyzu-content-revision", metadata.etag);
   if (offlineDownload) {
     const expires = new Date(Date.now() + OFFLINE_LICENSE_MILLIS).toISOString();
     headers.set("content-disposition", "attachment");
@@ -1455,7 +1456,8 @@ async function streamTrack(
   headers.set(
     "access-control-expose-headers",
     "Accept-Ranges, Content-Length, Content-Range, ETag, X-Rakyzu-Audio-Quality, " +
-      "X-Rakyzu-Offline-Allowed, X-Rakyzu-Offline-License-Expires, X-Request-ID",
+      "X-Rakyzu-Content-Revision, X-Rakyzu-Offline-Allowed, " +
+      "X-Rakyzu-Offline-License-Expires, X-Request-ID",
   );
 
   if (request.method === "HEAD") {

@@ -14,6 +14,12 @@ enum class OfflineDownloadStatus {
     Completed,
     Failed,
     Cancelled,
+    Unavailable,
+}
+
+enum class DownloadSignOutPolicy {
+    RemoveFromDevice,
+    KeepEncrypted,
 }
 
 data class OfflineDownloadItem(
@@ -49,6 +55,7 @@ data class OfflineDownloadsSnapshot(
     val items: List<OfflineDownloadItem> = emptyList(),
     val allowMobileDownloads: Boolean = false,
     val storage: OfflineDownloadStorage = OfflineDownloadStorage(),
+    val signOutPolicy: DownloadSignOutPolicy = DownloadSignOutPolicy.RemoveFromDevice,
 ) {
     val completedCount: Int
         get() = items.asSequence()
@@ -58,7 +65,41 @@ data class OfflineDownloadsSnapshot(
 
     fun collectionItems(kind: DownloadCollectionKind, id: String): List<OfflineDownloadItem> =
         items.filter { it.collectionKind == kind && it.collectionId == id }
+
+    val diagnostics: OfflineDownloadDiagnostics
+        get() = OfflineDownloadDiagnostics.from(items)
 }
+
+/** Aggregate-only diagnostics. Titles, account IDs, track IDs and file tokens never leave storage. */
+data class OfflineDownloadDiagnostics(
+    val totalCount: Int,
+    val activeCount: Int,
+    val readyCount: Int,
+    val attentionCount: Int,
+) {
+    companion object {
+        fun from(items: List<OfflineDownloadItem>): OfflineDownloadDiagnostics =
+            OfflineDownloadDiagnostics(
+                totalCount = items.distinctBy(OfflineDownloadItem::trackId).size,
+                activeCount = items.countDistinctWithStatus(
+                    OfflineDownloadStatus.Queued,
+                    OfflineDownloadStatus.Downloading,
+                ),
+                readyCount = items.countDistinctWithStatus(OfflineDownloadStatus.Completed),
+                attentionCount = items.countDistinctWithStatus(
+                    OfflineDownloadStatus.Failed,
+                    OfflineDownloadStatus.Unavailable,
+                ),
+            )
+    }
+}
+
+private fun List<OfflineDownloadItem>.countDistinctWithStatus(
+    vararg statuses: OfflineDownloadStatus,
+): Int = asSequence()
+    .filter { it.status in statuses }
+    .distinctBy(OfflineDownloadItem::trackId)
+    .count()
 
 /**
  * A decrypted, account-authorized stream. Callers must close [input] after playback.

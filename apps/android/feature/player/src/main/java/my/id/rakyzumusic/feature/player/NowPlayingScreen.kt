@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -100,6 +102,7 @@ fun NowPlayingScreen(
     onLikeChange: (Boolean) -> Unit = {},
     onAlbumSaveChange: (Boolean) -> Unit = {},
     onArtistFollowChange: (Boolean) -> Unit = {},
+    onShareTrack: (PlaybackQueueItem) -> Unit = {},
 ) {
     val currentItem = snapshot.queue.getOrNull(snapshot.currentIndex)
     LazyColumn(
@@ -136,6 +139,7 @@ fun NowPlayingScreen(
                     onLikeChange = onLikeChange,
                     onAlbumSaveChange = onAlbumSaveChange,
                     onArtistFollowChange = onArtistFollowChange,
+                    onShareTrack = onShareTrack,
                 )
             }
         }
@@ -198,13 +202,18 @@ private fun NowPlayingLibraryActions(
     onLikeChange: (Boolean) -> Unit,
     onAlbumSaveChange: (Boolean) -> Unit,
     onArtistFollowChange: (Boolean) -> Unit,
+    onShareTrack: (PlaybackQueueItem) -> Unit,
 ) {
-    Row(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
+      FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        maxItemsInEachRow = if (maxWidth < 380.dp) 2 else 4,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+      ) {
         LibraryActionButton(
             icon = Icons.Rounded.Favorite,
             label = if (isLiked) "Liked" else "Like",
@@ -244,6 +253,16 @@ private fun NowPlayingLibraryActions(
             enabled = item.artistId.isNotBlank(),
             onClick = { onArtistFollowChange(!isArtistFollowed) },
         )
+        LibraryActionButton(
+            icon = Icons.Rounded.Share,
+            label = "Share",
+            actionDescription = "Share ${item.title} by ${item.artist}",
+            selected = false,
+            pending = false,
+            enabled = item.mediaId.isNotBlank(),
+            onClick = { onShareTrack(item) },
+        )
+      }
     }
 }
 

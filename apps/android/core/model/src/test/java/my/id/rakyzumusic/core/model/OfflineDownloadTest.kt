@@ -23,6 +23,20 @@ class OfflineDownloadTest {
             .hasDownloadCapacity)
     }
 
+    @Test
+    fun diagnosticsContainOnlyAggregateTransferState() {
+        val diagnostics = OfflineDownloadsSnapshot(
+            items = listOf(
+                item(100, 100).copy(status = OfflineDownloadStatus.Completed),
+                item(0, null).copy(trackId = "other", status = OfflineDownloadStatus.Unavailable),
+            ),
+        ).diagnostics
+
+        assertEquals(2, diagnostics.totalCount)
+        assertEquals(1, diagnostics.readyCount)
+        assertEquals(1, diagnostics.attentionCount)
+    }
+
     private fun item(downloaded: Long, total: Long?) = OfflineDownloadItem(
         userId = "listener",
         trackId = "track",

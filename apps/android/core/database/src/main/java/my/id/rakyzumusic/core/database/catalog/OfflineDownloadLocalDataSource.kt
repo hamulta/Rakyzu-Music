@@ -3,6 +3,7 @@ package my.id.rakyzumusic.core.database.catalog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
+import my.id.rakyzumusic.core.model.DownloadSignOutPolicy
 import my.id.rakyzumusic.core.model.OfflineDownloadItem
 import my.id.rakyzumusic.core.model.OfflineDownloadStatus
 
@@ -11,6 +12,7 @@ data class StoredOfflineDownload(
     val fileToken: String?,
     val contentType: String?,
     val licenseExpiresAtEpochMillis: Long?,
+    val contentRevision: String? = null,
     val attemptCount: Int,
     val requestedAtEpochMillis: Long,
 )
@@ -18,6 +20,7 @@ data class StoredOfflineDownload(
 data class StoredOfflineDownloadsSnapshot(
     val items: List<StoredOfflineDownload>,
     val allowMobileDownloads: Boolean,
+    val signOutPolicy: DownloadSignOutPolicy,
 )
 
 data class StoredOfflineDownloadCollection(
@@ -40,6 +43,7 @@ interface OfflineDownloadLocalDataSource {
         status: OfflineDownloadStatus,
         failureCode: String? = null,
         incrementAttempt: Boolean = false,
+        resetAttempts: Boolean = false,
         updatedAtEpochMillis: Long,
     ): Boolean
     suspend fun setProgress(
@@ -56,11 +60,15 @@ interface OfflineDownloadLocalDataSource {
         fileToken: String,
         contentType: String,
         licenseExpiresAtEpochMillis: Long,
+        contentRevision: String?,
         updatedAtEpochMillis: Long,
     ): Boolean
     suspend fun removeCompleted(userId: String): Int
+    suspend fun removeAll(userId: String): Int
     suspend fun allowMobileDownloads(userId: String): Boolean
     suspend fun setAllowMobileDownloads(userId: String, allow: Boolean)
+    suspend fun signOutPolicy(userId: String): DownloadSignOutPolicy
+    suspend fun setSignOutPolicy(userId: String, policy: DownloadSignOutPolicy)
 }
 
 internal class RoomOfflineDownloadLocalDataSource(
@@ -72,7 +80,8 @@ internal class RoomOfflineDownloadLocalDataSource(
         dao.observeOfflineDownloads(userId),
         dao.observeOfflineDownloadCollections(userId),
         dao.observeAllowMobileDownloads(userId),
-    ) { entities, collections, allowMobile ->
+        dao.observeKeepDownloadsAfterSignOut(userId),
+    ) { entities, collections, allowMobile, keepAfterSignOut ->
         val downloads = entities.associateBy(OfflineDownloadEntity::trackId)
         val linked = collections.mapNotNull { collection ->
             downloads[collection.trackId]?.toStored()?.withCollection(collection)
@@ -80,7 +89,11 @@ internal class RoomOfflineDownloadLocalDataSource(
         val linkedTrackIds = collections.mapTo(mutableSetOf(), OfflineDownloadCollectionEntity::trackId)
         val unlinked = entities.filterNot { it.trackId in linkedTrackIds }
             .map(OfflineDownloadEntity::toStored)
-        StoredOfflineDownloadsSnapshot(linked + unlinked, allowMobile == true)
+        StoredOfflineDownloadsSnapshot(
+            linked + unlinked,
+            allowMobile == true,
+            keepAfterSignOut.toPolicy(),
+        )
     }
 
     override suspend fun get(userId: String, trackId: String): StoredOfflineDownload? =
@@ -111,6 +124,7 @@ internal class RoomOfflineDownloadLocalDataSource(
         status: OfflineDownloadStatus,
         failureCode: String?,
         incrementAttempt: Boolean,
+        resetAttempts: Boolean,
         updatedAtEpochMillis: Long,
     ): Boolean = dao.updateOfflineDownloadStatus(
         userId,
@@ -118,6 +132,7 @@ internal class RoomOfflineDownloadLocalDataSource(
         status.name,
         failureCode,
         if (incrementAttempt) 1 else 0,
+        resetAttempts,
         updatedAtEpochMillis,
     ) == 1
 
@@ -143,6 +158,7 @@ internal class RoomOfflineDownloadLocalDataSource(
         fileToken: String,
         contentType: String,
         licenseExpiresAtEpochMillis: Long,
+        contentRevision: String?,
         updatedAtEpochMillis: Long,
     ): Boolean = dao.completeOfflineDownload(
         userId,
@@ -152,17 +168,35 @@ internal class RoomOfflineDownloadLocalDataSource(
         fileToken,
         contentType,
         licenseExpiresAtEpochMillis,
+        contentRevision,
         updatedAtEpochMillis,
     ) == 1
 
     override suspend fun removeCompleted(userId: String): Int =
         dao.deleteOfflineDownloadsWithStatus(userId, OfflineDownloadStatus.Completed.name)
 
+    override suspend fun removeAll(userId: String): Int = dao.deleteOfflineDownloads(userId)
+
     override suspend fun allowMobileDownloads(userId: String): Boolean =
         dao.getAllowMobileDownloads(userId) == true
 
     override suspend fun setAllowMobileDownloads(userId: String, allow: Boolean) {
-        dao.insertOfflineDownloadPreference(OfflineDownloadPreferenceEntity(userId, allow))
+        val keep = dao.getKeepDownloadsAfterSignOut(userId)
+        dao.insertOfflineDownloadPreference(OfflineDownloadPreferenceEntity(userId, allow, keep))
+    }
+
+    override suspend fun signOutPolicy(userId: String): DownloadSignOutPolicy =
+        dao.getKeepDownloadsAfterSignOut(userId).toPolicy()
+
+    override suspend fun setSignOutPolicy(userId: String, policy: DownloadSignOutPolicy) {
+        val allowMobile = dao.getAllowMobileDownloads(userId) == true
+        dao.insertOfflineDownloadPreference(
+            OfflineDownloadPreferenceEntity(
+                userId = userId,
+                allowMobile = allowMobile,
+                keepAfterSignOut = policy == DownloadSignOutPolicy.KeepEncrypted,
+            ),
+        )
     }
 }
 
@@ -184,6 +218,7 @@ private fun OfflineDownloadEntity.toStored(): StoredOfflineDownload = StoredOffl
     fileToken = fileToken,
     contentType = contentType,
     licenseExpiresAtEpochMillis = licenseExpiresAtEpochMillis,
+    contentRevision = contentRevision,
     attemptCount = attemptCount,
     requestedAtEpochMillis = requestedAtEpochMillis,
 )
@@ -202,6 +237,7 @@ private fun StoredOfflineDownload.toEntity(): OfflineDownloadEntity = OfflineDow
     fileToken = fileToken,
     contentType = contentType,
     licenseExpiresAtEpochMillis = licenseExpiresAtEpochMillis,
+    contentRevision = contentRevision,
     attemptCount = attemptCount,
     failureCode = item.failureCode,
     requestedAtEpochMillis = requestedAtEpochMillis,
@@ -220,3 +256,9 @@ private fun StoredOfflineDownload.withCollection(
 
 private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String, fallback: T): T =
     enumValues<T>().firstOrNull { it.name == value } ?: fallback
+
+private fun Boolean?.toPolicy(): DownloadSignOutPolicy = if (this == true) {
+    DownloadSignOutPolicy.KeepEncrypted
+} else {
+    DownloadSignOutPolicy.RemoveFromDevice
+}

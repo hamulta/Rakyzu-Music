@@ -13,6 +13,7 @@ import my.id.rakyzumusic.core.data.download.OfflineDownloadActionResult
 import my.id.rakyzumusic.core.data.download.OfflineDownloadFailure
 import my.id.rakyzumusic.core.data.download.OfflineDownloadRepository
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
+import my.id.rakyzumusic.core.model.DownloadSignOutPolicy
 import my.id.rakyzumusic.core.model.OfflineDownloadsSnapshot
 import my.id.rakyzumusic.core.model.Track
 
@@ -36,6 +37,7 @@ class OfflineDownloadsViewModel internal constructor(
                 mutableState.update { it.copy(snapshot = snapshot) }
             }
         }
+        viewModelScope.launch { repository.auditStorage(userId) }
     }
 
     fun downloadAlbum(albumId: String, title: String, tracks: List<Track>) = perform {
@@ -66,6 +68,17 @@ class OfflineDownloadsViewModel internal constructor(
         repository.setAllowMobileDownloads(userId, allow)
     }
     fun clearCompleted() = perform { repository.clearCompleted(userId) }
+    fun setKeepDownloadsAfterSignOut(keep: Boolean) = perform {
+        repository.setSignOutPolicy(
+            userId,
+            if (keep) DownloadSignOutPolicy.KeepEncrypted else DownloadSignOutPolicy.RemoveFromDevice,
+        )
+    }
+
+    fun reconcileCatalog(tracks: List<Track>) {
+        val availableTrackIds = tracks.mapTo(mutableSetOf(), Track::id)
+        viewModelScope.launch { repository.reconcileCatalog(userId, availableTrackIds) }
+    }
 
     private fun perform(action: suspend () -> OfflineDownloadActionResult) {
         if (mutableState.value.isWorking) return
@@ -119,4 +132,6 @@ private fun OfflineDownloadFailure.toMessage(): String = when (this) {
     OfflineDownloadFailure.MediaUnavailable -> "This track is not available for offline listening."
     OfflineDownloadFailure.Network -> "Download interrupted. Retry when your connection is stable."
     OfflineDownloadFailure.Storage -> "Encrypted device storage is unavailable."
+    OfflineDownloadFailure.QuotaExceeded -> "This device has reached its offline download limit."
+    OfflineDownloadFailure.RetryExhausted -> "Download retry limit reached. Try again manually."
 }

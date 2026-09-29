@@ -1,6 +1,39 @@
 # Rakyzu Music — engineering work sessions
 
-## Active cumulative 0.6.0–0.6.5 batch — 2026-09-24
+## Active cumulative 0.6.6–0.7.0 batch — 2026-09-29
+
+- [x] Audit the clean `v0.6.5` baseline and preserve the pre-existing `gradlew` mode change.
+- [x] `0.6.6`: reconcile removed/restored catalog tracks non-destructively and persist bounded
+  server content revisions.
+- [x] `0.6.7`: add account/device isolation and explicit remove-or-keep sign-out policy.
+- [x] `0.6.8`: adapt Download rows and actions for compact screens, large text, and TalkBack state.
+- [x] `0.6.9`: aggregate-only diagnostics, two-transfer concurrency, retry cap, and quota bounds.
+- [x] `0.6.10`: decrypt-to-EOF integrity audit, expiry failure, Room 9→10 migration, and final gates.
+- [x] `0.7.0`: add bounded lyrics/credits/notification/share contracts and Android Sharesheet entry.
+- [x] Audit correction: make explicit manual retry reset the exhausted automatic-attempt window.
+- [x] Run cumulative Android unit tests, lint, debug/instrumentation APK builds, and release R8.
+- [x] Run Worker types/tests/dry-run and verify Supabase migration parity.
+- [x] Inspect the complete diff, generated Room schema, manifest, version, and secret scan.
+- [ ] Explicitly stage validated paths, create one cumulative Conventional Commit, and push main.
+- [ ] Verify exact-commit CI/CD and Worker health, then tag and publish the cumulative prerelease.
+- [ ] Download the public APK, verify identity/signature/checksum, and complete the final audit.
+
+The restored host initially lacked Java and `/tmp/android-sdk`; OpenJDK 17, Android SDK 37,
+Build Tools 36, platform-tools, QEMU user support, and the native Linux/aarch64 SQLite verifier
+were restored before counting any local build evidence. No emulator, Appetize, or ADB runtime is
+claimed for this batch unless explicitly added to the final evidence.
+
+The final local Android source gate passed 233 unit tests with zero failures, errors, or skips;
+all 14 module lint reports contain zero issues; the debug, app-test, Room migration-test, and
+R8/resource-shrunk release APKs assembled. The signed debug APK identifies as
+`my.id.rakyzumusic`, versionName `0.7.0`, versionCode `89`, min SDK 26, target SDK 37, and one v2
+signer; its pre-CI SHA-256 is `21e420dd0f5afe80d849e62bdad96d280d0252997b590ac8396727e4de5ddd50`.
+Worker validation passed 73 tests, both TypeScript checks, generated-binding verification, and a
+no-write Wrangler deployment dry-run. Supabase CLI 2.118.0 confirmed all 18 local migrations match
+production. Production dependency audit reported zero vulnerabilities, tracked credential-prefix
+and exact-value scans were clean, and `credential.env` remains ignored.
+
+## Completed cumulative 0.6.0–0.6.5 batch — 2026-09-24
 
 - [x] Audit the clean v0.5.30 hotfix baseline, release train, current architecture, and official
   Spotify offline/storage references.

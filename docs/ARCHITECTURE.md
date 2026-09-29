@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.6.5` Android source adds encrypted account-scoped offline downloads, durable Wi-Fi-first transfer work, offline-first Media3 resolution, and listener storage controls to the verified `0.5.30` baseline; publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.7.0` Android source completes the first offline-download resilience train with catalog reconciliation, explicit sign-out retention, adaptive controls, bounded execution, integrity/quota gates, and a bounded track-context/share foundation; publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 

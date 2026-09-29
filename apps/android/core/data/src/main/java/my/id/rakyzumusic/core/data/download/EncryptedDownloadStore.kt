@@ -122,6 +122,29 @@ internal class EncryptedDownloadStore(context: Context) {
         fileToken?.takeIf(::isValidToken)?.let { File(directory, "$it$FILE_SUFFIX").delete() }
     }
 
+    fun isValid(
+        userId: String,
+        fileToken: String?,
+        expectedPlaintextBytes: Long?,
+    ): Boolean {
+        val expected = expectedPlaintextBytes?.takeIf { it > 0L } ?: return false
+        val asset = open(userId, fileToken ?: return false, expected, "application/octet-stream")
+            ?: return false
+        return runCatching {
+            asset.input.use { input ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var count = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    count += read
+                    if (count > expected) return@runCatching false
+                }
+                count == expected
+            }
+        }.getOrDefault(false)
+    }
+
     private fun keyFor(userId: String): SecretKey {
         val alias = "$KEY_ALIAS_PREFIX${sha256(userId).take(KEY_ALIAS_HASH_LENGTH)}"
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }

@@ -249,6 +249,7 @@ internal data class OfflineDownloadEntity(
     @ColumnInfo(name = "file_token") val fileToken: String?,
     @ColumnInfo(name = "content_type") val contentType: String?,
     @ColumnInfo(name = "license_expires_at_epoch_ms") val licenseExpiresAtEpochMillis: Long?,
+    @ColumnInfo(name = "content_revision") val contentRevision: String?,
     @ColumnInfo(name = "attempt_count") val attemptCount: Int,
     @ColumnInfo(name = "failure_code") val failureCode: String?,
     @ColumnInfo(name = "requested_at_epoch_ms") val requestedAtEpochMillis: Long,
@@ -280,4 +281,5 @@ internal data class OfflineDownloadCollectionEntity(
 internal data class OfflineDownloadPreferenceEntity(
     @PrimaryKey @ColumnInfo(name = "user_id") val userId: String,
     @ColumnInfo(name = "allow_mobile") val allowMobile: Boolean,
+    @ColumnInfo(name = "keep_after_sign_out") val keepAfterSignOut: Boolean? = null,
 )

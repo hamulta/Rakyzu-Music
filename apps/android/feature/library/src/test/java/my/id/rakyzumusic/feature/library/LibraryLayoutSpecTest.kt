@@ -2,6 +2,8 @@ package my.id.rakyzumusic.feature.library
 
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LibraryLayoutSpecTest {
@@ -29,5 +31,12 @@ class LibraryLayoutSpecTest {
         assertEquals(88.dp, spec.rowMinimumHeight)
         assertEquals(56.dp, spec.artworkSize)
         assertEquals(2, spec.textMaxLines)
+    }
+
+    @Test
+    fun downloadActionsStackForCompactScreensOrLargeText() {
+        assertFalse(shouldStackOfflineDownloadRow(390.dp, 1f))
+        assertTrue(shouldStackOfflineDownloadRow(320.dp, 1f))
+        assertTrue(shouldStackOfflineDownloadRow(390.dp, 1.3f))
     }
 }

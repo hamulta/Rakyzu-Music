@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.media.OfflineDownloadRequestResult
@@ -24,6 +26,7 @@ import my.id.rakyzumusic.core.database.catalog.OfflineDownloadLocalDataSource
 import my.id.rakyzumusic.core.database.catalog.StoredOfflineDownload
 import my.id.rakyzumusic.core.database.catalog.StoredOfflineDownloadCollection
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
+import my.id.rakyzumusic.core.model.DownloadSignOutPolicy
 import my.id.rakyzumusic.core.model.MIN_OFFLINE_STORAGE_RESERVE_BYTES
 import my.id.rakyzumusic.core.model.OfflineDownloadItem
 import my.id.rakyzumusic.core.model.OfflineDownloadStatus
@@ -46,6 +49,8 @@ enum class OfflineDownloadFailure {
     MediaUnavailable,
     Network,
     Storage,
+    QuotaExceeded,
+    RetryExhausted,
 }
 
 interface OfflineDownloadRepository {
@@ -63,6 +68,10 @@ interface OfflineDownloadRepository {
     suspend fun retry(userId: String, trackId: String): OfflineDownloadActionResult
     suspend fun setAllowMobileDownloads(userId: String, allow: Boolean): OfflineDownloadActionResult
     suspend fun clearCompleted(userId: String): OfflineDownloadActionResult
+    suspend fun reconcileCatalog(userId: String, availableTrackIds: Set<String>): OfflineDownloadActionResult
+    suspend fun auditStorage(userId: String): OfflineDownloadActionResult
+    suspend fun setSignOutPolicy(userId: String, policy: DownloadSignOutPolicy): OfflineDownloadActionResult
+    suspend fun prepareForSignOut(userId: String): OfflineDownloadActionResult
     fun openForPlayback(userId: String, trackId: String): OfflineMediaAsset?
 }
 
@@ -90,6 +99,7 @@ internal class AuthenticatedOfflineDownloadRepository(
             OfflineDownloadsSnapshot(
                 items = stored.items.map(StoredOfflineDownload::item),
                 allowMobileDownloads = stored.allowMobileDownloads,
+                signOutPolicy = stored.signOutPolicy,
                 storage = OfflineDownloadStorage(
                     encryptedBytes = stored.items
                         .distinctBy { it.item.trackId }
@@ -116,6 +126,9 @@ internal class AuthenticatedOfflineDownloadRepository(
         }
         val timestamp = now()
         val existing = local.getAll(userId).associateBy { it.item.trackId }
+        if (!hasOfflineQuotaCapacity(existing.keys, tracks.map(Track::id))) {
+            return OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.QuotaExceeded)
+        }
         local.upsert(tracks.distinctBy(Track::id).map { track ->
             val prior = existing[track.id]
             val reusable = prior?.item?.status == OfflineDownloadStatus.Completed &&
@@ -149,6 +162,7 @@ internal class AuthenticatedOfflineDownloadRepository(
                 fileToken = prior?.fileToken.takeIf { reusable },
                 contentType = prior?.contentType.takeIf { reusable },
                 licenseExpiresAtEpochMillis = prior?.licenseExpiresAtEpochMillis.takeIf { reusable },
+                contentRevision = prior?.contentRevision.takeIf { reusable },
                 attemptCount = prior?.attemptCount ?: 0,
                 requestedAtEpochMillis = timestamp,
             )
@@ -187,7 +201,7 @@ internal class AuthenticatedOfflineDownloadRepository(
         restart(userId, trackId)
 
     override suspend fun retry(userId: String, trackId: String): OfflineDownloadActionResult =
-        restart(userId, trackId)
+        restart(userId, trackId, resetAttempts = true)
 
     override suspend fun cancel(userId: String, trackId: String): OfflineDownloadActionResult {
         if (!ownsSession(userId)) return OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.WrongAccount)
@@ -220,6 +234,103 @@ internal class AuthenticatedOfflineDownloadRepository(
         return OfflineDownloadActionResult.Accepted
     }
 
+    override suspend fun reconcileCatalog(
+        userId: String,
+        availableTrackIds: Set<String>,
+    ): OfflineDownloadActionResult = withContext(Dispatchers.IO) {
+        if (!ownsSession(userId)) return@withContext rejectedWrongAccount()
+        if (availableTrackIds.any(String::isBlank)) return@withContext rejectedInvalidRequest()
+        val allowMobile = local.allowMobileDownloads(userId)
+        local.getAll(userId).forEach { stored ->
+            val available = stored.item.trackId in availableTrackIds
+            when {
+                !available && stored.item.status != OfflineDownloadStatus.Unavailable -> {
+                    workManager.cancelUniqueWork(workName(userId, stored.item.trackId))
+                    local.setStatus(
+                        userId,
+                        stored.item.trackId,
+                        OfflineDownloadStatus.Unavailable,
+                        failureCode = OfflineDownloadFailure.MediaUnavailable.name,
+                        updatedAtEpochMillis = now(),
+                    )
+                }
+                available && stored.item.status == OfflineDownloadStatus.Unavailable -> {
+                    val reusable = stored.licenseExpiresAtEpochMillis?.let { it > now() } == true &&
+                        store.isValid(userId, stored.fileToken, stored.item.totalBytes)
+                    local.setStatus(
+                        userId,
+                        stored.item.trackId,
+                        if (reusable) OfflineDownloadStatus.Completed else OfflineDownloadStatus.Queued,
+                        updatedAtEpochMillis = now(),
+                    )
+                    if (!reusable) schedule(userId, stored.item.trackId, allowMobile)
+                }
+            }
+        }
+        OfflineDownloadActionResult.Accepted
+    }
+
+    override suspend fun auditStorage(userId: String): OfflineDownloadActionResult =
+        withContext(Dispatchers.IO) {
+            if (!ownsSession(userId)) return@withContext rejectedWrongAccount()
+            local.getAll(userId)
+                .filter { it.item.status == OfflineDownloadStatus.Completed }
+                .forEach { stored ->
+                    val isExpired = stored.licenseExpiresAtEpochMillis?.let { it <= now() } != false
+                    val isValid = !isExpired && store.isValid(
+                        userId,
+                        stored.fileToken,
+                        stored.item.totalBytes,
+                    )
+                    if (!isValid) {
+                        local.setStatus(
+                            userId,
+                            stored.item.trackId,
+                            OfflineDownloadStatus.Failed,
+                            failureCode = if (isExpired) {
+                                OfflineDownloadFailure.NotEntitled.name
+                            } else {
+                                OfflineDownloadFailure.Storage.name
+                            },
+                            updatedAtEpochMillis = now(),
+                        )
+                    }
+                }
+            OfflineDownloadActionResult.Accepted
+        }
+
+    override suspend fun setSignOutPolicy(
+        userId: String,
+        policy: DownloadSignOutPolicy,
+    ): OfflineDownloadActionResult {
+        if (!ownsSession(userId)) return rejectedWrongAccount()
+        local.setSignOutPolicy(userId, policy)
+        return OfflineDownloadActionResult.Accepted
+    }
+
+    override suspend fun prepareForSignOut(userId: String): OfflineDownloadActionResult {
+        if (!ownsSession(userId)) return rejectedWrongAccount()
+        workManager.cancelAllWorkByTag(accountTag(userId))
+        val stored = local.getAll(userId)
+        if (local.signOutPolicy(userId) == DownloadSignOutPolicy.RemoveFromDevice) {
+            stored.forEach { store.delete(it.fileToken) }
+            local.removeAll(userId)
+        } else {
+            stored.filter {
+                it.item.status == OfflineDownloadStatus.Queued ||
+                    it.item.status == OfflineDownloadStatus.Downloading
+            }.forEach {
+                local.setStatus(
+                    userId,
+                    it.item.trackId,
+                    OfflineDownloadStatus.Paused,
+                    updatedAtEpochMillis = now(),
+                )
+            }
+        }
+        return OfflineDownloadActionResult.Accepted
+    }
+
     override fun openForPlayback(userId: String, trackId: String): OfflineMediaAsset? {
         if (!ownsSession(userId)) return null
         val item = runCatching {
@@ -237,6 +348,9 @@ internal class AuthenticatedOfflineDownloadRepository(
     }
 
     override suspend fun execute(userId: String, trackId: String): DownloadExecutionResult =
+        DOWNLOAD_PERMITS.withPermit { executeBounded(userId, trackId) }
+
+    private suspend fun executeBounded(userId: String, trackId: String): DownloadExecutionResult =
         withContext(Dispatchers.IO) {
             when (sessionAccess(userId)) {
                 SessionAccess.Pending -> return@withContext DownloadExecutionResult.Retry
@@ -244,6 +358,10 @@ internal class AuthenticatedOfflineDownloadRepository(
                 SessionAccess.Allowed -> Unit
             }
             val stored = local.get(userId, trackId) ?: return@withContext DownloadExecutionResult.Failure
+            if (stored.attemptCount >= MAX_DOWNLOAD_ATTEMPTS) {
+                fail(userId, trackId, OfflineDownloadFailure.RetryExhausted)
+                return@withContext DownloadExecutionResult.Failure
+            }
             if (stored.item.status in setOf(
                     OfflineDownloadStatus.Paused,
                     OfflineDownloadStatus.Cancelled,
@@ -318,6 +436,9 @@ internal class AuthenticatedOfflineDownloadRepository(
                     fail(userId, trackId, OfflineDownloadFailure.NotEntitled)
                     return@withContext DownloadExecutionResult.Failure
                 }
+                val contentRevision = sanitizeContentRevision(
+                    connection.getHeaderField(CONTENT_REVISION_HEADER),
+                )
                 var lastReported = 0L
                 val encrypted = connection.inputStream.use { input ->
                     store.write(userId, trackId, input, MAX_DOWNLOAD_BYTES) { downloaded ->
@@ -344,6 +465,7 @@ internal class AuthenticatedOfflineDownloadRepository(
                     encrypted.fileToken,
                     contentType,
                     licenseExpiry,
+                    contentRevision,
                     now(),
                 )
                 DownloadExecutionResult.Success
@@ -357,12 +479,22 @@ internal class AuthenticatedOfflineDownloadRepository(
             }
         }
 
-    private suspend fun restart(userId: String, trackId: String): OfflineDownloadActionResult {
+    private suspend fun restart(
+        userId: String,
+        trackId: String,
+        resetAttempts: Boolean = false,
+    ): OfflineDownloadActionResult {
         if (!ownsSession(userId)) return OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.WrongAccount)
         val item = local.get(userId, trackId)
             ?: return OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.InvalidRequest)
         if (item.item.status == OfflineDownloadStatus.Completed) return OfflineDownloadActionResult.Accepted
-        local.setStatus(userId, trackId, OfflineDownloadStatus.Queued, updatedAtEpochMillis = now())
+        local.setStatus(
+            userId,
+            trackId,
+            OfflineDownloadStatus.Queued,
+            resetAttempts = resetAttempts,
+            updatedAtEpochMillis = now(),
+        )
         schedule(userId, trackId, local.allowMobileDownloads(userId))
         return OfflineDownloadActionResult.Accepted
     }
@@ -433,13 +565,35 @@ internal class AuthenticatedOfflineDownloadRepository(
         const val MAX_DOWNLOAD_BYTES = 512L * 1024L * 1024L
         const val PROGRESS_STEP_BYTES = 256L * 1024L
         const val NETWORK_TIMEOUT_MILLIS = 30_000
+        const val MAX_DOWNLOAD_ATTEMPTS = 5
         const val DEFAULT_CONTENT_TYPE = "application/octet-stream"
         const val OFFLINE_ALLOWED_HEADER = "X-Rakyzu-Offline-Allowed"
         const val LICENSE_EXPIRY_HEADER = "X-Rakyzu-Offline-License-Expires"
+        const val CONTENT_REVISION_HEADER = "X-Rakyzu-Content-Revision"
+        val DOWNLOAD_PERMITS = Semaphore(2)
     }
 
     private enum class SessionAccess { Pending, DifferentAccount, Allowed }
 }
+
+private fun rejectedWrongAccount() =
+    OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.WrongAccount)
+
+private fun rejectedInvalidRequest() =
+    OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.InvalidRequest)
+
+internal fun hasOfflineQuotaCapacity(
+    existingTrackIds: Set<String>,
+    requestedTrackIds: List<String>,
+): Boolean {
+    if (requestedTrackIds.size > 500) return false
+    val requested = requestedTrackIds.toSet()
+    return existingTrackIds.size + requested.count { it !in existingTrackIds } <= 2_000
+}
+
+internal fun sanitizeContentRevision(value: String?): String? = value
+    ?.trim()
+    ?.takeIf { it.length in 1..128 && Regex("^[A-Za-z0-9._:-]+$").matches(it) }
 
 internal fun workName(userId: String, trackId: String): String =
     "rakyzu-download-${safeWorkPart(userId)}-${safeWorkPart(trackId)}"
@@ -464,6 +618,10 @@ internal data object UnavailableOfflineDownloadRepository : ExecutableOfflineDow
     override suspend fun retry(userId: String, trackId: String) = unavailable()
     override suspend fun setAllowMobileDownloads(userId: String, allow: Boolean) = unavailable()
     override suspend fun clearCompleted(userId: String) = unavailable()
+    override suspend fun reconcileCatalog(userId: String, availableTrackIds: Set<String>) = unavailable()
+    override suspend fun auditStorage(userId: String) = unavailable()
+    override suspend fun setSignOutPolicy(userId: String, policy: DownloadSignOutPolicy) = unavailable()
+    override suspend fun prepareForSignOut(userId: String) = unavailable()
     override fun openForPlayback(userId: String, trackId: String): OfflineMediaAsset? = null
     override suspend fun execute(userId: String, trackId: String) = DownloadExecutionResult.Failure
     private fun unavailable() = OfflineDownloadActionResult.Rejected(OfflineDownloadFailure.NotAuthenticated)

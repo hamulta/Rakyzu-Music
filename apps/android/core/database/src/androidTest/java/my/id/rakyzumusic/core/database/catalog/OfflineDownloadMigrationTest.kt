@@ -10,6 +10,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
 import kotlinx.coroutines.test.runTest
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
+import my.id.rakyzumusic.core.model.DownloadSignOutPolicy
 import my.id.rakyzumusic.core.model.OfflineDownloadItem
 import my.id.rakyzumusic.core.model.OfflineDownloadStatus
 import org.json.JSONArray
@@ -40,6 +41,25 @@ class OfflineDownloadMigrationTest {
             assertEquals(null, local.get("account-b", "track-1"))
             assertTrue(local.allowMobileDownloads("account-a"))
             assertFalse(local.allowMobileDownloads("account-b"))
+            assertEquals(DownloadSignOutPolicy.RemoveFromDevice, local.signOutPolicy("account-a"))
+            local.setSignOutPolicy("account-a", DownloadSignOutPolicy.KeepEncrypted)
+            assertEquals(DownloadSignOutPolicy.KeepEncrypted, local.signOutPolicy("account-a"))
+            local.setStatus(
+                "account-a",
+                "track-1",
+                OfflineDownloadStatus.Downloading,
+                incrementAttempt = true,
+                updatedAtEpochMillis = 2_000L,
+            )
+            assertEquals(1, local.get("account-a", "track-1")?.attemptCount)
+            local.setStatus(
+                "account-a",
+                "track-1",
+                OfflineDownloadStatus.Queued,
+                resetAttempts = true,
+                updatedAtEpochMillis = 3_000L,
+            )
+            assertEquals(0, local.get("account-a", "track-1")?.attemptCount)
         } finally {
             database.close()
             context.deleteDatabase(name)

@@ -81,6 +81,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
+import my.id.rakyzumusic.core.model.DownloadSignOutPolicy
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.OfflineDownloadItem
 import my.id.rakyzumusic.core.model.OfflineDownloadStatus
@@ -128,6 +129,7 @@ fun LibraryRoute(
     onBrowseMusic: () -> Unit,
     downloadState: OfflineDownloadsUiState,
     onAllowMobileDownloads: (Boolean) -> Unit,
+    onKeepDownloadsAfterSignOut: (Boolean) -> Unit,
     onPauseDownload: (String) -> Unit,
     onResumeDownload: (String) -> Unit,
     onCancelDownload: (String) -> Unit,
@@ -151,6 +153,7 @@ fun LibraryRoute(
         onBrowseMusic = onBrowseMusic,
         downloadState = downloadState,
         onAllowMobileDownloads = onAllowMobileDownloads,
+        onKeepDownloadsAfterSignOut = onKeepDownloadsAfterSignOut,
         onPauseDownload = onPauseDownload,
         onResumeDownload = onResumeDownload,
         onCancelDownload = onCancelDownload,
@@ -181,6 +184,7 @@ fun LibraryScreen(
     onBrowseMusic: () -> Unit = {},
     downloadState: OfflineDownloadsUiState = OfflineDownloadsUiState(),
     onAllowMobileDownloads: (Boolean) -> Unit = {},
+    onKeepDownloadsAfterSignOut: (Boolean) -> Unit = {},
     onPauseDownload: (String) -> Unit = {},
     onResumeDownload: (String) -> Unit = {},
     onCancelDownload: (String) -> Unit = {},
@@ -236,6 +240,7 @@ fun LibraryScreen(
                 OfflineDownloadsPanel(
                     state = downloadState,
                     onAllowMobileDownloads = onAllowMobileDownloads,
+                    onKeepDownloadsAfterSignOut = onKeepDownloadsAfterSignOut,
                     onPause = onPauseDownload,
                     onResume = onResumeDownload,
                     onCancel = onCancelDownload,
@@ -437,6 +442,7 @@ fun LibraryScreen(
 private fun OfflineDownloadsPanel(
     state: OfflineDownloadsUiState,
     onAllowMobileDownloads: (Boolean) -> Unit,
+    onKeepDownloadsAfterSignOut: (Boolean) -> Unit,
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
@@ -501,6 +507,29 @@ private fun OfflineDownloadsPanel(
                     enabled = !state.isWorking,
                 )
             }
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Keep downloads after sign out", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Off by default. Encrypted downloads otherwise stay only on this device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = snapshot.signOutPolicy == DownloadSignOutPolicy.KeepEncrypted,
+                    onCheckedChange = onKeepDownloadsAfterSignOut,
+                    enabled = !state.isWorking,
+                    modifier = Modifier.semantics {
+                        stateDescription = if (
+                            snapshot.signOutPolicy == DownloadSignOutPolicy.KeepEncrypted
+                        ) "Downloads kept after sign out" else "Downloads removed on sign out"
+                    },
+                )
+            }
             if (!snapshot.storage.hasDownloadCapacity) {
                 Text(
                     "Free at least 1 GB before adding downloads.",
@@ -537,17 +566,25 @@ private fun OfflineDownloadRow(
     onCancel: (String) -> Unit,
     onRetry: (String) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stacked = shouldStackOfflineDownloadRow(maxWidth, LocalDensity.current.fontScale)
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = if (stacked) Alignment.Top else Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    item.title,
+                    maxLines = if (stacked) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     "${item.artist} · ${item.status.toDownloadLabel()}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            when (item.status) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Row {
+                        when (item.status) {
                 OfflineDownloadStatus.Queued,
                 OfflineDownloadStatus.Downloading,
                 -> IconButton(onClick = { onPause(item.trackId) }) {
@@ -562,27 +599,46 @@ private fun OfflineDownloadRow(
                 OfflineDownloadStatus.Cancelled -> IconButton(onClick = { onResume(item.trackId) }) {
                     Icon(Icons.Rounded.Replay, "Download ${item.title} again")
                 }
-                OfflineDownloadStatus.Completed -> Unit
-            }
-            if (item.status != OfflineDownloadStatus.Completed &&
-                item.status != OfflineDownloadStatus.Cancelled
-            ) {
-                IconButton(onClick = { onCancel(item.trackId) }) {
-                    Icon(Icons.Rounded.Close, "Cancel ${item.title}")
+                            OfflineDownloadStatus.Completed,
+                            OfflineDownloadStatus.Unavailable,
+                            -> Unit
+                        }
+                        if (item.status != OfflineDownloadStatus.Completed &&
+                            item.status != OfflineDownloadStatus.Cancelled
+                        ) {
+                            IconButton(
+                                onClick = { onCancel(item.trackId) },
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(Icons.Rounded.Close, "Cancel ${item.title}")
+                            }
+                        }
+                    }
                 }
             }
-        }
-        val progress = item.progressFraction
-        if (progress != null && item.status != OfflineDownloadStatus.Completed) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().semantics {
-                    stateDescription = "${(progress * 100).toInt()} percent downloaded"
-                },
-            )
+            val progress = item.progressFraction
+            if (progress != null && item.status != OfflineDownloadStatus.Completed) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().semantics {
+                        stateDescription = "${(progress * 100).toInt()} percent downloaded"
+                    },
+                )
+            }
+            if (item.status == OfflineDownloadStatus.Unavailable) {
+                Text(
+                    "Removed from the current catalog. The encrypted file is retained until you clear it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
         }
     }
 }
+
+internal fun shouldStackOfflineDownloadRow(availableWidth: Dp, fontScale: Float): Boolean =
+    availableWidth < 340.dp || fontScale >= 1.3f
 
 private fun OfflineDownloadStatus.toDownloadLabel(): String = when (this) {
     OfflineDownloadStatus.Queued -> "Waiting for allowed network"
@@ -591,6 +647,7 @@ private fun OfflineDownloadStatus.toDownloadLabel(): String = when (this) {
     OfflineDownloadStatus.Completed -> "Available offline"
     OfflineDownloadStatus.Failed -> "Needs retry"
     OfflineDownloadStatus.Cancelled -> "Cancelled"
+    OfflineDownloadStatus.Unavailable -> "Unavailable in catalog"
 }
 
 private fun Long.toStorageLabel(): String {

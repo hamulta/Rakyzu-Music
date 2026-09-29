@@ -52,7 +52,8 @@ internal interface CatalogDao {
 
     @Query(
         "UPDATE offline_downloads SET status = :status, failure_code = :failureCode, " +
-            "attempt_count = attempt_count + :attemptIncrement, updated_at_epoch_ms = :updatedAt " +
+            "attempt_count = CASE WHEN :resetAttempts THEN 0 " +
+            "ELSE attempt_count + :attemptIncrement END, updated_at_epoch_ms = :updatedAt " +
             "WHERE user_id = :userId AND track_id = :trackId",
     )
     suspend fun updateOfflineDownloadStatus(
@@ -61,6 +62,7 @@ internal interface CatalogDao {
         status: String,
         failureCode: String?,
         attemptIncrement: Int,
+        resetAttempts: Boolean,
         updatedAt: Long,
     ): Int
 
@@ -81,7 +83,8 @@ internal interface CatalogDao {
     @Query(
         "UPDATE offline_downloads SET status = :status, downloaded_bytes = :totalBytes, " +
             "total_bytes = :totalBytes, file_token = :fileToken, content_type = :contentType, " +
-            "license_expires_at_epoch_ms = :licenseExpiresAt, failure_code = NULL, " +
+            "license_expires_at_epoch_ms = :licenseExpiresAt, content_revision = :contentRevision, " +
+            "failure_code = NULL, " +
             "updated_at_epoch_ms = :updatedAt WHERE user_id = :userId AND track_id = :trackId",
     )
     suspend fun completeOfflineDownload(
@@ -92,6 +95,7 @@ internal interface CatalogDao {
         fileToken: String,
         contentType: String,
         licenseExpiresAt: Long,
+        contentRevision: String?,
         updatedAt: Long,
     ): Int
 
@@ -99,6 +103,9 @@ internal interface CatalogDao {
         "DELETE FROM offline_downloads WHERE user_id = :userId AND status = :status",
     )
     suspend fun deleteOfflineDownloadsWithStatus(userId: String, status: String): Int
+
+    @Query("DELETE FROM offline_downloads WHERE user_id = :userId")
+    suspend fun deleteOfflineDownloads(userId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOfflineDownloadPreference(preference: OfflineDownloadPreferenceEntity)
@@ -108,6 +115,12 @@ internal interface CatalogDao {
 
     @Query("SELECT allow_mobile FROM offline_download_preferences WHERE user_id = :userId")
     fun observeAllowMobileDownloads(userId: String): kotlinx.coroutines.flow.Flow<Boolean?>
+
+    @Query("SELECT keep_after_sign_out FROM offline_download_preferences WHERE user_id = :userId")
+    suspend fun getKeepDownloadsAfterSignOut(userId: String): Boolean?
+
+    @Query("SELECT keep_after_sign_out FROM offline_download_preferences WHERE user_id = :userId")
+    fun observeKeepDownloadsAfterSignOut(userId: String): kotlinx.coroutines.flow.Flow<Boolean?>
 
     @Query(
         "SELECT * FROM playback_queue_entries WHERE user_id = :userId " +
