@@ -32,10 +32,11 @@ insert into public.tracks(id, album_id, title, duration_ms, track_number, is_pub
    'b7000000-0000-4000-8000-000000000011', 'Context Track', 180000, 1, true);
 insert into public.track_contexts(
   track_id, lyrics_kind, lyrics_lines, lyrics_provider_name, lyrics_provider_notice,
-  credits, allowed_country_codes
+  lyrics_source_format, lyrics_status, lyrics_published_at, credits, allowed_country_codes
 ) values (
   'b7000000-0000-4000-8000-000000000012', 'time_synced',
   '[{"text":"Licensed line","startTimeMs":0}]', 'Rights Provider', 'Used under license',
+  'lrc', 'published', now(),
   '[{"displayName":"Context Writer","role":"songwriter","sourceName":"Label source"}]',
   array['id']
 );

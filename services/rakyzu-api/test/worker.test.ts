@@ -17,7 +17,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.7.7" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.8.0" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -627,6 +627,71 @@ describe("Rakyzu Music API", () => {
     });
 
     expect(response.status).toBe(403);
+  });
+
+  it("validates and publishes first-party lyrics through the staff boundary", async () => {
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute(`/v1/admin/tracks/${TRACK_ID}/lyrics`, {
+      method: "PUT",
+      headers: { authorization: "Bearer manager-token", "content-type": "application/json" },
+      body: JSON.stringify({ sourceFormat: "lrc", language: "id", published: true,
+        lines: [{ text: "Baris pertama", startTimeMs: 1200 },
+          { text: "Baris kedua", startTimeMs: 4500 }] }),
+      staff: staffContext("manager", ["admin.access", "lyrics.manage"]),
+      adminCalls: calls,
+      rpcResults: { upsert_track_lyrics: { trackId: TRACK_ID, status: "published" } },
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([{ name: "upsert_track_lyrics", payload: {
+      target_track_id: TRACK_ID, requested_kind: "time_synced", requested_source_format: "lrc",
+      requested_language: "id", requested_lines: [
+        { text: "Baris pertama", startTimeMs: 1200 },
+        { text: "Baris kedua", startTimeMs: 4500 },
+      ], requested_published: true,
+    } }]);
+  });
+
+  it("rejects malformed lyrics and roles without lyrics permission", async () => {
+    const denied = await execute(`/v1/admin/tracks/${TRACK_ID}/lyrics`, {
+      method: "PUT",
+      headers: { authorization: "Bearer officer-token", "content-type": "application/json" },
+      body: JSON.stringify({ sourceFormat: "manual", language: null, published: false,
+        lines: [{ text: "Line" }] }),
+      staff: staffContext("officer", ["admin.access"]),
+    });
+    expect(denied.status).toBe(403);
+
+    const malformed = await execute(`/v1/admin/tracks/${TRACK_ID}/lyrics`, {
+      method: "PUT",
+      headers: { authorization: "Bearer manager-token", "content-type": "application/json" },
+      body: JSON.stringify({ sourceFormat: "srt", language: "id", published: false,
+        lines: [{ text: "Second", startTimeMs: 2 }, { text: "First", startTimeMs: 1 }] }),
+      staff: staffContext("manager", ["admin.access", "lyrics.manage"]),
+    });
+    expect(malformed.status).toBe(422);
+  });
+
+  it("allows an Artist editor to save drafts but never publish lyrics", async () => {
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const draft = await execute(`/v1/artist/tracks/${TRACK_ID}/lyrics`, {
+      method: "PUT",
+      headers: { authorization: "Bearer artist-token", "content-type": "application/json" },
+      body: JSON.stringify({ sourceFormat: "manual", language: null, published: false,
+        lines: [{ text: "Artist-owned draft" }] }),
+      adminCalls: calls,
+      rpcResults: { artist_can_edit_track: true, upsert_track_lyrics: { status: "draft" } },
+    });
+    expect(draft.status).toBe(200);
+    expect(calls.map(({ name }) => name)).toEqual(["artist_can_edit_track", "upsert_track_lyrics"]);
+
+    const publish = await execute(`/v1/artist/tracks/${TRACK_ID}/lyrics`, {
+      method: "PUT",
+      headers: { authorization: "Bearer artist-token", "content-type": "application/json" },
+      body: JSON.stringify({ sourceFormat: "manual", language: null, published: true,
+        lines: [{ text: "Must remain a draft" }] }),
+      rpcResults: { artist_can_edit_track: true },
+    });
+    expect(publish.status).toBe(403);
   });
 
   it("requires authentication for the Artist workspace", async () => {

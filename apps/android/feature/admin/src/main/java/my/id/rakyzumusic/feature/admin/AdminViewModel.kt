@@ -14,7 +14,10 @@ import my.id.rakyzumusic.core.data.admin.AdminAuditExportResult
 import my.id.rakyzumusic.core.data.admin.AdminDashboard
 import my.id.rakyzumusic.core.data.admin.AdminDashboardResult
 import my.id.rakyzumusic.core.data.admin.AdminFailure
+import my.id.rakyzumusic.core.data.admin.AdminLyricsResult
 import my.id.rakyzumusic.core.data.admin.AdminRepository
+import my.id.rakyzumusic.core.data.admin.EditableLyrics
+import my.id.rakyzumusic.core.data.admin.LyricsSourceFormat
 import my.id.rakyzumusic.core.data.admin.StaffRole
 
 data class AdminUiState(
@@ -24,6 +27,7 @@ data class AdminUiState(
     val message: String? = null,
     val messageIsError: Boolean = false,
     val auditExportCsv: String? = null,
+    val lyrics: EditableLyrics? = null,
 )
 
 class AdminViewModel(
@@ -81,6 +85,37 @@ class AdminViewModel(
     fun uploadAudio(trackId: String, quality: String, bytes: ByteArray) = runAction {
         repository.uploadAudio(trackId, quality, bytes)
     }
+
+    fun loadLyrics(trackId: String) {
+        if (mutableUiState.value.isWorking) return
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isWorking = true, message = null, lyrics = null) }
+            when (val result = repository.loadLyrics(trackId.trim())) {
+                is AdminLyricsResult.Success -> mutableUiState.update {
+                    it.copy(
+                        isWorking = false,
+                        lyrics = result.lyrics,
+                        message = if (result.lyrics.lineCount == 0) "No lyrics saved for this track" else
+                            "Loaded ${result.lyrics.lineCount} lyric lines",
+                        messageIsError = false,
+                    )
+                }
+                is AdminLyricsResult.Failure -> mutableUiState.update {
+                    it.copy(isWorking = false, message = result.reason.toMessage(), messageIsError = true)
+                }
+            }
+        }
+    }
+
+    fun saveLyrics(
+        trackId: String,
+        sourceFormat: LyricsSourceFormat,
+        language: String?,
+        published: Boolean,
+        content: String,
+    ) = runAction { repository.saveLyrics(trackId, sourceFormat, language, published, content) }
+
+    fun deleteLyrics(trackId: String) = runAction { repository.deleteLyrics(trackId) }
 
     fun publishAlbum(albumId: String) = runAction { repository.publishAlbum(albumId) }
 

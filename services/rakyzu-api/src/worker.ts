@@ -19,7 +19,7 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 
-const API_VERSION = "0.7.7";
+const API_VERSION = "0.8.0";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
@@ -42,9 +42,11 @@ const ADMIN_RECOMMENDATION_ARTWORK_ROUTE = new RegExp(
 const ADMIN_ALBUM_SCHEDULE_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/schedule/?$`, "i");
 const ADMIN_ARTWORK_UPLOAD_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/artwork/?$`, "i");
 const ADMIN_AUDIO_ROUTE = new RegExp(`^/v1/admin/tracks/${UUID}/audio/(low|standard|high)/?$`, "i");
+const ADMIN_LYRICS_ROUTE = new RegExp(`^/v1/admin/tracks/${UUID}/lyrics/?$`, "i");
 const ARTIST_ARTWORK_ROUTE = new RegExp(`^/v1/artists/${UUID}/artwork/?$`, "i");
 const ARTIST_ALBUM_ARTWORK_ROUTE = new RegExp(`^/v1/artist/albums/${UUID}/artwork/?$`, "i");
 const ARTIST_AUDIO_ROUTE = new RegExp(`^/v1/artist/tracks/${UUID}/audio/(low|standard|high)/?$`, "i");
+const ARTIST_LYRICS_ROUTE = new RegExp(`^/v1/artist/tracks/${UUID}/lyrics/?$`, "i");
 const ARTIST_ANALYTICS_ROUTE = new RegExp(`^/v1/artists/${UUID}/analytics/?$`, "i");
 const ADMIN_MODERATION_ACTION_ROUTE = new RegExp(`^/v1/admin/moderation/${UUID}/?$`, "i");
 const ADMIN_STAFF_ASSIGNMENT_ROUTE = new RegExp(`^/v1/admin/staff/${UUID}/?$`, "i");
@@ -55,6 +57,7 @@ const ADMIN_DELETION_APPROVAL_ROUTE = new RegExp(`^/v1/admin/deletions/${UUID}/a
 const ADMIN_SECURITY_ALERT_ROUTE = new RegExp(`^/v1/admin/security/alerts/${UUID}/?$`, "i");
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 const MAX_ARTWORK_BYTES = 5 * 1024 * 1024;
+const MAX_LYRICS_JSON_BYTES = 1024 * 1024;
 const ARTWORK_CACHE_CONTROL = "private, max-age=86400";
 const dependencies: RequestDependencies = {
   verifyListener,
@@ -129,6 +132,7 @@ export function createWorker(
           ADMIN_ALBUM_SCHEDULE_ROUTE.test(url.pathname) ||
           ADMIN_ARTWORK_UPLOAD_ROUTE.test(url.pathname) ||
           ADMIN_AUDIO_ROUTE.test(url.pathname) ||
+          ADMIN_LYRICS_ROUTE.test(url.pathname) ||
           ADMIN_MODERATION_ACTION_ROUTE.test(url.pathname) ||
           ADMIN_STAFF_ASSIGNMENT_ROUTE.test(url.pathname) ||
           ADMIN_REVIEW_ACTION_ROUTE.test(url.pathname) ||
@@ -152,7 +156,8 @@ export function createWorker(
           url.pathname === "/v1/artists/me/reviews" ||
           ARTIST_PROFILE_ARTWORK_ROUTE.test(url.pathname) ||
           ARTIST_ALBUM_ARTWORK_ROUTE.test(url.pathname) ||
-          ARTIST_AUDIO_ROUTE.test(url.pathname) || ARTIST_ANALYTICS_ROUTE.test(url.pathname) ||
+          ARTIST_AUDIO_ROUTE.test(url.pathname) || ARTIST_LYRICS_ROUTE.test(url.pathname) ||
+          ARTIST_ANALYTICS_ROUTE.test(url.pathname) ||
           !!artistArtworkRoute;
         const isAccountRoute = url.pathname === "/v1/account/lifecycle" ||
           url.pathname === "/v1/account/appeals" ||
@@ -627,6 +632,31 @@ async function artistRequest(
       return await uploadTrackAudio(request, env, trackId, audio[2].toLowerCase(),
         null, token, requestDependencies, requestId, origin, "artist_record_track_media");
     }
+    const lyrics = path.match(ARTIST_LYRICS_ROUTE);
+    if (lyrics?.[1]) {
+      const trackId = lyrics[1].toLowerCase();
+      const allowed = await requestDependencies.adminRpc("artist_can_edit_track",
+        { target_track_id: trackId }, token, env);
+      if (allowed !== true) return artistForbidden(requestId, origin);
+      if (request.method === "GET") {
+        const value = await requestDependencies.adminRpc("get_editable_track_lyrics",
+          { target_track_id: trackId }, token, env);
+        return jsonResponse(value, 200, requestId, origin);
+      }
+      if (request.method === "PUT") {
+        const payload = await readLyricsPayload(request, false);
+        const value = await requestDependencies.adminRpc("upsert_track_lyrics", {
+          target_track_id: trackId,
+          ...payload,
+        }, token, env);
+        return jsonResponse(value, 200, requestId, origin);
+      }
+      if (request.method === "DELETE") {
+        const value = await requestDependencies.adminRpc("delete_track_lyrics",
+          { target_track_id: trackId }, token, env);
+        return jsonResponse(value, 200, requestId, origin);
+      }
+    }
     const artwork = path.match(ARTIST_ARTWORK_ROUTE);
     if (artwork?.[1] && (request.method === "GET" || request.method === "HEAD")) {
       const artistId = artwork[1].toLowerCase();
@@ -848,6 +878,23 @@ async function adminRequest(
         request, env, audioMatch[1].toLowerCase(), audioMatch[2].toLowerCase(), context,
         token, requestDependencies, requestId, origin,
       );
+    }
+    const lyricsMatch = path.match(ADMIN_LYRICS_ROUTE);
+    if (lyricsMatch?.[1]) {
+      const trackId = lyricsMatch[1].toLowerCase();
+      if (request.method === "GET") {
+        return await rpcResponse("get_editable_track_lyrics", { target_track_id: trackId },
+          "lyrics.manage", context, token, env, requestDependencies, requestId, origin);
+      }
+      if (request.method === "PUT") {
+        const payload = await readLyricsPayload(request, true);
+        return await rpcResponse("upsert_track_lyrics", { target_track_id: trackId, ...payload },
+          "lyrics.manage", context, token, env, requestDependencies, requestId, origin);
+      }
+      if (request.method === "DELETE") {
+        return await rpcResponse("delete_track_lyrics", { target_track_id: trackId },
+          "lyrics.manage", context, token, env, requestDependencies, requestId, origin);
+      }
     }
     if (path === "/v1/admin/moderation" && request.method === "GET") {
       return await rpcResponse("admin_list_moderation_cases", { page_size: 50 }, "moderation.view",
@@ -1257,6 +1304,50 @@ async function readBoundedJsonBody(
   } catch {
     return null;
   }
+}
+
+async function readLyricsPayload(
+  request: Request,
+  allowPublication: boolean,
+): Promise<Record<string, unknown>> {
+  const decoded = await readBoundedJsonBody(request, MAX_LYRICS_JSON_BYTES);
+  if (decoded === null) throw new AdminRequestRejected(422);
+  const body = decoded.value;
+  const sourceFormat = readString(body, "sourceFormat", 10).toLowerCase();
+  if (!new Set(["manual", "lrc", "srt"]).has(sourceFormat)) {
+    throw new AdminRequestRejected(422);
+  }
+  const kind = sourceFormat === "manual" ? "plain" : "time_synced";
+  const language = readNullableString(body, "language", 35);
+  if (language !== null && !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(language)) {
+    throw new AdminRequestRejected(422);
+  }
+  const published = readBoolean(body, "published");
+  if (published && !allowPublication) throw new AdminRequestRejected(403);
+  const rawLines = body.lines;
+  if (!Array.isArray(rawLines) || rawLines.length < 1 || rawLines.length > 2_000) {
+    throw new AdminRequestRejected(422);
+  }
+  let previousTime = -1;
+  const lines = rawLines.map((raw) => {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      throw new AdminRequestRejected(422);
+    }
+    const line = raw as Record<string, unknown>;
+    const text = readString(line, "text", 500);
+    if (kind === "plain") return { text };
+    const startTimeMs = readInteger(line, "startTimeMs", 0, 86_400_000);
+    if (startTimeMs < previousTime) throw new AdminRequestRejected(422);
+    previousTime = startTimeMs;
+    return { text, startTimeMs };
+  });
+  return {
+    requested_kind: kind,
+    requested_source_format: sourceFormat,
+    requested_language: language,
+    requested_lines: lines,
+    requested_published: published,
+  };
 }
 
 async function verifyWebhookSignature(

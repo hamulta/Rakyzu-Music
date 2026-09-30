@@ -79,6 +79,9 @@ export type AdminRpcName =
   | "admin_schedule_album"
   | "admin_set_audit_retention"
   | "admin_submit_catalog_review"
+  | "get_editable_track_lyrics"
+  | "upsert_track_lyrics"
+  | "delete_track_lyrics"
   | "get_track_context"
   | "get_release_notification_preference"
   | "set_release_notification_preference";

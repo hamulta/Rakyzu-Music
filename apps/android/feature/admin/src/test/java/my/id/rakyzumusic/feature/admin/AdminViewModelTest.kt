@@ -11,6 +11,8 @@ import my.id.rakyzumusic.core.data.admin.AdminDashboard
 import my.id.rakyzumusic.core.data.admin.AdminDashboardResult
 import my.id.rakyzumusic.core.data.admin.AdminAuditExportResult
 import my.id.rakyzumusic.core.data.admin.AdminRepository
+import my.id.rakyzumusic.core.data.admin.AdminLyricsResult
+import my.id.rakyzumusic.core.data.admin.LyricsSourceFormat
 import my.id.rakyzumusic.core.data.admin.StaffAccessContext
 import my.id.rakyzumusic.core.data.admin.StaffPermission
 import my.id.rakyzumusic.core.data.admin.StaffRole
@@ -94,6 +96,13 @@ class AdminViewModelTest {
             trackNumber: Int, explicit: Boolean,
         ) = ok()
         override suspend fun uploadAudio(trackId: String, quality: String, bytes: ByteArray) = ok()
+        override suspend fun loadLyrics(trackId: String) =
+            AdminLyricsResult.Failure(my.id.rakyzumusic.core.data.admin.AdminFailure.InvalidInput)
+        override suspend fun saveLyrics(
+            trackId: String, sourceFormat: LyricsSourceFormat, language: String?, published: Boolean,
+            content: String,
+        ) = ok()
+        override suspend fun deleteLyrics(trackId: String) = ok()
         override suspend fun publishAlbum(albumId: String) = ok()
         override suspend fun createModerationCase(
             subjectType: String, subjectId: String, reason: String, priority: Int,

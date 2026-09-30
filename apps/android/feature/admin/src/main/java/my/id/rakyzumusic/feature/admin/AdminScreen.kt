@@ -58,6 +58,8 @@ import my.id.rakyzumusic.core.data.admin.AdminDashboard
 import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.admin.AuditSummary
 import my.id.rakyzumusic.core.data.admin.CatalogReview
+import my.id.rakyzumusic.core.data.admin.EditableLyrics
+import my.id.rakyzumusic.core.data.admin.LyricsSourceFormat
 import my.id.rakyzumusic.core.data.admin.ModerationCase
 import my.id.rakyzumusic.core.data.admin.StaffPermission
 import my.id.rakyzumusic.core.data.admin.StaffRole
@@ -94,6 +96,9 @@ fun AdminRoute(
         onArchiveAlbum = viewModel::archiveAlbum,
         onCreateTrack = viewModel::createTrack,
         onUploadAudio = viewModel::uploadAudio,
+        onLoadLyrics = viewModel::loadLyrics,
+        onSaveLyrics = viewModel::saveLyrics,
+        onDeleteLyrics = viewModel::deleteLyrics,
         onPublishAlbum = viewModel::publishAlbum,
         onCreateModerationCase = viewModel::createModerationCase,
         onModerate = viewModel::moderate,
@@ -131,6 +136,9 @@ internal fun AdminScreen(
     onArchiveAlbum: (String) -> Unit,
     onCreateTrack: (String, String, Int, Int, Int, Boolean) -> Unit,
     onUploadAudio: (String, String, ByteArray) -> Unit,
+    onLoadLyrics: (String) -> Unit,
+    onSaveLyrics: (String, LyricsSourceFormat, String?, Boolean, String) -> Unit,
+    onDeleteLyrics: (String) -> Unit,
     onPublishAlbum: (String) -> Unit,
     onCreateModerationCase: (String, String, String, Int) -> Unit,
     onModerate: (String, String, String) -> Unit,
@@ -172,6 +180,9 @@ internal fun AdminScreen(
             onArchiveAlbum = onArchiveAlbum,
             onCreateTrack = onCreateTrack,
             onUploadAudio = onUploadAudio,
+            onLoadLyrics = onLoadLyrics,
+            onSaveLyrics = onSaveLyrics,
+            onDeleteLyrics = onDeleteLyrics,
             onPublishAlbum = onPublishAlbum,
             onCreateModerationCase = onCreateModerationCase,
             onModerate = onModerate,
@@ -211,6 +222,9 @@ private fun StaffAdminPanel(
     onArchiveAlbum: (String) -> Unit,
     onCreateTrack: (String, String, Int, Int, Int, Boolean) -> Unit,
     onUploadAudio: (String, String, ByteArray) -> Unit,
+    onLoadLyrics: (String) -> Unit,
+    onSaveLyrics: (String, LyricsSourceFormat, String?, Boolean, String) -> Unit,
+    onDeleteLyrics: (String) -> Unit,
     onPublishAlbum: (String) -> Unit,
     onCreateModerationCase: (String, String, String, Int) -> Unit,
     onModerate: (String, String, String) -> Unit,
@@ -475,6 +489,18 @@ private fun StaffAdminPanel(
                     title = "Scheduled release • ${schedule.status}",
                     detail = schedule.publishAt,
                     id = schedule.albumId,
+                )
+            }
+        }
+
+        if (access.can(StaffPermission.LyricsManage)) {
+            item {
+                LyricsStudio(
+                    loaded = state.lyrics,
+                    enabled = !state.isWorking,
+                    onLoad = onLoadLyrics,
+                    onSave = onSaveLyrics,
+                    onDelete = onDeleteLyrics,
                 )
             }
         }
@@ -1110,6 +1136,105 @@ private fun CatalogComposer(
 }
 
 @Composable
+private fun LyricsStudio(
+    loaded: EditableLyrics?,
+    enabled: Boolean,
+    onLoad: (String) -> Unit,
+    onSave: (String, LyricsSourceFormat, String?, Boolean, String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    var trackId by remember { mutableStateOf("") }
+    var format by remember { mutableStateOf(LyricsSourceFormat.Manual) }
+    var language by remember { mutableStateOf("") }
+    var published by remember { mutableStateOf(false) }
+    var content by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val document = withContext(Dispatchers.IO) { readBoundedLyrics(context, uri) }
+                if (document != null) content = document
+            }
+        }
+    }
+    LaunchedEffect(loaded) {
+        loaded ?: return@LaunchedEffect
+        trackId = loaded.trackId
+        format = loaded.sourceFormat
+        language = loaded.language.orEmpty()
+        published = loaded.published
+        content = loaded.content
+    }
+    AdminSection("Rakyzu Lyrics Studio") {
+        Text("First-party lyrics only. Write manually or import an editable .LRC/.SRT document; no external lyrics API is used.")
+        OutlinedTextField(
+            trackId,
+            { trackId = it.trim().take(36) },
+            label = { Text("Track UUID") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onLoad(trackId) }, enabled = enabled && trackId.length == 36) {
+                Text("Load")
+            }
+            OutlinedButton(
+                onClick = { documentPicker.launch(arrayOf("text/plain", "application/x-subrip")) },
+                enabled = enabled && format != LyricsSourceFormat.Manual,
+            ) { Text("Import ${format.displayName}") }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LyricsSourceFormat.entries.forEach { option ->
+                FilterChip(
+                    selected = format == option,
+                    onClick = { format = option },
+                    label = { Text(option.displayName) },
+                    enabled = enabled,
+                )
+            }
+        }
+        OutlinedTextField(
+            language,
+            { language = it.take(35) },
+            label = { Text("Language tag (optional, e.g. id or en-US)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+        )
+        OutlinedTextField(
+            content,
+            { content = it.take(MAX_LYRICS_CHARS) },
+            label = { Text(if (format == LyricsSourceFormat.Manual) "Lyrics" else "${format.displayName} document") },
+            supportingText = { Text("${content.length} characters • maximum 2,000 lyric lines") },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp),
+            minLines = 8,
+            enabled = enabled,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Publish to listeners")
+                Text(
+                    "Turn off to keep a private draft",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = published, onCheckedChange = { published = it }, enabled = enabled)
+        }
+        PrimaryAction("Validate and save lyrics", enabled && trackId.length == 36 && content.isNotBlank()) {
+            onSave(trackId, format, language.ifBlank { null }, published, content)
+        }
+        OutlinedButton(
+            onClick = { onDelete(trackId) },
+            enabled = enabled && trackId.length == 36,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Delete lyrics") }
+    }
+}
+
+@Composable
 private fun StaffComposer(
     actorRole: StaffRole,
     enabled: Boolean,
@@ -1371,6 +1496,20 @@ private fun readBoundedAudio(context: android.content.Context, uri: Uri): ByteAr
     }
 }
 
+private fun readBoundedLyrics(context: android.content.Context, uri: Uri): String? {
+    val output = ByteArrayOutputStream()
+    return context.contentResolver.openInputStream(uri)?.use { input ->
+        val buffer = ByteArray(8192)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (output.size() + count > MAX_LYRICS_BYTES) return@use null
+            output.write(buffer, 0, count)
+        }
+        output.toString(Charsets.UTF_8.name())
+    }
+}
+
 internal fun readBoundedArtwork(context: android.content.Context, uri: Uri): ByteArray? {
     val output = ByteArrayOutputStream()
     val source = context.contentResolver.openInputStream(uri)?.use { input ->
@@ -1407,5 +1546,7 @@ private fun webpLossyFormat(): Bitmap.CompressFormat =
     else Bitmap.CompressFormat.WEBP
 
 private const val MAX_AUDIO_BYTES = 50 * 1024 * 1024
+private const val MAX_LYRICS_BYTES = 1024 * 1024
+private const val MAX_LYRICS_CHARS = 1_048_576
 private const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
 private const val MAX_ARTWORK_SOURCE_BYTES = 15 * 1024 * 1024

@@ -212,19 +212,18 @@ rights-aware Worker boundary. Smart Recommendation is included ahead of the broa
 personalization train as a private, deterministic on-device ranker: recent playback, Likes, saved
 albums, and followed Artists influence a bounded, artist-diverse shelf, while consumed tracks are
 excluded and recommendations are never appended to playback automatically.
-- [ ] `0.7.8` — adaptive phone/tablet layouts, large-text reflow, TalkBack traversal/actions,
-  reduced-motion behavior, and RTL/localization preparation.
-- [ ] `0.7.9` — privacy-safe interaction telemetry, notification abuse/rate limits, deep-link threat
-  modeling, performance budgets, and resilience tests.
-- [ ] `0.7.10` — cumulative lyrics/credits/share/notification security, accessibility, runtime,
-  database migration, Worker, and release gate.
+- [x] `0.7.8` — replace provider-oriented lyrics metadata with Rakyzu-owned draft/publish/delete
+  lifecycle, immutable revisions, server validation, and staff/Artist scope enforcement.
+- [x] `0.8.0` — ship Rakyzu Lyrics Studio with manual authoring, bounded editable `.LRC`/`.SRT`
+  import, language metadata, listener-safe publication, and first-party attribution.
 
 This plan uses only the public product concepts described by Spotify's
 [lyrics guidance](https://support.spotify.com/article/lyrics/) and
 [song-credit guidance](https://support.spotify.com/article/song-credits/). Lyrics text, credit
 records, provider attribution, notification policy, and sharing infrastructure must be licensed
 or owned by Rakyzu; no Spotify catalog data, code, assets, or private behavior is copied.
-- `0.8.x`: Personalization, radio, mixes, history, recommendations.
+- `0.8.1`–`0.8.10`: personalization, radio, mixes, history, recommendations, plus the deferred
+  adaptive layout, accessibility, telemetry, threat-model, and cumulative release gates.
 - `0.9.x`: subscriptions/entitlements, privacy, and advanced trust-and-safety governance.
 - `0.10.x`: release candidate hardening, accessibility, localization, performance, security, Play readiness.
 - `1.0.0`: signed production release after all quality gates pass.

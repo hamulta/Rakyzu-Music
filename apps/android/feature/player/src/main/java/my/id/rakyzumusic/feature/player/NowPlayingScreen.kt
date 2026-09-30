@@ -270,7 +270,7 @@ private fun TrackContextActions(
         }
         when {
             isRefreshing -> Text(
-                "Loading licensed lyrics and credits…",
+                "Loading Rakyzu lyrics and credits…",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -336,7 +336,7 @@ private fun LyricsSheet(
                         )
                     }
                 }
-                lyrics.providerName?.let { Text("Lyrics provided by $it") }
+                lyrics.providerName?.let { Text("Lyrics maintained by $it") }
                 lyrics.providerNotice?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)

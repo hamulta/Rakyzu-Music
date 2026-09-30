@@ -32,6 +32,17 @@ GitHub Actions runs this sequence against an isolated database on every database
 
 Every client-facing table must explicitly enable and force RLS, revoke default access, grant only required operations, and test anonymous, owner, and cross-owner behavior. Privileged functions use a fixed empty `search_path`, fully qualified object names, and revoked public execution.
 
+### First-party lyrics — 0.7.8–0.8.0
+
+`track_contexts` stores the current Rakyzu-owned lyric draft with manual/LRC/SRT source format,
+language, publication state, author, and revision. `track_lyrics_revisions` is an immutable,
+forced-RLS history with no authenticated table privileges. Bounded security-definer RPCs validate
+1–2,000 non-empty lines, 500-character line limits, monotonic timestamps, and language tags.
+Manager, C-Level, and CEO roles receive `lyrics.manage`; scoped Artist editors may save or delete
+drafts for editable unpublished tracks but cannot publish. Listener context exposes only published
+lyrics with `Rakyzu Music` attribution. No external lyrics provider or client-side direct write is
+part of the architecture.
+
 `public.profiles` stores the listener's required `display_name` and non-null `onboarding_completed` state. Authenticated clients may select and update only their own row; profile inserts and deletes remain lifecycle operations controlled by the Auth trigger and privileged backend. The onboarding migration defaults existing and new rows to incomplete without deleting or rewriting profile data.
 
 `public.artists`, `public.albums`, and `public.tracks` contain published catalog metadata. Authenticated listeners receive SELECT-only access to rows whose `is_published` flag is true; anonymous reads and all client writes are denied. Foreign keys, positive duration/position checks, unique album positions, and pgTAP policy tests protect the server catalog. The initial synthetic Rakyzu Sessions fixtures are owned development content and include no third-party catalog or media.

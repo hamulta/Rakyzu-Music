@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.7.7` Android source adds rights-aware track context, account-isolated Room caching, adaptive synchronized lyrics and normalized credits, validated track links, release-notification preferences, and private on-device Smart Recommendation; publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.8.0` Android source adds first-party manual/LRC/SRT Lyrics Studio, rights-aware draft/publication projection, immutable revisions, account-isolated Room context caching, normalized credits, validated track links, release-notification preferences, and private on-device Smart Recommendation; publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 

@@ -198,7 +198,7 @@ internal class AuthenticatedTrackContextRepository(
         val lyrics = TrackLyrics(
             kind = kind,
             lines = if (kind == LyricsKind.Unavailable) emptyList() else lines,
-            providerName = lyricsObject.string("providerName")?.take(120),
+            providerName = (lyricsObject.string("sourceName") ?: lyricsObject.string("providerName"))?.take(120),
             providerNotice = lyricsObject.string("providerNotice")?.take(240),
         )
         if (kind != LyricsKind.Unavailable && !lyrics.isDisplayable) return null

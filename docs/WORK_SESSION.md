@@ -1,5 +1,35 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.7.8 and 0.8.0 batch — 2026-09-30
+
+- [x] Audit the `0.7.7` baseline and confirm listener lyrics use the owned Rakyzu API/database.
+- [x] `0.7.8`: add first-party lyrics lifecycle, immutable revisions, RLS isolation, role/scope
+  enforcement, and draft-only Artist editing.
+- [x] `0.8.0`: add manual/LRC/SRT parsing and an editable Lyrics Studio to the Android Admin Panel.
+- [x] Add fail-closed size, line, timestamp, language, publication, and listener-projection checks.
+- [x] Run the complete Android, Worker, database, dependency, and secret-leak gates.
+- [x] Apply the forward Supabase migration, deploy Worker `0.8.0`, and verify production health.
+- [ ] Explicitly stage validated paths, commit/push, verify CI, tag, publish, download, and audit the
+  final GitHub Release artifact.
+
+No third-party lyrics API is present. Published listeners receive only a rights-aware Rakyzu
+projection; drafts and immutable history remain inaccessible through direct client tables.
+
+The final local Android gate completed 1,637 Gradle tasks and passed 240 unit tests with zero
+failures, errors, or skips. All 14 module lint reports completed; debug, instrumentation, and
+minified/resource-shrunk release APKs assembled. The signed debug candidate identifies as
+`my.id.rakyzumusic`, versionName `0.8.0`, versionCode `98`, min SDK 26, target SDK 37, and one v2
+signer. Its pre-CI SHA-256 is
+`cf4e935a3f21c31ea17757078be47ca91bd7dd4af310a6e3b9094a824b1b49be`.
+
+Worker validation passed 79 tests, both TypeScript targets, generated-binding verification, and a
+no-write Wrangler dry-run; the production dependency audit reports zero vulnerabilities. Supabase
+accepted the forward first-party lyrics migration, all 20 local/remote migrations match, and
+remote `public`/`private` lint returned no findings. Cloudflare deployed Worker version
+`14dcace4-b171-494d-b2dd-65ec5bb4cf77` with the R2 binding, and the public health endpoint returned
+`status: ok`, version `0.8.0`. The pending-source credential-prefix scan is clean and
+`credential.env` remains ignored.
+
 ## Active cumulative 0.7.1–0.7.7 batch — 2026-09-30
 
 - [x] Audit the tagged `v0.7.0` baseline and preserve the pre-existing `gradlew` mode change.

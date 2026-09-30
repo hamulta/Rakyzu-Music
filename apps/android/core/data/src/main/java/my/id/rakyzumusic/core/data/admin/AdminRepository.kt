@@ -61,7 +61,8 @@ enum class StaffPermission(val wireName: String) {
     AppealReview("appeal.review"),
     DataExport("data.export"),
     DeletionApprove("deletion.approve"),
-    SecurityManage("security.manage");
+    SecurityManage("security.manage"),
+    LyricsManage("lyrics.manage");
 
     companion object {
         fun fromWire(value: String): StaffPermission? = entries.firstOrNull { it.wireName == value }
@@ -297,6 +298,15 @@ interface AdminRepository {
         explicit: Boolean,
     ): AdminActionResult
     suspend fun uploadAudio(trackId: String, quality: String, bytes: ByteArray): AdminActionResult
+    suspend fun loadLyrics(trackId: String): AdminLyricsResult
+    suspend fun saveLyrics(
+        trackId: String,
+        sourceFormat: LyricsSourceFormat,
+        language: String?,
+        published: Boolean,
+        content: String,
+    ): AdminActionResult
+    suspend fun deleteLyrics(trackId: String): AdminActionResult
     suspend fun publishAlbum(albumId: String): AdminActionResult
     suspend fun createModerationCase(
         subjectType: String,
@@ -514,6 +524,67 @@ internal class AuthenticatedAdminRepository(
             binaryContentType = audioType,
         ).toActionResult("Audio uploaded")
     }
+
+    override suspend fun loadLyrics(trackId: String): AdminLyricsResult = withContext(Dispatchers.IO) {
+        if (!UUID.matches(trackId)) {
+            return@withContext AdminLyricsResult.Failure(AdminFailure.InvalidInput)
+        }
+        val response = request("GET", "/v1/admin/tracks/${trackId.lowercase()}/lyrics")
+        val root = response.body as? JsonObject
+            ?: return@withContext AdminLyricsResult.Failure(response.toFailure())
+        val format = LyricsSourceFormat.fromWire(root.string("sourceFormat"))
+            ?: return@withContext AdminLyricsResult.Failure(AdminFailure.ServiceUnavailable)
+        val lines = root.array("lines").mapNotNull { raw ->
+            val item = raw as? JsonObject ?: return@mapNotNull null
+            val text = item.string("text") ?: return@mapNotNull null
+            ParsedLyricLine(text, item.long("startTimeMs"))
+        }
+        AdminLyricsResult.Success(
+            EditableLyrics(
+                trackId = root.string("trackId") ?: trackId.lowercase(),
+                sourceFormat = format,
+                language = root.string("language"),
+                published = root.string("status") == "published",
+                content = FirstPartyLyrics.format(format, lines),
+                lineCount = lines.size,
+            ),
+        )
+    }
+
+    override suspend fun saveLyrics(
+        trackId: String,
+        sourceFormat: LyricsSourceFormat,
+        language: String?,
+        published: Boolean,
+        content: String,
+    ): AdminActionResult = withContext(Dispatchers.IO) {
+        if (!UUID.matches(trackId) || (language != null && language.isNotBlank() &&
+                !LANGUAGE_TAG.matches(language.trim()))) {
+            return@withContext AdminActionResult.Failure(AdminFailure.InvalidInput)
+        }
+        val parsed = FirstPartyLyrics.parse(sourceFormat, content)
+        if (parsed !is LyricsParseResult.Success) {
+            return@withContext AdminActionResult.Failure(AdminFailure.InvalidInput)
+        }
+        val body = buildJsonObject {
+            put("sourceFormat", sourceFormat.wireName)
+            if (language.isNullOrBlank()) put("language", JsonNull) else put("language", language.trim())
+            put("published", published)
+            put("lines", JsonArray(parsed.lines.map { line ->
+                buildJsonObject {
+                    put("text", line.text)
+                    line.startTimeMs?.let { put("startTimeMs", it) }
+                }
+            }))
+        }
+        request("PUT", "/v1/admin/tracks/${trackId.lowercase()}/lyrics", body)
+            .toActionResult(if (published) "Lyrics published" else "Lyrics draft saved")
+    }
+
+    override suspend fun deleteLyrics(trackId: String): AdminActionResult = action(
+        "DELETE", "/v1/admin/tracks/${trackId.trim().lowercase()}/lyrics", buildJsonObject {},
+        "Lyrics removed from the track",
+    )
 
     override suspend fun publishAlbum(albumId: String): AdminActionResult = action(
         "POST", "/v1/admin/albums/${albumId.trim().lowercase()}/publish",
@@ -1062,6 +1133,7 @@ internal class AuthenticatedAdminRepository(
             RegexOption.IGNORE_CASE,
         )
         val AUDIO_QUALITIES = setOf("low", "standard", "high")
+        val LANGUAGE_TAG = Regex("^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$")
         const val MAX_AUDIO_BYTES = 50 * 1024 * 1024
         const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
         const val MAX_JSON_BYTES = 1024 * 1024
@@ -1102,6 +1174,12 @@ internal data object UnavailableAdminRepository : AdminRepository {
         trackNumber: Int, explicit: Boolean,
     ) = unavailable()
     override suspend fun uploadAudio(trackId: String, quality: String, bytes: ByteArray) = unavailable()
+    override suspend fun loadLyrics(trackId: String) = AdminLyricsResult.Failure(AdminFailure.ServiceUnavailable)
+    override suspend fun saveLyrics(
+        trackId: String, sourceFormat: LyricsSourceFormat, language: String?, published: Boolean,
+        content: String,
+    ) = unavailable()
+    override suspend fun deleteLyrics(trackId: String) = unavailable()
     override suspend fun publishAlbum(albumId: String) = unavailable()
     override suspend fun createModerationCase(
         subjectType: String, subjectId: String, reason: String, priority: Int,
