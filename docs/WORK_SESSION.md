@@ -9,8 +9,9 @@
 - [x] Add fail-closed size, line, timestamp, language, publication, and listener-projection checks.
 - [x] Run the complete Android, Worker, database, dependency, and secret-leak gates.
 - [x] Apply the forward Supabase migration, deploy Worker `0.8.0`, and verify production health.
-- [ ] Explicitly stage validated paths, commit/push, verify CI, tag, publish, download, and audit the
-  final GitHub Release artifact.
+- [x] Explicitly stage validated paths, commit/push, tag, publish, download, and audit the final
+  GitHub Release artifact; record the GitHub Actions backend startup incident without claiming a
+  green remote run.
 
 No third-party lyrics API is present. Published listeners receive only a rights-aware Rakyzu
 projection; drafts and immutable history remain inaccessible through direct client tables.
@@ -29,6 +30,20 @@ remote `public`/`private` lint returned no findings. Cloudflare deployed Worker 
 `14dcace4-b171-494d-b2dd-65ec5bb4cf77` with the R2 binding, and the public health endpoint returned
 `status: ok`, version `0.8.0`. The pending-source credential-prefix scan is clean and
 `credential.env` remains ignored.
+
+Commit `a6605bf` was pushed to `main`, tagged `v0.8.0`, and published as an Android prerelease.
+The downloaded `Rakyzu-Music-0.8.0-debug.apk` is byte-identical to the validated local candidate:
+29,580,522 bytes, SHA-256
+`cf4e935a3f21c31ea17757078be47ca91bd7dd4af310a6e3b9094a824b1b49be`, package
+`my.id.rakyzumusic`, versionName `0.8.0`, versionCode `98`, min SDK 26, target SDK 37, and one valid
+v2 signer.
+
+GitHub accepted the push but its Actions backend created synthetic run `36762165615` against a
+deleted workflow path named `BuildFailed`; it ended in `startup_failure` with zero jobs, zero
+check-runs, and no logs. Direct dispatches of the active Database and Worker workflows produced
+the same pre-job failure in runs `36762360921` and `36762368360`. Consequently no green GitHub
+run is claimed for this release. The equivalent Android, PostgreSQL, and Worker gates were run
+successfully in the workspace, and both production services were verified before the tag.
 
 ## Active cumulative 0.7.1–0.7.7 batch — 2026-09-30
 
