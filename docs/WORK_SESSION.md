@@ -15,8 +15,8 @@
 - [x] Replay/test/lint/apply the forward Supabase migration and confirm remote parity.
 - [x] Run Worker type/tests/dry-run, deploy the exact source, and verify production health.
 - [x] Inspect the complete diff, secret scan, versions, generated schema, and release artifact.
-- [ ] Explicitly stage validated paths, commit, push `main`, verify CI, tag, and publish prerelease.
-- [ ] Download the release APK and verify identity, signature, checksum, and byte equality.
+- [x] Explicitly stage validated paths, commit, push `main`, verify CI, tag, and publish prerelease.
+- [x] Download the release APK and verify identity, signature, checksum, and byte equality.
 
 The batch intentionally adds Smart Recommendation as a local privacy-first slice before `0.8.x`.
 Only verified Room catalog and account-local signals are ranked; no raw listening profile is added
@@ -36,6 +36,36 @@ PostgreSQL migration passed 14 transactional pgTAP assertions through the offici
 remote `public`/`private` lint returned no errors, and all 19 local migrations now match production.
 Worker version `0.7.7` was deployed and its production health endpoint returned `ok`. Tracked
 credential-prefix and exact-sensitive-value scans were clean; `credential.env` remains ignored.
+
+### 0.7.7 public-configuration release correction — 2026-09-30
+
+- [x] Reproduce the released APK's missing-public-configuration state and identify the build input
+  omission.
+- [x] Add a fail-fast artifact gate for the hosted Supabase origin, non-privileged publishable key,
+  and canonical Rakyzu API origin.
+- [x] Prove the gate fails without configuration and passes with the ignored local environment.
+- [x] Run the configured unit, lint, debug, Android-test, and R8 release build once.
+- [x] Exercise sign-up, first-run profile creation, Home, sign-out, existing-account sign-in, and
+  Home on Appetize Android 16.
+- [x] Remove the temporary Supabase user, R2 transfer object, Appetize session, and Appetize build.
+- [x] Replace and re-download the corrected GitHub Release APK, checksum, and audit evidence.
+
+The release process had loaded no public Android configuration for the original local artifact.
+The runtime failed closed as designed, but no build-time control stopped that unusable APK from
+being published. `preBuild` now depends on a configuration verifier, so local and CI builds reject
+missing or malformed public origins as well as any Supabase secret/service-role key before an APK
+can be assembled.
+
+The configured cumulative Gradle gate completed 1,637 tasks successfully, covering unit tests,
+all module lint checks, debug and Android-test APKs, and the minified/resource-shrunk release build.
+The corrected debug APK contains all required public values and has SHA-256
+`84739ccfaf5a6fe2bb89020dd3447dae98ad255ca8c7fc499c8b55e31ff5a6a5`.
+
+On an Appetize Pixel 9 Pro running Android 16, a new temporary listener completed sign-up,
+confirmation, profile onboarding, and Home. Sign-out returned to the sign-in screen, and a second
+sign-in as the now-existing listener returned directly to Home. The captured UI contained neither
+missing configuration nor Profile Unavailable, and the device log contained no application fatal
+exception or ANR. All temporary remote test state was removed after verification.
 
 ## Completed cumulative 0.6.6–0.7.0 batch — 2026-09-29
 

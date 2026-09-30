@@ -1,4 +1,6 @@
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import java.net.URI
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -18,6 +20,43 @@ val supabasePublishableKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY"
 val rakyzuApiBaseUrl = providers.gradleProperty("RAKYZU_API_BASE_URL")
     .orElse(providers.environmentVariable("RAKYZU_API_BASE_URL"))
     .getOrElse("")
+
+fun String.isPrivilegedSupabaseKey(): Boolean {
+    if (startsWith("sb_secret_", ignoreCase = true)) return true
+    val payload = split('.').getOrNull(1) ?: return false
+    return runCatching {
+        String(Base64.getUrlDecoder().decode(payload.padEnd((payload.length + 3) / 4 * 4, '=')))
+    }.getOrDefault("").contains(Regex("\"role\"\\s*:\\s*\"service_role\""))
+}
+
+val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
+    group = "verification"
+    description = "Rejects Android artifacts with missing or privileged public configuration."
+    inputs.property("supabaseUrl", supabaseUrl)
+    inputs.property("supabasePublishableKey", supabasePublishableKey)
+    inputs.property("rakyzuApiBaseUrl", rakyzuApiBaseUrl)
+    doLast {
+        val supabaseUri = runCatching { URI(supabaseUrl) }.getOrNull()
+        check(
+            supabaseUri?.scheme == "https" &&
+                supabaseUri.host?.endsWith(".supabase.co") == true &&
+                (supabaseUri.port == -1 || supabaseUri.port == 443) &&
+                (supabaseUri.path.isNullOrEmpty() || supabaseUri.path == "/") &&
+                supabaseUri.userInfo == null &&
+                supabaseUri.query == null &&
+                supabaseUri.fragment == null,
+        ) { "SUPABASE_URL must be a hosted Supabase HTTPS origin." }
+        check(supabasePublishableKey.length >= 20 && !supabasePublishableKey.any(Char::isWhitespace)) {
+            "SUPABASE_PUBLISHABLE_KEY is missing or malformed."
+        }
+        check(!supabasePublishableKey.isPrivilegedSupabaseKey()) {
+            "SUPABASE_PUBLISHABLE_KEY must never contain a secret or service-role key."
+        }
+        check(rakyzuApiBaseUrl == "https://api.rakyzu.my.id") {
+            "RAKYZU_API_BASE_URL must use the production Rakyzu API origin."
+        }
+    }
+}
 
 android {
     namespace = "my.id.rakyzumusic"
@@ -78,6 +117,10 @@ extensions.configure<ApplicationAndroidComponentsExtension> {
             output.outputFileName.set("Rakyzu-Music-${output.versionName.get()}-${variant.name}.apk")
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(verifyPublicConfiguration)
 }
 
 dependencies {
