@@ -78,7 +78,10 @@ export type AdminRpcName =
   | "admin_upsert_editorial_shelf"
   | "admin_schedule_album"
   | "admin_set_audit_retention"
-  | "admin_submit_catalog_review";
+  | "admin_submit_catalog_review"
+  | "get_track_context"
+  | "get_release_notification_preference"
+  | "set_release_notification_preference";
 
 export interface RequestDependencies {
   playlistAccess(

@@ -26,6 +26,7 @@ data class RakyzuLocalDataSources(
     val playlist: PlaylistLocalDataSource,
     val playbackQueue: PlaybackQueueLocalDataSource,
     val downloads: OfflineDownloadLocalDataSource,
+    val trackContext: TrackContextLocalDataSource,
 )
 
 fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
@@ -36,6 +37,7 @@ fun createRakyzuLocalDataSources(context: Context): RakyzuLocalDataSources {
         playlist = RoomPlaylistLocalDataSource(database),
         playbackQueue = RoomPlaybackQueueLocalDataSource(database),
         downloads = RoomOfflineDownloadLocalDataSource(database),
+        trackContext = RoomTrackContextLocalDataSource(database),
     )
 }
 
@@ -66,15 +68,25 @@ internal class RoomCatalogLocalDataSource(
             "editorial_shelves",
             "editorial_shelf_tracks",
             "recently_played",
+            "library_liked_tracks",
+            "library_saved_albums",
+            "library_followed_artists",
             "sync_metadata",
         )
         .map {
             val catalog = dao.readSnapshot().toDomain()
             val tracksById = catalog.tracks.associateBy(Track::id)
+            val recentIds = dao.getRecentlyPlayedTrackIds(userId, RECENTLY_PLAYED_LIMIT)
             HomeFeedSnapshot(
                 catalog = catalog,
-                recentlyPlayed = dao.getRecentlyPlayedTrackIds(userId, RECENTLY_PLAYED_LIMIT)
-                    .mapNotNull(tracksById::get),
+                recentlyPlayed = recentIds.mapNotNull(tracksById::get),
+                smartRecommendations = rankSmartRecommendations(
+                    tracks = catalog.tracks,
+                    recentTrackIds = recentIds,
+                    likedTrackIds = dao.getLikedTrackIds(userId, SIGNAL_LIMIT),
+                    savedAlbumIds = dao.getSavedAlbumIds(userId, SIGNAL_LIMIT),
+                    followedArtistIds = dao.getFollowedArtistIds(userId, SIGNAL_LIMIT),
+                ),
             )
         }
 
@@ -113,8 +125,57 @@ internal class RoomCatalogLocalDataSource(
 
     private companion object {
         const val RECENTLY_PLAYED_LIMIT = 20
+        const val SIGNAL_LIMIT = 100
     }
 }
+
+internal fun rankSmartRecommendations(
+    tracks: List<Track>,
+    recentTrackIds: List<String>,
+    likedTrackIds: List<String>,
+    savedAlbumIds: List<String>,
+    followedArtistIds: List<String>,
+    limit: Int = 20,
+): List<Track> {
+    if (limit <= 0 || tracks.isEmpty()) return emptyList()
+    val tracksById = tracks.associateBy(Track::id)
+    val recentIds = recentTrackIds.toSet()
+    val likedIds = likedTrackIds.toSet()
+    val savedAlbums = savedAlbumIds.toSet()
+    val followedArtists = followedArtistIds.toSet()
+    val recentTracks = recentTrackIds.mapNotNull(tracksById::get)
+    val affinityArtists = recentTracks.mapTo(mutableSetOf(), Track::artistId) +
+        likedTrackIds.mapNotNull(tracksById::get).map(Track::artistId)
+    val affinityAlbums = recentTracks.mapTo(mutableSetOf(), Track::albumId)
+    if (recentIds.isEmpty() && likedIds.isEmpty() && savedAlbums.isEmpty() &&
+        followedArtists.isEmpty()
+    ) return emptyList()
+
+    val ranked = tracks.asSequence()
+        .filterNot { it.id in recentIds || it.id in likedIds }
+        .map { track ->
+            val score =
+                (if (track.artistId in followedArtists) 12 else 0) +
+                    (if (track.albumId in savedAlbums) 10 else 0) +
+                    (if (track.artistId in affinityArtists) 6 else 0) +
+                    (if (track.albumId in affinityAlbums) 4 else 0)
+            track to score
+        }
+        .filter { (_, score) -> score > 0 }
+        .sortedWith(compareByDescending<Pair<Track, Int>> { it.second }.thenBy { it.first.id })
+
+    val artistCounts = mutableMapOf<String, Int>()
+    return ranked.mapNotNull { (track, _) ->
+        val artistCount = artistCounts[track.artistId] ?: 0
+        if (artistCount >= MAX_RECOMMENDATIONS_PER_ARTIST) null else {
+            artistCounts[track.artistId] = artistCount + 1
+            track
+        }
+    }.take(limit.coerceAtMost(MAX_SMART_RECOMMENDATIONS)).toList()
+}
+
+private const val MAX_RECOMMENDATIONS_PER_ARTIST = 2
+private const val MAX_SMART_RECOMMENDATIONS = 20
 
 internal fun CatalogEntitySnapshot.toDomain(): CatalogSnapshot {
     val artistsById = artists.associateBy(ArtistEntity::id)

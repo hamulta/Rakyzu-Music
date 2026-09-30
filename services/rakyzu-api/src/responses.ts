@@ -9,10 +9,14 @@ export function jsonResponse(
   status: number,
   requestId: string,
   origin: string | null,
+  extraHeaders?: HeadersInit,
 ): Response {
   const headers = responseHeaders(requestId, origin);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "no-store");
+  if (extraHeaders) {
+    new Headers(extraHeaders).forEach((value, key) => headers.set(key, value));
+  }
   return Response.json(body, { status, headers });
 }
 

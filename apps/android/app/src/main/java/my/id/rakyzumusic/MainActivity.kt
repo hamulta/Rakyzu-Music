@@ -7,13 +7,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import my.id.rakyzumusic.core.data.auth.parseAuthCallback
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
+import my.id.rakyzumusic.core.model.parseRakyzuTrackShareUri
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
+    private val pendingTrackLink = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val rakyzuApplication = application as RakyzuMusicApplication
         handleAuthCallback(intent, rakyzuApplication)
+        handleTrackLink(intent)
         setContent {
             RakyzuMusicTheme(darkTheme = true) {
                 RakyzuMusicApp(
@@ -21,6 +26,7 @@ class MainActivity : ComponentActivity() {
                     authRepository = rakyzuApplication.authRepository,
                     profileRepository = rakyzuApplication.profileRepository,
                     catalogRepository = rakyzuApplication.catalogRepository,
+                    trackContextRepository = rakyzuApplication.trackContextRepository,
                     libraryRepository = rakyzuApplication.libraryRepository,
                     playlistRepository = rakyzuApplication.playlistRepository,
                     mediaDeliveryRepository = rakyzuApplication.mediaDeliveryRepository,
@@ -32,6 +38,10 @@ class MainActivity : ComponentActivity() {
                     adminRepository = rakyzuApplication.adminRepository,
                     artistWorkspaceRepository = rakyzuApplication.artistWorkspaceRepository,
                     offlineDownloadRepository = rakyzuApplication.executableOfflineDownloadRepository,
+                    pendingTrackLink = pendingTrackLink,
+                    onTrackLinkConsumed = { consumed ->
+                        pendingTrackLink.compareAndSet(consumed, null)
+                    },
                 )
             }
         }
@@ -41,6 +51,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAuthCallback(intent, application as RakyzuMusicApplication)
+        handleTrackLink(intent)
     }
 
     private fun handleAuthCallback(
@@ -50,5 +61,11 @@ class MainActivity : ComponentActivity() {
         val callback = parseAuthCallback(intent?.dataString) ?: return
         intent?.data = null
         application.authRepository.handleAuthCallback(callback)
+    }
+
+    private fun handleTrackLink(intent: Intent?) {
+        val trackId = parseRakyzuTrackShareUri(intent?.dataString) ?: return
+        pendingTrackLink.value = trackId
+        intent?.data = null
     }
 }

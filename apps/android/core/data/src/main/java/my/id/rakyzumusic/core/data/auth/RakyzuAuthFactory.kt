@@ -22,6 +22,9 @@ import my.id.rakyzumusic.core.data.admin.AuthenticatedAdminRepository
 import my.id.rakyzumusic.core.data.admin.UnavailableAdminRepository
 import my.id.rakyzumusic.core.data.catalog.CatalogRefreshResult
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.context.AuthenticatedTrackContextRepository
+import my.id.rakyzumusic.core.data.context.TrackContextRepository
+import my.id.rakyzumusic.core.data.context.UnavailableTrackContextRepository
 import my.id.rakyzumusic.core.data.catalog.OfflineFirstCatalogRepository
 import my.id.rakyzumusic.core.data.catalog.SupabaseCatalogRemoteDataSource
 import my.id.rakyzumusic.core.data.library.LibraryActionResult
@@ -102,6 +105,7 @@ object RakyzuAuthFactory {
             adminRepository = UnavailableAdminRepository,
             artistWorkspaceRepository = UnavailableArtistWorkspaceRepository,
             offlineDownloadRepository = UnavailableOfflineDownloadRepository,
+            trackContextRepository = UnavailableTrackContextRepository,
         )
 
         val localDataSources = createRakyzuLocalDataSources(context)
@@ -179,6 +183,11 @@ object RakyzuAuthFactory {
                 mediaDelivery = mediaDeliveryRepository,
                 activeUserId = { client.auth.currentUserOrNull()?.id },
             ),
+            trackContextRepository = AuthenticatedTrackContextRepository(
+                configuration = apiConfiguration,
+                tokens = AccessTokenProvider(client.auth::currentAccessTokenOrNull),
+                local = localDataSources.trackContext,
+            ),
         )
     }
 }
@@ -196,6 +205,7 @@ data class RakyzuRepositories(
     val adminRepository: AdminRepository,
     val artistWorkspaceRepository: ArtistWorkspaceRepository,
     val offlineDownloadRepository: ExecutableOfflineDownloadRepository,
+    val trackContextRepository: TrackContextRepository,
 )
 
 private data object UnavailablePlaybackQueueRepository : PlaybackQueueRepository {

@@ -49,6 +49,7 @@ data class EditorialShelf(
 data class HomeFeedSnapshot(
     val catalog: CatalogSnapshot,
     val recentlyPlayed: List<Track>,
+    val smartRecommendations: List<Track> = emptyList(),
 )
 
 enum class LibraryItemKind {

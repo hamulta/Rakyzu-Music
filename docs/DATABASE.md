@@ -90,6 +90,27 @@ roles, and stale revisions cannot overwrite an existing verified snapshot.
 
 Credentials belong only in local ignored files or GitHub encrypted secrets. Neither SQL migrations nor the Android build may contain privileged keys.
 
+### Track context and release notifications — 0.7.1–0.7.7
+
+`track_contexts` stores only licensed lyrics, provider notices, territory allowlists, bounded
+normalized credits, and an opaque revision. It forces RLS and grants Android no direct table
+access. `get_track_context` authenticates the listener, rechecks the complete published and
+enforcement-aware catalog chain, applies the Cloudflare country projection, and returns an
+explicit unavailable state when lyrics rights do not apply. Credits remain source-attributed and
+bounded even when lyrics are unavailable.
+
+Room schema 11 adds account-and-track keyed context, lyric-line, and credit tables. Replacement is
+transactional; another account cannot observe the cache. Successful catalog reconciliation prunes
+contexts for removed tracks, remote revisions replace complete context atomically, and a bounded
+expiry prevents stale rights data from being treated as current while still allowing explicit
+offline presentation.
+
+`release_notification_preferences` stores one server-authoritative opt-in per Auth account.
+`release_notification_deliveries` is a service-owned idempotent queue keyed by account, album, and
+channel; Android cannot insert or mark deliveries. Selecting Off immediately suppresses pending
+delivery records. Android 13+ permission remains a separate user gesture, and account/security
+alerts use a channel distinct from new releases.
+
 ### Organization RBAC and moderation — 0.5.11–0.5.15
 
 `staff_roles` fixes the Officer, Supervisor, Manager, C-Level Executive, and CEO hierarchy, while

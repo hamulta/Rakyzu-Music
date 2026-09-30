@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.7.0` Android source completes the first offline-download resilience train with catalog reconciliation, explicit sign-out retention, adaptive controls, bounded execution, integrity/quota gates, and a bounded track-context/share foundation; publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.7.7` Android source adds rights-aware track context, account-isolated Room caching, adaptive synchronized lyrics and normalized credits, validated track links, release-notification preferences, and private on-device Smart Recommendation; publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 

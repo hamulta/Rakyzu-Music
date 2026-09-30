@@ -23,6 +23,71 @@ internal data class CatalogEntitySnapshot(
 @Dao
 internal interface CatalogDao {
     @Query(
+        "SELECT * FROM track_contexts WHERE user_id = :userId AND track_id = :trackId",
+    )
+    suspend fun getTrackContext(userId: String, trackId: String): TrackContextEntity?
+
+    @Query(
+        "SELECT * FROM track_lyric_lines WHERE user_id = :userId AND track_id = :trackId " +
+            "ORDER BY position",
+    )
+    suspend fun getTrackLyricLines(userId: String, trackId: String): List<TrackLyricLineEntity>
+
+    @Query(
+        "SELECT * FROM track_credits WHERE user_id = :userId AND track_id = :trackId " +
+            "ORDER BY position",
+    )
+    suspend fun getTrackCredits(userId: String, trackId: String): List<TrackCreditEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrackContext(context: TrackContextEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrackLyricLines(lines: List<TrackLyricLineEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrackCredits(credits: List<TrackCreditEntity>)
+
+    @Query("DELETE FROM track_lyric_lines WHERE user_id = :userId AND track_id = :trackId")
+    suspend fun deleteTrackLyricLines(userId: String, trackId: String)
+
+    @Query("DELETE FROM track_credits WHERE user_id = :userId AND track_id = :trackId")
+    suspend fun deleteTrackCredits(userId: String, trackId: String)
+
+    @Query("DELETE FROM track_contexts WHERE user_id = :userId AND track_id NOT IN (:trackIds)")
+    suspend fun deleteTrackContextsOutsideCatalog(userId: String, trackIds: List<String>): Int
+
+    @Query(
+        "DELETE FROM track_contexts WHERE user_id = :userId AND track_id NOT IN (" +
+            "SELECT track_id FROM track_contexts WHERE user_id = :userId " +
+            "ORDER BY cached_at_epoch_ms DESC, track_id LIMIT :limit)",
+    )
+    suspend fun pruneTrackContexts(userId: String, limit: Int): Int
+
+    @Query("SELECT COUNT(*) FROM track_contexts WHERE user_id = :userId")
+    suspend fun countTrackContexts(userId: String): Int
+
+    @Query("SELECT COUNT(*) FROM track_lyric_lines WHERE user_id = :userId")
+    suspend fun countTrackLyricLines(userId: String): Int
+
+    @Query("SELECT COUNT(*) FROM track_credits WHERE user_id = :userId")
+    suspend fun countTrackCredits(userId: String): Int
+
+    @Transaction
+    suspend fun replaceTrackContext(
+        context: TrackContextEntity,
+        lines: List<TrackLyricLineEntity>,
+        credits: List<TrackCreditEntity>,
+    ) {
+        deleteTrackLyricLines(context.userId, context.trackId)
+        deleteTrackCredits(context.userId, context.trackId)
+        insertTrackContext(context)
+        if (lines.isNotEmpty()) insertTrackLyricLines(lines)
+        if (credits.isNotEmpty()) insertTrackCredits(credits)
+        pruneTrackContexts(context.userId, 250)
+    }
+
+    @Query(
         "SELECT * FROM offline_downloads WHERE user_id = :userId " +
             "ORDER BY updated_at_epoch_ms DESC, track_id",
     )
@@ -213,6 +278,24 @@ internal interface CatalogDao {
         """,
     )
     suspend fun getRecentlyPlayedTrackIds(userId: String, limit: Int): List<String>
+
+    @Query(
+        "SELECT track_id FROM library_liked_tracks WHERE user_id = :userId " +
+            "ORDER BY saved_at_epoch_ms DESC, track_id LIMIT :limit",
+    )
+    suspend fun getLikedTrackIds(userId: String, limit: Int): List<String>
+
+    @Query(
+        "SELECT album_id FROM library_saved_albums WHERE user_id = :userId " +
+            "ORDER BY saved_at_epoch_ms DESC, album_id LIMIT :limit",
+    )
+    suspend fun getSavedAlbumIds(userId: String, limit: Int): List<String>
+
+    @Query(
+        "SELECT artist_id FROM library_followed_artists WHERE user_id = :userId " +
+            "ORDER BY saved_at_epoch_ms DESC, artist_id LIMIT :limit",
+    )
+    suspend fun getFollowedArtistIds(userId: String, limit: Int): List<String>
 
     @Query("SELECT EXISTS(SELECT 1 FROM tracks WHERE id = :trackId)")
     suspend fun containsTrack(trackId: String): Boolean

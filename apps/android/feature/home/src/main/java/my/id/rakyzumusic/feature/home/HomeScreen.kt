@@ -115,6 +115,7 @@ internal data class HomeSectionVisibility(
     val editorialShelves: Boolean,
     val newReleases: Boolean,
     val allTracks: Boolean,
+    val smartRecommendations: Boolean = false,
 )
 
 internal fun HomeUiState.toHomeSectionVisibility(
@@ -126,6 +127,7 @@ internal fun HomeUiState.toHomeSectionVisibility(
         editorialShelves = showsMusicSections && catalog.editorialShelves.isNotEmpty(),
         newReleases = derivedSections.newReleaseTracks.isNotEmpty(),
         allTracks = showsMusicSections && catalog.tracks.isNotEmpty(),
+        smartRecommendations = showsMusicSections && smartRecommendations.isNotEmpty(),
     )
 }
 
@@ -355,6 +357,27 @@ fun HomeScreen(
                         title = "Recently played",
                         subtitle = "Continue from your latest listening on this device.",
                         tracks = state.recentlyPlayed,
+                        layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
+                        onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
+                    )
+                }
+            }
+            if (sectionVisibility.smartRecommendations) {
+                item(key = "smart-recommendations") {
+                    TrackShelf(
+                        title = "Made for you",
+                        subtitle = "Private recommendations ranked on this device from your Library and listening.",
+                        tracks = state.smartRecommendations,
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,

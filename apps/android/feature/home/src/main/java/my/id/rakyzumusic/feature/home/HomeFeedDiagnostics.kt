@@ -28,6 +28,7 @@ internal data class HomeFeedShape(
     val tracks: HomeContentCount,
     val shelves: HomeContentCount,
     val recentlyPlayed: HomeContentCount,
+    val smartRecommendations: HomeContentCount,
 ) {
     companion object {
         fun from(feed: HomeFeedSnapshot): HomeFeedShape = HomeFeedShape(
@@ -36,6 +37,7 @@ internal data class HomeFeedShape(
             tracks = HomeContentCount.from(feed.catalog.tracks.size),
             shelves = HomeContentCount.from(feed.catalog.editorialShelves.size),
             recentlyPlayed = HomeContentCount.from(feed.recentlyPlayed.size),
+            smartRecommendations = HomeContentCount.from(feed.smartRecommendations.size),
         )
     }
 }

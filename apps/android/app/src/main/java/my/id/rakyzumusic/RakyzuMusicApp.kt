@@ -1,9 +1,12 @@
 package my.id.rakyzumusic
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -11,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -86,6 +90,8 @@ import my.id.rakyzumusic.core.data.auth.AuthFailure
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.AuthSessionState
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.context.TrackContextRepository
+import my.id.rakyzumusic.core.data.context.NotificationSettingsResult
 import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.download.OfflineDownloadRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
@@ -102,6 +108,8 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurface
 import my.id.rakyzumusic.core.model.LibraryItemKind
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
 import my.id.rakyzumusic.core.model.rakyzuTrackShareUri
+import my.id.rakyzumusic.core.model.ReleaseNotificationPreference
+import my.id.rakyzumusic.core.model.TrackContext
 import my.id.rakyzumusic.core.playback.RakyzuPlaybackController
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
@@ -142,7 +150,10 @@ import my.id.rakyzumusic.navigation.openArtistDetail
 import my.id.rakyzumusic.navigation.openNowPlaying
 import my.id.rakyzumusic.navigation.selectTopLevelRoute
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 private data class TopLevelDestination(
@@ -176,6 +187,7 @@ fun RakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    trackContextRepository: TrackContextRepository,
     libraryRepository: LibraryRepository,
     playlistRepository: PlaylistRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
@@ -187,6 +199,8 @@ fun RakyzuMusicApp(
     adminRepository: AdminRepository,
     artistWorkspaceRepository: ArtistWorkspaceRepository,
     offlineDownloadRepository: OfflineDownloadRepository,
+    pendingTrackLink: StateFlow<String?>,
+    onTrackLinkConsumed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
@@ -220,6 +234,7 @@ fun RakyzuMusicApp(
             authRepository = authRepository,
             profileRepository = profileRepository,
             catalogRepository = catalogRepository,
+            trackContextRepository = trackContextRepository,
             libraryRepository = libraryRepository,
             playlistRepository = playlistRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
@@ -230,6 +245,8 @@ fun RakyzuMusicApp(
             adminRepository = adminRepository,
             artistWorkspaceRepository = artistWorkspaceRepository,
             offlineDownloadRepository = offlineDownloadRepository,
+            pendingTrackLink = pendingTrackLink,
+            onTrackLinkConsumed = onTrackLinkConsumed,
             modifier = modifier,
         )
     }
@@ -243,6 +260,7 @@ private fun ProfileGatedRakyzuMusicApp(
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
+    trackContextRepository: TrackContextRepository,
     libraryRepository: LibraryRepository,
     playlistRepository: PlaylistRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
@@ -253,6 +271,8 @@ private fun ProfileGatedRakyzuMusicApp(
     adminRepository: AdminRepository,
     artistWorkspaceRepository: ArtistWorkspaceRepository,
     offlineDownloadRepository: OfflineDownloadRepository,
+    pendingTrackLink: StateFlow<String?>,
+    onTrackLinkConsumed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val profileViewModel: ProfileViewModel = viewModel(
@@ -295,6 +315,7 @@ private fun ProfileGatedRakyzuMusicApp(
             onDeleteAvatar = profileViewModel::deleteAvatar,
             authRepository = authRepository,
             catalogRepository = catalogRepository,
+            trackContextRepository = trackContextRepository,
             libraryRepository = libraryRepository,
             playlistRepository = playlistRepository,
             mediaDeliveryRepository = mediaDeliveryRepository,
@@ -305,6 +326,8 @@ private fun ProfileGatedRakyzuMusicApp(
             adminRepository = adminRepository,
             artistWorkspaceRepository = artistWorkspaceRepository,
             offlineDownloadRepository = offlineDownloadRepository,
+            pendingTrackLink = pendingTrackLink,
+            onTrackLinkConsumed = onTrackLinkConsumed,
             modifier = modifier,
         )
     }
@@ -332,6 +355,7 @@ private fun AuthenticatedRakyzuMusicApp(
     onDeleteAvatar: () -> Unit,
     authRepository: AuthRepository,
     catalogRepository: CatalogRepository,
+    trackContextRepository: TrackContextRepository,
     libraryRepository: LibraryRepository,
     playlistRepository: PlaylistRepository,
     mediaDeliveryRepository: MediaDeliveryRepository,
@@ -342,12 +366,61 @@ private fun AuthenticatedRakyzuMusicApp(
     adminRepository: AdminRepository,
     artistWorkspaceRepository: ArtistWorkspaceRepository,
     offlineDownloadRepository: OfflineDownloadRepository,
+    pendingTrackLink: StateFlow<String?>,
+    onTrackLinkConsumed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
     val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
+    val pendingTrackId by pendingTrackLink.collectAsStateWithLifecycle()
+    var trackLinkMessage by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(userId, pendingTrackId) {
+        val trackId = pendingTrackId ?: return@LaunchedEffect
+        try {
+            var catalog = catalogRepository.observeCatalog().first()
+            var track = catalog.tracks.firstOrNull { it.id == trackId }
+            if (track == null) {
+                catalogRepository.refresh()
+                catalog = catalogRepository.observeCatalog().first()
+                track = catalog.tracks.firstOrNull { it.id == trackId }
+            }
+            if (track != null) {
+                trackLinkMessage = null
+                playbackController.playQueue(listOf(track), 0)
+                openNowPlaying(backStack)
+            } else {
+                trackLinkMessage = "This shared track is unavailable on Rakyzu Music."
+                delay(5_000)
+                trackLinkMessage = null
+            }
+        } finally {
+            onTrackLinkConsumed(trackId)
+        }
+    }
+    val currentTrackId = playbackSnapshot.mediaId
+    val currentTrackContextFlow = remember(userId, currentTrackId, trackContextRepository) {
+        currentTrackId?.let { trackContextRepository.observe(userId, it) }
+            ?: kotlinx.coroutines.flow.flowOf(null)
+    }
+    val currentTrackContext by currentTrackContextFlow.collectAsStateWithLifecycle(initialValue = null)
+    var isTrackContextRefreshing by remember { mutableStateOf(false) }
+    var trackContextMessage by remember { mutableStateOf<String?>(null) }
+    var offlineTrackContextCount by remember(userId) { mutableStateOf(0) }
+    LaunchedEffect(userId, currentTrackId) {
+        val trackId = currentTrackId ?: return@LaunchedEffect
+        isTrackContextRefreshing = true
+        trackContextMessage = null
+        val result = trackContextRepository.refresh(userId, trackId)
+        if (result is my.id.rakyzumusic.core.data.context.TrackContextRefreshResult.Failure &&
+            currentTrackContext == null
+        ) {
+            trackContextMessage = "Lyrics and credits are temporarily unavailable."
+        }
+        offlineTrackContextCount = trackContextRepository.cachedTrackCount(userId)
+        isTrackContextRefreshing = false
+    }
     val playbackPreferenceState by playbackPreferences.state.collectAsStateWithLifecycle()
     val searchViewModel: SearchViewModel = viewModel(
         key = "search-$userId",
@@ -375,6 +448,8 @@ private fun AuthenticatedRakyzuMusicApp(
         catalogRepository.observeCatalog().collect { catalog ->
             if (catalog.lastSyncedAtEpochMillis != null) {
                 offlineDownloadsViewModel.reconcileCatalog(catalog.tracks)
+                trackContextRepository.reconcileCatalog(userId, catalog.tracks.mapTo(mutableSetOf()) { it.id })
+                offlineTrackContextCount = trackContextRepository.cachedTrackCount(userId)
             }
         }
     }
@@ -404,6 +479,22 @@ private fun AuthenticatedRakyzuMusicApp(
     var showAccount by remember { mutableStateOf(false) }
     var isSigningOut by remember { mutableStateOf(false) }
     var signOutMessage by remember { mutableStateOf<String?>(null) }
+    var releaseNotificationPreference by remember {
+        mutableStateOf(ReleaseNotificationPreference.Off)
+    }
+    var notificationPreferenceWorking by remember { mutableStateOf(false) }
+    var notificationPreferenceMessage by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(userId, trackContextRepository) {
+        when (val result = trackContextRepository.notificationSettings()) {
+            is NotificationSettingsResult.Success -> {
+                releaseNotificationPreference = result.settings.preference
+            }
+            is NotificationSettingsResult.Failure -> {
+                notificationPreferenceMessage = "Release notification settings are temporarily unavailable."
+            }
+        }
+        offlineTrackContextCount = trackContextRepository.cachedTrackCount(userId)
+    }
 
     ArtistWelcomeDialog(
         profile = profile,
@@ -432,6 +523,28 @@ private fun AuthenticatedRakyzuMusicApp(
             onWifiQualityChanged = playbackPreferences::setWifiQuality,
             onMobileQualityChanged = playbackPreferences::setMobileQuality,
             onDataSaverChanged = playbackPreferences::setDataSaverEnabled,
+            releaseNotificationPreference = releaseNotificationPreference,
+            notificationPreferenceWorking = notificationPreferenceWorking,
+            notificationPreferenceMessage = notificationPreferenceMessage,
+            onReleaseNotificationPreferenceChanged = { preference ->
+                if (!notificationPreferenceWorking) {
+                    coroutineScope.launch {
+                        notificationPreferenceWorking = true
+                        notificationPreferenceMessage = null
+                        when (val result = trackContextRepository.updateNotificationSettings(preference)) {
+                            is NotificationSettingsResult.Success -> {
+                                releaseNotificationPreference = result.settings.preference
+                                notificationPreferenceMessage = "Release notification preference saved."
+                            }
+                            is NotificationSettingsResult.Failure -> {
+                                notificationPreferenceMessage = "Could not save release notification preference."
+                            }
+                        }
+                        notificationPreferenceWorking = false
+                    }
+                }
+            },
+            offlineTrackContextCount = offlineTrackContextCount,
             onDismiss = {
                 if (!isSigningOut && !isSavingProfile) {
                     onResetProfileDraft()
@@ -780,11 +893,46 @@ private fun AuthenticatedRakyzuMusicApp(
                                     Intent.createChooser(intent, "Share from Rakyzu Music"),
                                 )
                             },
+                            trackContext = currentTrackContext,
+                            isTrackContextRefreshing = isTrackContextRefreshing,
+                            trackContextMessage = trackContextMessage,
+                            onRetryTrackContext = {
+                                currentTrackId?.let { trackId ->
+                                    coroutineScope.launch {
+                                        isTrackContextRefreshing = true
+                                        trackContextMessage = null
+                                        val result = trackContextRepository.refresh(userId, trackId)
+                                        if (result is my.id.rakyzumusic.core.data.context.TrackContextRefreshResult.Failure) {
+                                            trackContextMessage = "Lyrics and credits are temporarily unavailable."
+                                        }
+                                        offlineTrackContextCount =
+                                            trackContextRepository.cachedTrackCount(userId)
+                                        isTrackContextRefreshing = false
+                                    }
+                                }
+                            },
                         )
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+
+            trackLinkMessage?.let { message ->
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                    )
+                }
+            }
 
             if (
                 playbackSnapshot.mediaId != null &&
@@ -859,6 +1007,11 @@ private fun AccountSheet(
     onWifiQualityChanged: (PlaybackQuality) -> Unit,
     onMobileQualityChanged: (PlaybackQuality) -> Unit,
     onDataSaverChanged: (Boolean) -> Unit,
+    releaseNotificationPreference: ReleaseNotificationPreference,
+    notificationPreferenceWorking: Boolean,
+    notificationPreferenceMessage: String?,
+    onReleaseNotificationPreferenceChanged: (ReleaseNotificationPreference) -> Unit,
+    offlineTrackContextCount: Int,
     onDismiss: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -866,6 +1019,35 @@ private fun AccountSheet(
     val scope = rememberCoroutineScope()
     var artistBiography by remember(profile.artist?.id, profile.artist?.biography) {
         mutableStateOf(profile.artist?.biography.orEmpty())
+    }
+    var notificationPermissionMessage by remember { mutableStateOf<String?>(null) }
+    var pendingNotificationPreference by remember {
+        mutableStateOf<ReleaseNotificationPreference?>(null)
+    }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        val pending = pendingNotificationPreference
+        pendingNotificationPreference = null
+        if (granted && pending != null) {
+            onReleaseNotificationPreferenceChanged(pending)
+        } else if (!granted) {
+            notificationPermissionMessage =
+                "Notification permission remains off. You can enable it later in Android settings."
+        }
+    }
+    fun selectReleasePreference(preference: ReleaseNotificationPreference) {
+        notificationPermissionMessage = null
+        if (preference == ReleaseNotificationPreference.Off ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            onReleaseNotificationPreferenceChanged(preference)
+        } else {
+            pendingNotificationPreference = preference
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
@@ -1033,6 +1215,54 @@ private fun AccountSheet(
                     checked = playbackPreferences.dataSaverEnabled,
                     onCheckedChange = onDataSaverChanged,
                     enabled = !isSigningOut,
+                )
+            }
+            Text(
+                text = "Release notifications",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = "Choose which Artist releases can use the New music releases channel. " +
+                    "Account and security alerts stay in a separate Android channel.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ReleaseNotificationPreference.entries.forEach { preference ->
+                    FilterChip(
+                        selected = releaseNotificationPreference == preference,
+                        onClick = { selectReleasePreference(preference) },
+                        enabled = !notificationPreferenceWorking && !isSigningOut,
+                        label = {
+                            Text(
+                                when (preference) {
+                                    ReleaseNotificationPreference.Off -> "Off"
+                                    ReleaseNotificationPreference.FollowedArtists -> "Followed Artists"
+                                    ReleaseNotificationPreference.AllSavedArtists -> "Saved Artists"
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+            if (notificationPreferenceWorking) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            Text(
+                text = "Offline lyrics and credits: $offlineTrackContextCount of 250 tracks cached",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            (notificationPermissionMessage ?: notificationPreferenceMessage)?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             Text(

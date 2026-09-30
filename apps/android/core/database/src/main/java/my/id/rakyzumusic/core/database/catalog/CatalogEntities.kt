@@ -283,3 +283,62 @@ internal data class OfflineDownloadPreferenceEntity(
     @ColumnInfo(name = "allow_mobile") val allowMobile: Boolean,
     @ColumnInfo(name = "keep_after_sign_out") val keepAfterSignOut: Boolean? = null,
 )
+
+@Entity(
+    tableName = "track_contexts",
+    primaryKeys = ["user_id", "track_id"],
+    indices = [Index(value = ["user_id", "cached_at_epoch_ms"])],
+)
+internal data class TrackContextEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    @ColumnInfo(name = "lyrics_kind") val lyricsKind: String,
+    @ColumnInfo(name = "provider_name") val providerName: String?,
+    @ColumnInfo(name = "provider_notice") val providerNotice: String?,
+    @ColumnInfo(name = "catalog_revision") val catalogRevision: String,
+    @ColumnInfo(name = "cached_at_epoch_ms") val cachedAtEpochMillis: Long,
+    @ColumnInfo(name = "expires_at_epoch_ms") val expiresAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "track_lyric_lines",
+    primaryKeys = ["user_id", "track_id", "position"],
+    foreignKeys = [
+        ForeignKey(
+            entity = TrackContextEntity::class,
+            parentColumns = ["user_id", "track_id"],
+            childColumns = ["user_id", "track_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["user_id", "track_id"])],
+)
+internal data class TrackLyricLineEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    val position: Int,
+    val text: String,
+    @ColumnInfo(name = "start_time_ms") val startTimeMs: Long?,
+)
+
+@Entity(
+    tableName = "track_credits",
+    primaryKeys = ["user_id", "track_id", "position"],
+    foreignKeys = [
+        ForeignKey(
+            entity = TrackContextEntity::class,
+            parentColumns = ["user_id", "track_id"],
+            childColumns = ["user_id", "track_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["user_id", "track_id"])],
+)
+internal data class TrackCreditEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    val position: Int,
+    @ColumnInfo(name = "display_name") val displayName: String,
+    val role: String,
+    @ColumnInfo(name = "source_name") val sourceName: String?,
+)

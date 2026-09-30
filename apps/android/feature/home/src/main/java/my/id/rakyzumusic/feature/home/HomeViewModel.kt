@@ -21,6 +21,7 @@ import my.id.rakyzumusic.core.model.Track
 data class HomeUiState(
     val catalog: CatalogSnapshot = EMPTY_CATALOG,
     val recentlyPlayed: List<Track> = emptyList(),
+    val smartRecommendations: List<Track> = emptyList(),
     val derivedSections: HomeDerivedSections = catalog.toHomeDerivedSections(),
     val catalogFreshness: CatalogFreshness = CatalogFreshness(),
     val isRefreshing: Boolean = true,
@@ -305,9 +306,11 @@ internal fun HomeUiState.withHomeFeed(
 ): HomeUiState {
     val stableCatalog = catalog.reuseWhenEqual(feed.catalog)
     val stableRecentlyPlayed = recentlyPlayed.reuseWhenEqual(feed.recentlyPlayed)
+    val stableSmartRecommendations = smartRecommendations.reuseWhenEqual(feed.smartRecommendations)
     return copy(
         catalog = stableCatalog,
         recentlyPlayed = stableRecentlyPlayed,
+        smartRecommendations = stableSmartRecommendations,
         derivedSections = if (stableCatalog === catalog) {
             derivedSections
         } else {

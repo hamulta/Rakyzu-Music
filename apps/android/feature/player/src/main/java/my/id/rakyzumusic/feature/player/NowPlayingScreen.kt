@@ -26,9 +26,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -45,10 +47,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,10 +80,14 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 import my.id.rakyzumusic.core.model.PlaybackQueueItem
+import my.id.rakyzumusic.core.model.LyricsKind
+import my.id.rakyzumusic.core.model.TrackContext
+import my.id.rakyzumusic.core.model.TrackCreditRole
 import my.id.rakyzumusic.core.playback.PlaybackSnapshot
 import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.core.playback.toPlaybackTimeLabel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     snapshot: PlaybackSnapshot,
@@ -103,8 +112,15 @@ fun NowPlayingScreen(
     onAlbumSaveChange: (Boolean) -> Unit = {},
     onArtistFollowChange: (Boolean) -> Unit = {},
     onShareTrack: (PlaybackQueueItem) -> Unit = {},
+    trackContext: TrackContext? = null,
+    isTrackContextRefreshing: Boolean = false,
+    trackContextMessage: String? = null,
+    onRetryTrackContext: () -> Unit = {},
 ) {
     val currentItem = snapshot.queue.getOrNull(snapshot.currentIndex)
+    var contextSheet by remember(currentItem?.mediaId) {
+        mutableStateOf<TrackContextSheet?>(null)
+    }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -140,6 +156,17 @@ fun NowPlayingScreen(
                     onAlbumSaveChange = onAlbumSaveChange,
                     onArtistFollowChange = onArtistFollowChange,
                     onShareTrack = onShareTrack,
+                )
+            }
+            item {
+                TrackContextActions(
+                    item = queueItem,
+                    context = trackContext,
+                    isRefreshing = isTrackContextRefreshing,
+                    message = trackContextMessage,
+                    onLyrics = { contextSheet = TrackContextSheet.Lyrics },
+                    onCredits = { contextSheet = TrackContextSheet.Credits },
+                    onRetry = onRetryTrackContext,
                 )
             }
         }
@@ -188,6 +215,181 @@ fun NowPlayingScreen(
             )
         }
     }
+    when (contextSheet) {
+        TrackContextSheet.Lyrics -> LyricsSheet(
+            context = trackContext,
+            playbackPositionMs = snapshot.positionMs,
+            onDismiss = { contextSheet = null },
+        )
+        TrackContextSheet.Credits -> CreditsSheet(
+            context = trackContext,
+            onDismiss = { contextSheet = null },
+        )
+        null -> Unit
+    }
+}
+
+private enum class TrackContextSheet { Lyrics, Credits }
+
+@Composable
+private fun TrackContextActions(
+    item: PlaybackQueueItem,
+    context: TrackContext?,
+    isRefreshing: Boolean,
+    message: String?,
+    onLyrics: () -> Unit,
+    onCredits: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Button(
+                onClick = onLyrics,
+                enabled = context?.lyrics?.isDisplayable == true && !isRefreshing,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.Article, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Lyrics")
+            }
+            Button(
+                onClick = onCredits,
+                enabled = context?.hasCredits == true && !isRefreshing,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.Rounded.Badge, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Credits")
+            }
+        }
+        when {
+            isRefreshing -> Text(
+                "Loading licensed lyrics and credits…",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            message != null -> Button(onClick = onRetry) { Text("Retry track details") }
+            context != null && !context.lyrics.isDisplayable && !context.hasCredits -> Text(
+                "Lyrics and detailed credits are not available for ${item.title}.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LyricsSheet(
+    context: TrackContext?,
+    playbackPositionMs: Long,
+    onDismiss: () -> Unit,
+) {
+    val lyrics = context?.lyrics
+    val activeIndex = lyrics?.activeLineIndex(playbackPositionMs)
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var followPlayback by remember(context?.trackId) { mutableStateOf(true) }
+    LaunchedEffect(activeIndex, followPlayback) {
+        if (followPlayback && activeIndex != null) listState.animateScrollToItem(activeIndex)
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Lyrics", style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+                if (lyrics?.kind == LyricsKind.TimeSynced) {
+                    Button(onClick = { followPlayback = !followPlayback }) {
+                        Text(if (followPlayback) "Following" else "Follow lyrics")
+                    }
+                }
+            }
+            if (lyrics?.isDisplayable == true) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    itemsIndexed(lyrics.lines) { index, line ->
+                        Text(
+                            text = line.text,
+                            color = if (index == activeIndex) RakyzuAqua else
+                                MaterialTheme.colorScheme.onSurface,
+                            style = if (index == activeIndex) MaterialTheme.typography.titleLarge else
+                                MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (index == activeIndex) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier.semantics {
+                                if (index == activeIndex) stateDescription = "Current lyric line"
+                            },
+                        )
+                    }
+                }
+                lyrics.providerName?.let { Text("Lyrics provided by $it") }
+                lyrics.providerNotice?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                Text("Lyrics are unavailable for this track or your current region.")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreditsSheet(context: TrackContext?, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Text("Song credits", style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+            }
+            val grouped = context?.credits.orEmpty().groupBy { it.role }
+            TrackCreditRole.entries.forEach { role ->
+                val credits = grouped[role].orEmpty()
+                if (credits.isNotEmpty()) {
+                    item(key = role.name) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(role.displayLabel(), color = RakyzuAqua, fontWeight = FontWeight.Bold)
+                            credits.forEach { credit ->
+                                Text(credit.displayName, style = MaterialTheme.typography.bodyLarge)
+                                credit.sourceName?.let {
+                                    Text("Source: $it", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (context?.hasCredits != true) item { Text("Detailed credits are unavailable.") }
+        }
+    }
+}
+
+private fun TrackCreditRole.displayLabel(): String = when (this) {
+    TrackCreditRole.PrimaryArtist -> "Primary Artist"
+    TrackCreditRole.FeaturedArtist -> "Featured Artist"
+    TrackCreditRole.Songwriter -> "Songwriter"
+    TrackCreditRole.Producer -> "Producer"
+    TrackCreditRole.Performer -> "Performer"
 }
 
 @Composable

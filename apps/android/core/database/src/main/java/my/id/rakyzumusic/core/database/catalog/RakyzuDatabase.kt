@@ -28,8 +28,11 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         OfflineDownloadEntity::class,
         OfflineDownloadCollectionEntity::class,
         OfflineDownloadPreferenceEntity::class,
+        TrackContextEntity::class,
+        TrackLyricLineEntity::class,
+        TrackCreditEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -41,6 +44,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
+        AutoMigration(from = 10, to = 11),
     ],
 )
 internal abstract class RakyzuDatabase : RoomDatabase() {

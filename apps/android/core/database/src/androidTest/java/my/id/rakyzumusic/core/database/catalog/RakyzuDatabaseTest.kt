@@ -19,6 +19,12 @@ import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.DownloadCollectionKind
 import my.id.rakyzumusic.core.model.OfflineDownloadItem
 import my.id.rakyzumusic.core.model.OfflineDownloadStatus
+import my.id.rakyzumusic.core.model.LyricLine
+import my.id.rakyzumusic.core.model.LyricsKind
+import my.id.rakyzumusic.core.model.TrackContext
+import my.id.rakyzumusic.core.model.TrackCredit
+import my.id.rakyzumusic.core.model.TrackCreditRole
+import my.id.rakyzumusic.core.model.TrackLyrics
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,6 +40,7 @@ class RakyzuDatabaseTest {
     private lateinit var playlistDataSource: PlaylistLocalDataSource
     private lateinit var playbackQueueDataSource: PlaybackQueueLocalDataSource
     private lateinit var downloadDataSource: OfflineDownloadLocalDataSource
+    private lateinit var trackContextDataSource: TrackContextLocalDataSource
 
     @Before
     fun setUp() {
@@ -48,6 +55,7 @@ class RakyzuDatabaseTest {
         playlistDataSource = RoomPlaylistLocalDataSource(database)
         playbackQueueDataSource = RoomPlaybackQueueLocalDataSource(database)
         downloadDataSource = RoomOfflineDownloadLocalDataSource(database)
+        trackContextDataSource = RoomTrackContextLocalDataSource(database)
     }
 
     @After
@@ -212,6 +220,31 @@ class RakyzuDatabaseTest {
         assertEquals(true, owner.allowMobileDownloads)
         assertEquals(emptyList<StoredOfflineDownload>(), other.items)
         assertEquals(false, other.allowMobileDownloads)
+    }
+
+    @Test
+    fun trackContextCacheIsAtomicAccountScopedAndCatalogReconciled() = runTest {
+        val context = TrackContext(
+            trackId = "track-1",
+            lyrics = TrackLyrics(
+                LyricsKind.TimeSynced,
+                listOf(LyricLine("First", 0L), LyricLine("Second", 2_000L)),
+                "Rights Provider",
+                "Used under license",
+            ),
+            credits = listOf(
+                TrackCredit("Rakyzu Writer", TrackCreditRole.Songwriter, "Label source"),
+            ),
+            catalogRevision = "revision-1",
+            cachedAtEpochMillis = 1_000L,
+            expiresAtEpochMillis = 2_000L,
+        )
+        trackContextDataSource.replace("listener-1", context)
+
+        assertEquals(context, trackContextDataSource.observe("listener-1", "track-1").first())
+        assertEquals(null, trackContextDataSource.observe("listener-2", "track-1").first())
+        assertEquals(1, trackContextDataSource.reconcileCatalog("listener-1", setOf("track-2")))
+        assertEquals(null, trackContextDataSource.observe("listener-1", "track-1").first())
     }
 
     private fun queueItem(id: String) = PlaybackQueueItem(

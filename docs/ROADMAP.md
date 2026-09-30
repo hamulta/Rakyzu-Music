@@ -192,20 +192,26 @@ WorkManager persists transfer state and network policy across process death.
 
 ### Lyrics, credits, sharing, and notifications — `0.7.x`
 
-- [ ] `0.7.1` — authenticated, rights-aware track-context API and local cache with explicit
+- [x] `0.7.1` — authenticated, rights-aware track-context API and local cache with explicit
   unavailable, plain-lyrics, and time-synced-lyrics states.
-- [ ] `0.7.2` — accessible lyrics sheet, current-line focus, manual scrolling, provider attribution,
+- [x] `0.7.2` — accessible lyrics sheet, current-line focus, manual scrolling, provider attribution,
   and fail-closed licensing behavior.
-- [ ] `0.7.3` — normalized songwriter, producer, performer, featured-artist, and primary-artist
+- [x] `0.7.3` — normalized songwriter, producer, performer, featured-artist, and primary-artist
   credits with source attribution and bounded contributor lists.
-- [ ] `0.7.4` — canonical share-link resolution, validated inbound track deep links, preview-safe
+- [x] `0.7.4` — canonical share-link resolution, validated inbound track deep links, preview-safe
   metadata, and graceful unavailable-track handling.
-- [ ] `0.7.5` — Android notification permission education, stable channel taxonomy, and per-channel
+- [x] `0.7.5` — Android notification permission education, stable channel taxonomy, and per-channel
   device controls without dark patterns.
-- [ ] `0.7.6` — followed-Artist and saved-Artist release preferences, server-authoritative delivery,
+- [x] `0.7.6` — followed-Artist and saved-Artist release preferences, server-authoritative delivery,
   deduplication, quiet behavior, and direct preference revocation.
-- [ ] `0.7.7` — offline lyrics/credits caching with account isolation, revision reconciliation,
+- [x] `0.7.7` — offline lyrics/credits caching with account isolation, revision reconciliation,
   bounded retention, and explicit storage visibility.
+
+The cumulative `0.7.1`–`0.7.7` artifact uses Android versionCode `96`, Room schema `11`, and one
+rights-aware Worker boundary. Smart Recommendation is included ahead of the broader `0.8.x`
+personalization train as a private, deterministic on-device ranker: recent playback, Likes, saved
+albums, and followed Artists influence a bounded, artist-diverse shelf, while consumed tracks are
+excluded and recommendations are never appended to playback automatically.
 - [ ] `0.7.8` — adaptive phone/tablet layouts, large-text reflow, TalkBack traversal/actions,
   reduced-motion behavior, and RTL/localization preparation.
 - [ ] `0.7.9` — privacy-safe interaction telemetry, notification abuse/rate limits, deep-link threat

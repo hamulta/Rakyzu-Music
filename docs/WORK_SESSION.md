@@ -1,6 +1,43 @@
 # Rakyzu Music — engineering work sessions
 
-## Active cumulative 0.6.6–0.7.0 batch — 2026-09-29
+## Active cumulative 0.7.1–0.7.7 batch — 2026-09-30
+
+- [x] Audit the tagged `v0.7.0` baseline and preserve the pre-existing `gradlew` mode change.
+- [x] `0.7.1`: add authenticated rights-aware track-context API and account-scoped local cache.
+- [x] `0.7.2`: add licensed plain/time-synced lyrics, current-line focus, and attribution UI.
+- [x] `0.7.3`: add bounded normalized and source-attributed song credits.
+- [x] `0.7.4`: validate inbound canonical track links and add preview-safe Worker resolution.
+- [x] `0.7.5`: add Android notification permission education and stable channel taxonomy.
+- [x] `0.7.6`: add server-authoritative followed/saved Artist release preferences and delivery queue.
+- [x] `0.7.7`: add Room 10→11 offline track-context cache and catalog reconciliation.
+- [x] Add private on-device Smart Recommendation with bounded scoring and Artist diversity.
+- [x] Run the cumulative Android unit, lint, debug/instrumentation, and release R8 gates.
+- [x] Replay/test/lint/apply the forward Supabase migration and confirm remote parity.
+- [x] Run Worker type/tests/dry-run, deploy the exact source, and verify production health.
+- [x] Inspect the complete diff, secret scan, versions, generated schema, and release artifact.
+- [ ] Explicitly stage validated paths, commit, push `main`, verify CI, tag, and publish prerelease.
+- [ ] Download the release APK and verify identity, signature, checksum, and byte equality.
+
+The batch intentionally adds Smart Recommendation as a local privacy-first slice before `0.8.x`.
+Only verified Room catalog and account-local signals are ranked; no raw listening profile is added
+to Worker requests, no recommendation enters the explicit queue automatically, and a signal-free
+account is not presented with falsely personalized content.
+
+The final local Android gate passed 236 unit tests with zero failures, errors, or skips; all 14
+module lint gates completed, and the debug, instrumentation, Room migration-test, and
+R8/resource-shrunk release APKs assembled. The signed debug candidate identifies as
+`my.id.rakyzumusic`, versionName `0.7.7`, versionCode `96`, min SDK 26, target SDK 37, and one v2
+signer; its pre-CI SHA-256 is
+`c76bb9cdd9f5d07f9dc4728d2b6e320dad30cf9c19904ddbbd1cd1d764d59ff8`.
+
+Worker validation passed 76 tests, both TypeScript checks, generated-binding verification, and a
+no-write Wrangler dry-run. Production dependency audit reported zero vulnerabilities. The forward
+PostgreSQL migration passed 14 transactional pgTAP assertions through the official Management API,
+remote `public`/`private` lint returned no errors, and all 19 local migrations now match production.
+Worker version `0.7.7` was deployed and its production health endpoint returned `ok`. Tracked
+credential-prefix and exact-sensitive-value scans were clean; `credential.env` remains ignored.
+
+## Completed cumulative 0.6.6–0.7.0 batch — 2026-09-29
 
 - [x] Audit the clean `v0.6.5` baseline and preserve the pre-existing `gradlew` mode change.
 - [x] `0.6.6`: reconcile removed/restored catalog tracks non-destructively and persist bounded
@@ -14,9 +51,9 @@
 - [x] Run cumulative Android unit tests, lint, debug/instrumentation APK builds, and release R8.
 - [x] Run Worker types/tests/dry-run and verify Supabase migration parity.
 - [x] Inspect the complete diff, generated Room schema, manifest, version, and secret scan.
-- [ ] Explicitly stage validated paths, create one cumulative Conventional Commit, and push main.
-- [ ] Verify exact-commit CI/CD and Worker health, then tag and publish the cumulative prerelease.
-- [ ] Download the public APK, verify identity/signature/checksum, and complete the final audit.
+- [x] Explicitly stage validated paths, create one cumulative Conventional Commit, and push main.
+- [x] Verify the GitHub startup exception, deploy the Worker, then tag and publish the prerelease.
+- [x] Download the release APK, verify identity/signature/checksum, and complete the final audit.
 
 The restored host initially lacked Java and `/tmp/android-sdk`; OpenJDK 17, Android SDK 37,
 Build Tools 36, platform-tools, QEMU user support, and the native Linux/aarch64 SQLite verifier

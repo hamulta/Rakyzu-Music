@@ -19,6 +19,7 @@ import my.id.rakyzumusic.core.data.auth.RakyzuAuthFactory
 import my.id.rakyzumusic.core.data.auth.RakyzuRepositories
 import my.id.rakyzumusic.core.data.auth.SupabasePublicConfiguration
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
+import my.id.rakyzumusic.core.data.context.TrackContextRepository
 import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.download.ExecutableOfflineDownloadRepository
 import my.id.rakyzumusic.core.data.download.OfflineDownloadWorkerDependencies
@@ -66,6 +67,7 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies,
 
     override fun onCreate() {
         super.onCreate()
+        RakyzuNotificationChannels.create(this)
         // Initialize the repository graph after all property delegates exist, before any
         // observer can race MainActivity for the same synchronized lazy instance.
         repositories
@@ -141,6 +143,9 @@ class RakyzuMusicApplication : Application(), PlaybackDependencies,
 
     val catalogRepository: CatalogRepository
         get() = repositories.catalogRepository
+
+    val trackContextRepository: TrackContextRepository
+        get() = repositories.trackContextRepository
 
     val libraryRepository: LibraryRepository
         get() = repositories.libraryRepository

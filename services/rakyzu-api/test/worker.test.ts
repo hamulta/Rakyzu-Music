@@ -17,7 +17,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.7.0" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.7.7" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -26,6 +26,62 @@ describe("Rakyzu Music API", () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get("www-authenticate")).toContain("Bearer");
+  });
+
+  it("returns only the rights-aware track context projection", async () => {
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const context = {
+      trackId: TRACK_ID,
+      revision: "context-v1",
+      cacheTtlSeconds: 86400,
+      lyrics: { kind: "plain", lines: [{ text: "Licensed line" }] },
+      credits: [{ displayName: "Rakyzu", role: "primary_artist" }],
+    };
+    const response = await execute(`/v1/tracks/${TRACK_ID}/context`, {
+      headers: { authorization: "Bearer listener-token" },
+      adminCalls: calls,
+      rpcResults: { get_track_context: context },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("private");
+    await expect(response.json()).resolves.toEqual(context);
+    expect(calls).toEqual([{ name: "get_track_context", payload: {
+      requested_track_id: TRACK_ID, requested_country_code: null,
+    } }]);
+  });
+
+  it("resolves a canonical track share link only after catalog authorization", async () => {
+    const response = await execute(`/v1/tracks/${TRACK_ID}/share`, {
+      headers: { authorization: "Bearer listener-token" },
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      trackId: TRACK_ID,
+      canonicalUri: `my.id.rakyzumusic://track/${TRACK_ID}`,
+      previewSafe: true,
+    });
+    const denied = await execute(`/v1/tracks/${TRACK_ID}/share`, {
+      headers: { authorization: "Bearer listener-token" }, published: false,
+    });
+    expect(denied.status).toBe(404);
+  });
+
+  it("stores release-notification preference through the account-scoped RPC", async () => {
+    const calls: Array<{ name: TestRpcName; payload: Record<string, unknown> }> = [];
+    const response = await execute("/v1/account/release-notifications", {
+      method: "PUT",
+      headers: { authorization: "Bearer listener-token", "content-type": "application/json" },
+      body: JSON.stringify({ preference: "followed_artists" }),
+      adminCalls: calls,
+      rpcResults: { set_release_notification_preference: {
+        preference: "followed_artists", updatedAtEpochMillis: 1,
+      } },
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([{ name: "set_release_notification_preference", payload: {
+      requested_preference: "followed_artists",
+    } }]);
   });
 
   it("does not disclose unpublished tracks", async () => {

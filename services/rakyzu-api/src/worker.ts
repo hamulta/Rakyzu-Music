@@ -19,17 +19,19 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 
-const API_VERSION = "0.7.0";
+const API_VERSION = "0.7.7";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
+const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const TRACK_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/stream\/?$/i;
 const TRACK_DOWNLOAD_ROUTE = /^\/v1\/tracks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/download\/?$/i;
+const TRACK_CONTEXT_ROUTE = new RegExp(`^/v1/tracks/${UUID}/context/?$`, "i");
+const TRACK_SHARE_ROUTE = new RegExp(`^/v1/tracks/${UUID}/share/?$`, "i");
 const PROFILE_AVATAR_ROUTE = /^\/v1\/profiles\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/avatar\/?$/i;
 const ARTIST_BIOGRAPHY_ROUTE = /^\/v1\/artists\/me\/biography\/?$/i;
 const ARTIST_PROFILE_ARTWORK_ROUTE = /^\/v1\/artists\/me\/artwork\/?$/i;
 const RECOMMENDATION_ARTWORK_ROUTE = /^\/v1\/recommendations\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
 const ALBUM_ARTWORK_ROUTE = /^\/v1\/albums\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
-const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const ADMIN_ALBUM_PUBLISH_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/publish/?$`, "i");
 const ADMIN_ARTIST_ROUTE = new RegExp(`^/v1/admin/artists/${UUID}/?$`, "i");
 const ADMIN_ALBUM_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/?$`, "i");
@@ -136,6 +138,8 @@ export function createWorker(
           ADMIN_SECURITY_ALERT_ROUTE.test(url.pathname);
         const trackRoute = url.pathname.match(TRACK_ROUTE);
         const trackDownloadRoute = url.pathname.match(TRACK_DOWNLOAD_ROUTE);
+        const trackContextRoute = url.pathname.match(TRACK_CONTEXT_ROUTE);
+        const trackShareRoute = url.pathname.match(TRACK_SHARE_ROUTE);
         const artworkRoute = url.pathname.match(ALBUM_ARTWORK_ROUTE);
         const playlistRoute = url.pathname.match(PLAYLIST_ARTWORK_ROUTE);
         const profileAvatarRoute = url.pathname.match(PROFILE_AVATAR_ROUTE);
@@ -153,9 +157,11 @@ export function createWorker(
         const isAccountRoute = url.pathname === "/v1/account/lifecycle" ||
           url.pathname === "/v1/account/appeals" ||
           url.pathname === "/v1/account/deletion" ||
-          url.pathname === "/v1/account/export";
+          url.pathname === "/v1/account/export" ||
+          url.pathname === "/v1/account/release-notifications";
         const recommendationArtworkRoute = url.pathname.match(RECOMMENDATION_ARTWORK_ROUTE);
-        if (!trackRoute?.[1] && !trackDownloadRoute?.[1] && !artworkRoute?.[1] && !playlistRoute?.[1] &&
+        if (!trackRoute?.[1] && !trackDownloadRoute?.[1] && !trackContextRoute?.[1] &&
+          !trackShareRoute?.[1] && !artworkRoute?.[1] && !playlistRoute?.[1] &&
           !profileAvatarRoute?.[1] && !isArtistBiographyRoute &&
           !recommendationArtworkRoute?.[1] && !isAdminRoute && !isArtistRoute && !isAccountRoute) {
           return errorResponse("not_found", "Resource not found.", 404, requestId, origin);
@@ -203,6 +209,39 @@ export function createWorker(
         if (isAccountRoute) {
           return await accountRequest(request, env, url.pathname, listener.userId, token,
             requestDependencies, requestId, origin);
+        }
+
+        if (trackContextRoute?.[1]) {
+          if (request.method !== "GET") {
+            return errorResponse("method_not_allowed", "Method not allowed.", 405,
+              requestId, origin, { allow: "GET, OPTIONS" });
+          }
+          return await trackContextRequest(
+            trackContextRoute[1].toLowerCase(), request, env, token,
+            requestDependencies, requestId, origin,
+          );
+        }
+
+        if (trackShareRoute?.[1]) {
+          if (request.method !== "GET") {
+            return errorResponse("method_not_allowed", "Method not allowed.", 405,
+              requestId, origin, { allow: "GET, OPTIONS" });
+          }
+          const trackId = trackShareRoute[1].toLowerCase();
+          try {
+            if (!(await requestDependencies.canStreamTrack(trackId, token, env))) {
+              return errorResponse("track_not_found", "Track not found.", 404, requestId, origin);
+            }
+          } catch (error) {
+            if (!(error instanceof CatalogUnavailable)) throw error;
+            return errorResponse("catalog_unavailable", "Catalog authorization is temporarily unavailable.",
+              503, requestId, origin, { "retry-after": "30" });
+          }
+          return jsonResponse({
+            trackId,
+            canonicalUri: `my.id.rakyzumusic://track/${trackId}`,
+            previewSafe: true,
+          }, 200, requestId, origin);
         }
 
         if (isArtistBiographyRoute) {
@@ -416,6 +455,17 @@ async function accountRequest(
   origin: string | null,
 ): Promise<Response> {
   try {
+    if (path === "/v1/account/release-notifications" && request.method === "GET") {
+      return jsonResponse(await requestDependencies.adminRpc(
+        "get_release_notification_preference", {}, token, env), 200, requestId, origin);
+    }
+    if (path === "/v1/account/release-notifications" && request.method === "PUT") {
+      const body = await readJsonObject(request);
+      return jsonResponse(await requestDependencies.adminRpc(
+        "set_release_notification_preference", {
+          requested_preference: readString(body, "preference", 24),
+        }, token, env), 200, requestId, origin);
+    }
     if (path === "/v1/account/lifecycle" && request.method === "GET") {
       return jsonResponse(await requestDependencies.adminRpc(
         "account_lifecycle_context", {}, token, env), 200, requestId, origin);
@@ -447,6 +497,40 @@ async function accountRequest(
     }
     if (error instanceof AdminUpstreamUnavailable) {
       return errorResponse("account_unavailable", "Account services are temporarily unavailable.",
+        503, requestId, origin, { "retry-after": "30" });
+    }
+    throw error;
+  }
+}
+
+async function trackContextRequest(
+  trackId: string,
+  request: Request,
+  env: RakyzuApiEnv,
+  token: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  const country = (request.cf as { country?: string } | undefined)?.country;
+  const normalizedCountry = country && /^[A-Z]{2}$/i.test(country) ? country.toUpperCase() : null;
+  try {
+    const value = await requestDependencies.adminRpc("get_track_context", {
+      requested_track_id: trackId,
+      requested_country_code: normalizedCountry,
+    }, token, env);
+    return jsonResponse(value, 200, requestId, origin, {
+      "cache-control": "private, max-age=300, must-revalidate",
+    });
+  } catch (error) {
+    if (error instanceof AdminRequestRejected) {
+      const status = error.status === 401 ? 401 : error.status === 403 ? 403 : 404;
+      return errorResponse(status === 404 ? "track_not_found" : "forbidden",
+        status === 404 ? "Track context is unavailable." : "Track context access is denied.",
+        status, requestId, origin);
+    }
+    if (error instanceof AdminUpstreamUnavailable) {
+      return errorResponse("context_unavailable", "Track context is temporarily unavailable.",
         503, requestId, origin, { "retry-after": "30" });
     }
     throw error;
