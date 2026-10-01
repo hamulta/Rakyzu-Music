@@ -1,6 +1,6 @@
 # Rakyzu Music — engineering work sessions
 
-## Active cumulative 0.8.1–0.8.8 batch — 2026-09-30 to 2026-10-01
+## Completed cumulative 0.8.1–0.8.8 batch — 2026-09-30 to 2026-10-01
 
 - [x] Audit the tagged `v0.8.0` baseline and preserve the unrelated `gradlew` mode change.
 - [x] `0.8.1`: add bounded weighted, account-scoped listening history in Room schema 12.
@@ -14,7 +14,7 @@
   cleanup, migration coverage, and synchronized release metadata.
 - [x] Complete Android, Worker, database, dependency, secret, APK identity/signature, and diff gates.
 - [x] Deploy Worker `0.8.8` and verify production health.
-- [ ] Push, tag, publish, download, and audit the
+- [x] Push, tag, publish, download, and audit the
   cumulative GitHub Release artifact.
 
 All recommendation computation and listener feedback remain account-scoped and device-local. No
@@ -36,6 +36,20 @@ Cloudflare uploaded Worker version `0d6faca2-a3cd-40cd-aaf7-f267a07d05d6`; produ
 Supabase migrations match production and remote `public`/`private` lint returned no findings; no
 database migration was required for device-local personalization. The tracked credential-prefix
 scan is clean and `credential.env` remains ignored.
+
+Commit `bc6156a` was pushed to `main`, tagged with annotated tag `v0.8.8`, and published as an
+Android prerelease. The downloaded `Rakyzu-Music-0.8.8-debug.apk` is byte-identical to the locally
+validated candidate: 29,646,058 bytes, SHA-256
+`af18f14e53ec5117746de59def40e085f293e7a1b2c21b75558e8c00eaebb743`, package
+`my.id.rakyzumusic`, versionName `0.8.8`, versionCode `106`, min SDK 26, target/compile SDK 37,
+and one valid v2 signer.
+
+GitHub accepted the push but its Actions backend again created synthetic run `36827351152` at
+path `BuildFailed`; it completed with `startup_failure`, zero jobs, and zero check-runs. The active
+Android workflow has push/PR triggers but no manual-dispatch trigger, so the attempted explicit
+dispatch was rejected before a run could be created. No green remote run is claimed. The complete
+local Android gate, Worker gate, linked Supabase checks, production Worker health, and downloaded
+release-asset audit above provide the release evidence.
 
 ## Active cumulative 0.7.8 and 0.8.0 batch — 2026-09-30
 
