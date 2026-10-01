@@ -778,3 +778,9 @@ metadata and asset inventories were compared through the GitHub API. The old and
 release manifests share SHA-256 `6244d4988b2ccc3f39737c629ad6f174a575b46925fe41801dab73e2e819478c`,
 and normalized release-note content shares SHA-256
 `053c730e97b170d0897856b7df2225c9e74d9e40534ac9d9430d4a518df02573`.
+
+The first destination Android run proved that all three public build secrets were available, then
+exhausted the 3 GiB Gradle heap while several Android-test D8 merge workers ran concurrently. The
+daemon remained alive until the 45-minute job timeout. Android CI now runs the same cumulative gate
+non-parallel with one Gradle worker, allows 75 minutes for a cold repository cache, and supports
+manual dispatch. This changes CI resource scheduling only; it does not relax or split the gate.
