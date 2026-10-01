@@ -791,3 +791,18 @@ script references that could not be serialized. The task now reads only its decl
 inside the action and performs the same hosted-origin, publishable-key, privileged-key, and API
 origin checks without capturing script state. Two local strict configuration-cache runs passed: the
 first stored a new entry and the second reused it successfully in four seconds.
+
+Final destination evidence:
+
+- Android CI [run 36856599037](https://github.com/hamulta/Rakyzu-Music/actions/runs/36856599037)
+  passed every setup, public-configuration, unit-test, lint, debug/test/release build, embedded
+  configuration, report-upload, and APK-upload step on commit `68adf39`.
+- Database CI [run 36833014374](https://github.com/hamulta/Rakyzu-Music/actions/runs/36833014374)
+  passed its isolated validation workflow in the destination repository.
+- Worker CI [run 36833019517](https://github.com/hamulta/Rakyzu-Music/actions/runs/36833019517)
+  passed its complete quality gate in the destination repository.
+- The Android artifact downloaded from the successful destination run is
+  `Rakyzu-Music-0.8.8-debug.apk`, 29,646,058 bytes, SHA-256
+  `215216e6d8f422d824f92442d77386e7e5a958f11dfe5110c336e800faef7123`. It identifies as
+  `my.id.rakyzumusic`, versionName `0.8.8`, versionCode `106`, min SDK 26, target/compile SDK 37,
+  and has one valid APK Signature Scheme v2 signer.
