@@ -21,14 +21,6 @@ val rakyzuApiBaseUrl = providers.gradleProperty("RAKYZU_API_BASE_URL")
     .orElse(providers.environmentVariable("RAKYZU_API_BASE_URL"))
     .getOrElse("")
 
-fun String.isPrivilegedSupabaseKey(): Boolean {
-    if (startsWith("sb_secret_", ignoreCase = true)) return true
-    val payload = split('.').getOrNull(1) ?: return false
-    return runCatching {
-        String(Base64.getUrlDecoder().decode(payload.padEnd((payload.length + 3) / 4 * 4, '=')))
-    }.getOrDefault("").contains(Regex("\"role\"\\s*:\\s*\"service_role\""))
-}
-
 val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
     group = "verification"
     description = "Rejects Android artifacts with missing or privileged public configuration."
@@ -36,7 +28,11 @@ val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
     inputs.property("supabasePublishableKey", supabasePublishableKey)
     inputs.property("rakyzuApiBaseUrl", rakyzuApiBaseUrl)
     doLast {
-        val supabaseUri = runCatching { URI(supabaseUrl) }.getOrNull()
+        val configuredSupabaseUrl = inputs.properties.getValue("supabaseUrl") as String
+        val configuredPublishableKey =
+            inputs.properties.getValue("supabasePublishableKey") as String
+        val configuredApiBaseUrl = inputs.properties.getValue("rakyzuApiBaseUrl") as String
+        val supabaseUri = runCatching { URI(configuredSupabaseUrl) }.getOrNull()
         check(
             supabaseUri?.scheme == "https" &&
                 supabaseUri.host?.endsWith(".supabase.co") == true &&
@@ -46,13 +42,26 @@ val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
                 supabaseUri.query == null &&
                 supabaseUri.fragment == null,
         ) { "SUPABASE_URL must be a hosted Supabase HTTPS origin." }
-        check(supabasePublishableKey.length >= 20 && !supabasePublishableKey.any(Char::isWhitespace)) {
+        check(
+            configuredPublishableKey.length >= 20 &&
+                !configuredPublishableKey.any(Char::isWhitespace),
+        ) {
             "SUPABASE_PUBLISHABLE_KEY is missing or malformed."
         }
-        check(!supabasePublishableKey.isPrivilegedSupabaseKey()) {
+        val isPrivilegedKey = if (configuredPublishableKey.startsWith("sb_secret_", ignoreCase = true)) {
+            true
+        } else {
+            val payload = configuredPublishableKey.split('.').getOrNull(1)
+            payload != null && runCatching {
+                String(
+                    Base64.getUrlDecoder().decode(payload.padEnd((payload.length + 3) / 4 * 4, '=')),
+                )
+            }.getOrDefault("").contains(Regex("\"role\"\\s*:\\s*\"service_role\""))
+        }
+        check(!isPrivilegedKey) {
             "SUPABASE_PUBLISHABLE_KEY must never contain a secret or service-role key."
         }
-        check(rakyzuApiBaseUrl == "https://api.rakyzu.my.id") {
+        check(configuredApiBaseUrl == "https://api.rakyzu.my.id") {
             "RAKYZU_API_BASE_URL must use the production Rakyzu API origin."
         }
     }

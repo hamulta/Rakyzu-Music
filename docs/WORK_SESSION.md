@@ -784,3 +784,10 @@ exhausted the 3 GiB Gradle heap while several Android-test D8 merge workers ran 
 daemon remained alive until the 45-minute job timeout. Android CI now runs the same cumulative gate
 non-parallel with one Gradle worker, allows 75 minutes for a cold repository cache, and supports
 manual dispatch. This changes CI resource scheduling only; it does not relax or split the gate.
+
+The bounded-concurrency rerun completed all 1,637 requested Gradle tasks in 14m52s, then Gradle 9.5
+correctly rejected the custom public-configuration task because its action captured Kotlin build
+script references that could not be serialized. The task now reads only its declared scalar inputs
+inside the action and performs the same hosted-origin, publishable-key, privileged-key, and API
+origin checks without capturing script state. Two local strict configuration-cache runs passed: the
+first stored a new entry and the second reused it successfully in four seconds.
