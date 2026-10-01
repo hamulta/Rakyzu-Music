@@ -19,6 +19,7 @@ import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
 import org.junit.After
@@ -481,15 +482,62 @@ class HomeViewModelTest {
         assertEquals("Rakyzu Sessions", track.copy(albumTitle = "").homeSubtitle())
     }
 
+    @Test
+    fun personalizationActionsStayScopedToRequestedListener() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(refreshResult = CatalogRefreshResult.Success(42L))
+        val viewModel = HomeViewModel("listener-73", repository, FakeConnectivityMonitor(true))
+        testScheduler.advanceUntilIdle()
+
+        viewModel.setDiscoveryMode(DiscoveryMode.Explore)
+        viewModel.hideRecommendation("track-1")
+        viewModel.setTasteSignalExcluded("track-1", true)
+        viewModel.clearPersonalizationData()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "mode:listener-73:explore",
+                "hide:listener-73:track-1:true",
+                "exclude:listener-73:track-1:true",
+                "clear:listener-73",
+            ),
+            repository.personalizationActions,
+        )
+        assertEquals(
+            "Listening history and private recommendation controls cleared",
+            viewModel.uiState.value.personalizationMessage,
+        )
+    }
+
+    @Test
+    fun personalizationStorageFailureIsReportedWithoutCrashing() = runTest(dispatcher) {
+        val repository = FakeCatalogRepository(
+            refreshResult = CatalogRefreshResult.Success(42L),
+            throwOnPersonalizationAction = true,
+        )
+        val viewModel = HomeViewModel("listener-73", repository, FakeConnectivityMonitor(true))
+        testScheduler.advanceUntilIdle()
+
+        viewModel.setPersonalizationEnabled(false)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            "Personalization settings could not be updated",
+            viewModel.uiState.value.personalizationMessage,
+        )
+    }
+
     private class FakeCatalogRepository(
         initial: CatalogSnapshot = EMPTY,
         private val recentlyPlayed: List<Track> = emptyList(),
         refreshResult: CatalogRefreshResult,
         additionalRefreshResults: List<CatalogRefreshResult> = emptyList(),
+        private val throwOnPersonalizationAction: Boolean = false,
     ) : CatalogRepository {
         val catalog = MutableStateFlow(initial)
         var observedUserId: String? = null
         var refreshCalls: Int = 0
+        val personalizationActions = mutableListOf<String>()
         private val refreshResults = ArrayDeque(
             listOf(refreshResult) + additionalRefreshResults,
         )
@@ -511,6 +559,40 @@ class HomeViewModelTest {
         }
 
         override suspend fun recordRecentlyPlayed(userId: String, trackId: String) = false
+
+        override suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean {
+            if (throwOnPersonalizationAction) error("storage unavailable")
+            personalizationActions += "enabled:$userId:$enabled"
+            return true
+        }
+
+        override suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean {
+            personalizationActions += "mode:$userId:${mode.storageValue}"
+            return true
+        }
+
+        override suspend fun setRecommendationHidden(
+            userId: String,
+            trackId: String,
+            hidden: Boolean,
+        ): Boolean {
+            personalizationActions += "hide:$userId:$trackId:$hidden"
+            return true
+        }
+
+        override suspend fun setTasteSignalExcluded(
+            userId: String,
+            trackId: String,
+            excluded: Boolean,
+        ): Boolean {
+            personalizationActions += "exclude:$userId:$trackId:$excluded"
+            return true
+        }
+
+        override suspend fun clearPersonalizationData(userId: String): Boolean {
+            personalizationActions += "clear:$userId"
+            return true
+        }
     }
 
     private class FakeConnectivityMonitor(initiallyOnline: Boolean) : ConnectivityMonitor {

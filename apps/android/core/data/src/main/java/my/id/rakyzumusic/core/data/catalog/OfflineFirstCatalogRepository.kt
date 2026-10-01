@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import my.id.rakyzumusic.core.database.catalog.CatalogLocalDataSource
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
 
@@ -33,6 +34,27 @@ internal class OfflineFirstCatalogRepository(
             trackId = trackId,
             playedAtEpochMillis = currentTimeMillis(),
         )
+
+    override suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean =
+        localDataSource.setPersonalizationEnabled(userId, enabled)
+
+    override suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean =
+        localDataSource.setDiscoveryMode(userId, mode)
+
+    override suspend fun setRecommendationHidden(
+        userId: String,
+        trackId: String,
+        hidden: Boolean,
+    ): Boolean = localDataSource.setRecommendationHidden(userId, trackId, hidden)
+
+    override suspend fun setTasteSignalExcluded(
+        userId: String,
+        trackId: String,
+        excluded: Boolean,
+    ): Boolean = localDataSource.setTasteSignalExcluded(userId, trackId, excluded)
+
+    override suspend fun clearPersonalizationData(userId: String): Boolean =
+        localDataSource.clearPersonalizationData(userId)
 
     override suspend fun refresh(): CatalogRefreshResult = try {
         val snapshot = remoteDataSource.fetchCatalog()

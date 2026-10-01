@@ -3,6 +3,7 @@ package my.id.rakyzumusic.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,18 +16,28 @@ import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
+import my.id.rakyzumusic.core.model.ListeningHistoryItem
+import my.id.rakyzumusic.core.model.PersonalizedCollection
+import my.id.rakyzumusic.core.model.PersonalizedTrack
+import my.id.rakyzumusic.core.model.TasteProfile
 import my.id.rakyzumusic.core.model.Track
 
 data class HomeUiState(
     val catalog: CatalogSnapshot = EMPTY_CATALOG,
     val recentlyPlayed: List<Track> = emptyList(),
-    val smartRecommendations: List<Track> = emptyList(),
+    val listeningHistory: List<ListeningHistoryItem> = emptyList(),
+    val recommendations: List<PersonalizedTrack> = emptyList(),
+    val mixes: List<PersonalizedCollection> = emptyList(),
+    val radioStations: List<PersonalizedCollection> = emptyList(),
+    val tasteProfile: TasteProfile = TasteProfile(),
     val derivedSections: HomeDerivedSections = catalog.toHomeDerivedSections(),
     val catalogFreshness: CatalogFreshness = CatalogFreshness(),
     val isRefreshing: Boolean = true,
     val isWaitingForConnection: Boolean = false,
     val refreshMessage: String? = null,
+    val personalizationMessage: String? = null,
 ) {
     val hasPlayableContent: Boolean
         get() = catalog.tracks.isNotEmpty()
@@ -143,6 +154,55 @@ class HomeViewModel internal constructor(
     }
 
     fun refresh() = startRefresh(HomeRefreshTrigger.Manual)
+
+    fun setPersonalizationEnabled(enabled: Boolean) = updatePersonalization(
+        successMessage = if (enabled) "Private recommendations enabled" else "Private recommendations paused",
+    ) { repository.setPersonalizationEnabled(userId, enabled) }
+
+    fun setDiscoveryMode(mode: DiscoveryMode) = updatePersonalization(
+        successMessage = "Discovery mode changed to ${mode.name.lowercase()}",
+    ) { repository.setDiscoveryMode(userId, mode) }
+
+    fun hideRecommendation(trackId: String) = updatePersonalization(
+        successMessage = "Recommendation hidden",
+    ) { repository.setRecommendationHidden(userId, trackId, true) }
+
+    fun setTasteSignalExcluded(trackId: String, excluded: Boolean) = updatePersonalization(
+        successMessage = if (excluded) {
+            "This track will not shape your taste profile"
+        } else {
+            "This track can shape your taste profile again"
+        },
+    ) { repository.setTasteSignalExcluded(userId, trackId, excluded) }
+
+    fun clearPersonalizationData() = updatePersonalization(
+        successMessage = "Listening history and private recommendation controls cleared",
+    ) { repository.clearPersonalizationData(userId) }
+
+    fun clearPersonalizationMessage() {
+        mutableUiState.update { it.copy(personalizationMessage = null) }
+    }
+
+    private fun updatePersonalization(
+        successMessage: String,
+        action: suspend () -> Boolean,
+    ) {
+        viewModelScope.launch {
+            val succeeded = try {
+                action()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                false
+            }
+            mutableUiState.update {
+                it.copy(
+                    personalizationMessage = if (succeeded) successMessage else
+                        "Personalization settings could not be updated",
+                )
+            }
+        }
+    }
 
     private fun startRefresh(trigger: HomeRefreshTrigger) {
         if (refreshInProgress) {
@@ -306,11 +366,18 @@ internal fun HomeUiState.withHomeFeed(
 ): HomeUiState {
     val stableCatalog = catalog.reuseWhenEqual(feed.catalog)
     val stableRecentlyPlayed = recentlyPlayed.reuseWhenEqual(feed.recentlyPlayed)
-    val stableSmartRecommendations = smartRecommendations.reuseWhenEqual(feed.smartRecommendations)
+    val stableListeningHistory = listeningHistory.reuseWhenEqual(feed.listeningHistory)
+    val stableRecommendations = recommendations.reuseWhenEqual(feed.recommendations)
+    val stableMixes = mixes.reuseWhenEqual(feed.mixes)
+    val stableRadioStations = radioStations.reuseWhenEqual(feed.radioStations)
     return copy(
         catalog = stableCatalog,
         recentlyPlayed = stableRecentlyPlayed,
-        smartRecommendations = stableSmartRecommendations,
+        listeningHistory = stableListeningHistory,
+        recommendations = stableRecommendations,
+        mixes = stableMixes,
+        radioStations = stableRadioStations,
+        tasteProfile = feed.tasteProfile,
         derivedSections = if (stableCatalog === catalog) {
             derivedSections
         } else {

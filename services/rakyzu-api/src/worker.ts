@@ -19,7 +19,7 @@ import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } fr
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 
-const API_VERSION = "0.8.0";
+const API_VERSION = "0.8.8";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;

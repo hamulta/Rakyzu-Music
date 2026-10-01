@@ -51,6 +51,16 @@ part of the architecture.
 
 Android mirrors the catalog and editorial graph in Room 3 using checked-in schema version 3 and automatic forward migrations from versions 1 and 2. Refresh validates the complete remote graph before a single transaction replaces artists, albums, tracks, shelves, entries, and the successful-sync timestamp. If network, service, or validation fails, the existing local snapshot remains untouched.
 
+### Private personalization — 0.8.1–0.8.8
+
+Room schema 12 adds a bounded `play_count` to account-and-track keyed listening history plus
+account-scoped `personalization_preferences` and `recommendation_feedback`. The automatic 11→12
+migration preserves earlier history with a default count of one. Recommendations, daily mixes,
+radio, explanations, discovery modes, hides, and taste exclusions are derived and stored only on
+the device; no new Supabase table or third-party recommendation service is introduced. Reset is a
+single Room transaction that clears only the active account's history and personalization state,
+leaving Library content unchanged.
+
 `public.liked_tracks`, `public.saved_albums`, and `public.followed_artists` store canonical account Library relationships. Forced RLS and owner-only policies restrict authenticated reads and mutations to `auth.uid()`; anonymous table and RPC access is revoked. Bounded `get_library_items_page`, `get_library_sync_anchor`, and `get_library_changes` functions use invoker rights and preserve RLS. The append-only `library_changes` stream records insertions and deletion tombstones for resumable per-listener synchronization. Room mirrors canonical IDs and adds a coalescing account/item mutation outbox; snapshot replacement and cursor application preserve newer pending intents.
 
 `public.playlists` stores owner-scoped playlist metadata. Forced RLS and security-invoker `get_my_playlists` and `create_playlist` functions keep reads and creates inside `auth.uid()`, normalize bounded names/descriptions, and deny anonymous execution. `revision` begins at one as the optimistic-concurrency snapshot boundary for later ordered-item and collaboration migrations. Room schema 5 caches only the authenticated listener's validated collection and updates it transactionally without storing the owner identifier in the domain/UI model.

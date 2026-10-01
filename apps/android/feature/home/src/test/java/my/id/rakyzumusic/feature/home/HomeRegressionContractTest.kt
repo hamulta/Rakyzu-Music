@@ -4,6 +4,8 @@ import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
+import my.id.rakyzumusic.core.model.PersonalizedCollection
+import my.id.rakyzumusic.core.model.PersonalizedTrack
 import my.id.rakyzumusic.core.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,6 +36,31 @@ class HomeRegressionContractTest {
         assertFalse(visibility.editorialShelves)
         assertTrue(visibility.newReleases)
         assertFalse(visibility.allTracks)
+    }
+
+    @Test
+    fun madeForYouFilterShowsOnlyPersonalizedSurfacesAndControls() {
+        val state = populatedState().let { baseline ->
+            val track = baseline.catalog.tracks.single()
+            baseline.copy(
+                recommendations = listOf(PersonalizedTrack(track, "Because you listen locally")),
+                mixes = listOf(PersonalizedCollection("mix", "Rakyzu Mix", "Daily", listOf(track))),
+                radioStations = listOf(
+                    PersonalizedCollection("radio", "Track Radio", "Local radio", listOf(track)),
+                ),
+            )
+        }
+
+        val visibility = state.toHomeSectionVisibility(HomeFilter.MadeForYou)
+
+        assertFalse(visibility.recentlyPlayed)
+        assertFalse(visibility.editorialShelves)
+        assertFalse(visibility.newReleases)
+        assertFalse(visibility.allTracks)
+        assertTrue(visibility.smartRecommendations)
+        assertTrue(visibility.mixes)
+        assertTrue(visibility.radioStations)
+        assertTrue(visibility.personalizationControls)
     }
 
     @Test

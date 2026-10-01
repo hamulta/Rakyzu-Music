@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
 
@@ -15,6 +16,16 @@ interface CatalogRepository {
     suspend fun refresh(): CatalogRefreshResult
 
     suspend fun recordRecentlyPlayed(userId: String, trackId: String): Boolean
+
+    suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean = false
+
+    suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean = false
+
+    suspend fun setRecommendationHidden(userId: String, trackId: String, hidden: Boolean): Boolean = false
+
+    suspend fun setTasteSignalExcluded(userId: String, trackId: String, excluded: Boolean): Boolean = false
+
+    suspend fun clearPersonalizationData(userId: String): Boolean = false
 
     suspend fun searchCatalog(
         query: String,

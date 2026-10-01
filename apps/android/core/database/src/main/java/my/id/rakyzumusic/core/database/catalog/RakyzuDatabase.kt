@@ -16,6 +16,8 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         EditorialShelfEntity::class,
         EditorialShelfTrackEntity::class,
         RecentlyPlayedEntity::class,
+        PersonalizationPreferenceEntity::class,
+        RecommendationFeedbackEntity::class,
         LibraryLikedTrackEntity::class,
         LibrarySavedAlbumEntity::class,
         LibraryFollowedArtistEntity::class,
@@ -32,7 +34,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         TrackLyricLineEntity::class,
         TrackCreditEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -45,6 +47,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
         AutoMigration(from = 10, to = 11),
+        AutoMigration(from = 11, to = 12),
     ],
 )
 internal abstract class RakyzuDatabase : RoomDatabase() {

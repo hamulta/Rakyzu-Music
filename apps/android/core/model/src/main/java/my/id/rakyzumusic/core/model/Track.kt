@@ -49,8 +49,54 @@ data class EditorialShelf(
 data class HomeFeedSnapshot(
     val catalog: CatalogSnapshot,
     val recentlyPlayed: List<Track>,
-    val smartRecommendations: List<Track> = emptyList(),
+    val listeningHistory: List<ListeningHistoryItem> = emptyList(),
+    val recommendations: List<PersonalizedTrack> = emptyList(),
+    val mixes: List<PersonalizedCollection> = emptyList(),
+    val radioStations: List<PersonalizedCollection> = emptyList(),
+    val tasteProfile: TasteProfile = TasteProfile(),
 )
+
+data class ListeningHistoryItem(
+    val track: Track,
+    val lastPlayedAtEpochMillis: Long,
+    val playCount: Int,
+)
+
+data class PersonalizedTrack(
+    val track: Track,
+    val reason: String,
+)
+
+data class PersonalizedCollection(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val tracks: List<Track>,
+)
+
+enum class DiscoveryMode(val storageValue: String) {
+    Familiar("familiar"),
+    Balanced("balanced"),
+    Explore("explore"),
+    ;
+
+    companion object {
+        fun fromStorage(value: String?): DiscoveryMode = entries
+            .firstOrNull { it.storageValue == value }
+            ?: Balanced
+    }
+}
+
+data class TasteProfile(
+    val enabled: Boolean = true,
+    val discoveryMode: DiscoveryMode = DiscoveryMode.Balanced,
+    val signalCount: Int = 0,
+    val excludedTrackIds: Set<String> = emptySet(),
+    val hiddenTrackIds: Set<String> = emptySet(),
+) {
+    val isPersonalized: Boolean
+        get() = enabled && signalCount > 0
+}
 
 enum class LibraryItemKind {
     Track,

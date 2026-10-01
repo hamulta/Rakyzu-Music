@@ -34,4 +34,24 @@ class HomeLayoutSpecTest {
         assertEquals(2, spec.trackTextMaxLines)
         assertTrue(spec.useStackedFeaturedCard)
     }
+
+    @Test
+    fun mediumTabletUsesRoomierTwoLineCards() {
+        val spec = resolveHomeLayoutSpec(availableWidth = 700.dp, fontScale = 1f)
+
+        assertEquals(32.dp, spec.horizontalPadding)
+        assertEquals(180.dp, spec.trackCardWidth)
+        assertEquals(2, spec.trackTextMaxLines)
+        assertFalse(spec.useStackedFeaturedCard)
+    }
+
+    @Test
+    fun expandedTabletUsesBoundedDesktopSpacing() {
+        val spec = resolveHomeLayoutSpec(availableWidth = 900.dp, fontScale = 1f)
+
+        assertEquals(48.dp, spec.horizontalPadding)
+        assertEquals(196.dp, spec.trackCardWidth)
+        assertEquals(2, spec.trackTextMaxLines)
+        assertFalse(spec.useStackedFeaturedCard)
+    }
 }

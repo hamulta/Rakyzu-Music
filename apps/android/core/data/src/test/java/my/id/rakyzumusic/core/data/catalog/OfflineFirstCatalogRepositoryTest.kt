@@ -7,6 +7,7 @@ import my.id.rakyzumusic.core.database.catalog.CatalogLocalDataSource
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
@@ -110,6 +111,32 @@ class OfflineFirstCatalogRepositoryTest {
     }
 
     @Test
+    fun personalizationControlsDelegateOnlyAccountScopedValues() = runTest {
+        val local = FakeLocalDataSource(VALID_CATALOG)
+        val repository = OfflineFirstCatalogRepository(
+            localDataSource = local,
+            remoteDataSource = FakeRemoteDataSource { VALID_CATALOG },
+        )
+
+        assertEquals(true, repository.setPersonalizationEnabled("listener-1", false))
+        assertEquals(true, repository.setDiscoveryMode("listener-1", DiscoveryMode.Explore))
+        assertEquals(true, repository.setRecommendationHidden("listener-1", "track-1", true))
+        assertEquals(true, repository.setTasteSignalExcluded("listener-1", "track-1", true))
+        assertEquals(true, repository.clearPersonalizationData("listener-1"))
+
+        assertEquals(
+            listOf(
+                "enabled:listener-1:false",
+                "mode:listener-1:explore",
+                "hide:listener-1:track-1:true",
+                "exclude:listener-1:track-1:true",
+                "clear:listener-1",
+            ),
+            local.personalizationActions,
+        )
+    }
+
+    @Test
     fun authenticatedSearchReturnsValidatedBoundedPage() = runTest {
         val expected = CatalogSearchPage(
             artists = VALID_CATALOG.artists,
@@ -168,6 +195,7 @@ class OfflineFirstCatalogRepositoryTest {
     private class FakeLocalDataSource(initial: CatalogSnapshot) : CatalogLocalDataSource {
         private val catalog = MutableStateFlow(initial)
         var lastRecorded: Triple<String, String, Long>? = null
+        val personalizationActions = mutableListOf<String>()
 
         override fun observeCatalog(): Flow<CatalogSnapshot> = catalog
 
@@ -184,6 +212,39 @@ class OfflineFirstCatalogRepositoryTest {
             playedAtEpochMillis: Long,
         ): Boolean {
             lastRecorded = Triple(userId, trackId, playedAtEpochMillis)
+            return true
+        }
+
+        override suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean {
+            personalizationActions += "enabled:$userId:$enabled"
+            return true
+        }
+
+        override suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean {
+            personalizationActions += "mode:$userId:${mode.storageValue}"
+            return true
+        }
+
+        override suspend fun setRecommendationHidden(
+            userId: String,
+            trackId: String,
+            hidden: Boolean,
+        ): Boolean {
+            personalizationActions += "hide:$userId:$trackId:$hidden"
+            return true
+        }
+
+        override suspend fun setTasteSignalExcluded(
+            userId: String,
+            trackId: String,
+            excluded: Boolean,
+        ): Boolean {
+            personalizationActions += "exclude:$userId:$trackId:$excluded"
+            return true
+        }
+
+        override suspend fun clearPersonalizationData(userId: String): Boolean {
+            personalizationActions += "clear:$userId"
             return true
         }
 

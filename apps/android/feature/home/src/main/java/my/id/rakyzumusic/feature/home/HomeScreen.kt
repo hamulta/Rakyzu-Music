@@ -26,13 +26,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,7 +49,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -85,6 +90,7 @@ import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.Track
 
 private val catalogGradients = listOf(
@@ -98,6 +104,7 @@ internal enum class HomeFilter(
     val label: String,
 ) {
     Music(storageKey = "music", label = "Music"),
+    MadeForYou(storageKey = "made-for-you", label = "Made for you"),
     NewReleases(storageKey = "new-releases", label = "New releases"),
     ;
 
@@ -116,18 +123,26 @@ internal data class HomeSectionVisibility(
     val newReleases: Boolean,
     val allTracks: Boolean,
     val smartRecommendations: Boolean = false,
+    val mixes: Boolean = false,
+    val radioStations: Boolean = false,
+    val personalizationControls: Boolean = false,
 )
 
 internal fun HomeUiState.toHomeSectionVisibility(
     filter: HomeFilter,
 ): HomeSectionVisibility {
     val showsMusicSections = filter == HomeFilter.Music
+    val showsPersonalizedSections = filter == HomeFilter.Music || filter == HomeFilter.MadeForYou
     return HomeSectionVisibility(
         recentlyPlayed = showsMusicSections && recentlyPlayed.isNotEmpty(),
         editorialShelves = showsMusicSections && catalog.editorialShelves.isNotEmpty(),
-        newReleases = derivedSections.newReleaseTracks.isNotEmpty(),
+        newReleases = (showsMusicSections || filter == HomeFilter.NewReleases) &&
+            derivedSections.newReleaseTracks.isNotEmpty(),
         allTracks = showsMusicSections && catalog.tracks.isNotEmpty(),
-        smartRecommendations = showsMusicSections && smartRecommendations.isNotEmpty(),
+        smartRecommendations = showsPersonalizedSections && recommendations.isNotEmpty(),
+        mixes = showsPersonalizedSections && mixes.isNotEmpty(),
+        radioStations = showsPersonalizedSections && radioStations.isNotEmpty(),
+        personalizationControls = showsPersonalizedSections && catalog.tracks.isNotEmpty(),
     )
 }
 
@@ -153,7 +168,25 @@ internal fun resolveHomeLayoutSpec(
 ): HomeLayoutSpec {
     val isCompactScreen = availableWidth < 360.dp
     val usesLargeText = fontScale >= 1.3f
-    if (!isCompactScreen && !usesLargeText) return HomeLayoutSpec.Standard
+    val isExpandedScreen = availableWidth >= 840.dp
+    val isMediumScreen = availableWidth >= 600.dp
+    if (!isCompactScreen && !usesLargeText) {
+        return when {
+            isExpandedScreen -> HomeLayoutSpec(
+                horizontalPadding = 48.dp,
+                trackCardWidth = 196.dp,
+                trackTextMaxLines = 2,
+                useStackedFeaturedCard = false,
+            )
+            isMediumScreen -> HomeLayoutSpec(
+                horizontalPadding = 32.dp,
+                trackCardWidth = 180.dp,
+                trackTextMaxLines = 2,
+                useStackedFeaturedCard = false,
+            )
+            else -> HomeLayoutSpec.Standard
+        }
+    }
 
     val horizontalPadding = if (isCompactScreen) 16.dp else 20.dp
     val availableCardWidth = availableWidth - (horizontalPadding * 2)
@@ -224,6 +257,14 @@ fun HomeRoute(
             onTrackLikeChange = onTrackLikeChange,
             onAlbumSaveChange = onAlbumSaveChange,
             onArtistFollowChange = onArtistFollowChange,
+            onPersonalizationEnabledChange = homeViewModel::setPersonalizationEnabled,
+            onDiscoveryModeChange = homeViewModel::setDiscoveryMode,
+            onRecommendationHidden = { homeViewModel.hideRecommendation(it.id) },
+            onTasteSignalExcluded = { track, excluded ->
+                homeViewModel.setTasteSignalExcluded(track.id, excluded)
+            },
+            onClearPersonalizationData = homeViewModel::clearPersonalizationData,
+            onPersonalizationMessageConsumed = homeViewModel::clearPersonalizationMessage,
         )
     }
 }
@@ -251,6 +292,12 @@ fun HomeScreen(
     onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
     onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
     onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onPersonalizationEnabledChange: (Boolean) -> Unit = {},
+    onDiscoveryModeChange: (DiscoveryMode) -> Unit = {},
+    onRecommendationHidden: (Track) -> Unit = {},
+    onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
+    onClearPersonalizationData: () -> Unit = {},
+    onPersonalizationMessageConsumed: () -> Unit = {},
 ) {
     var selectedFilterKey by rememberSaveable {
         mutableStateOf(HomeFilter.Music.storageKey)
@@ -354,9 +401,16 @@ fun HomeScreen(
             if (sectionVisibility.recentlyPlayed) {
                 item(key = "recently-played") {
                     TrackShelf(
-                        title = "Recently played",
-                        subtitle = "Continue from your latest listening on this device.",
+                        title = "Listening history",
+                        subtitle = "Continue from your private listening activity on this device.",
                         tracks = state.recentlyPlayed,
+                        recommendationReasons = state.listeningHistory.associate { item ->
+                            item.track.id to if (item.playCount == 1) {
+                                "Played once"
+                            } else {
+                                "Played ${item.playCount} times"
+                            }
+                        },
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
@@ -366,9 +420,57 @@ fun HomeScreen(
                         pendingTrackIds = pendingTrackIds,
                         pendingAlbumIds = pendingAlbumIds,
                         pendingArtistIds = pendingArtistIds,
+                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
+                        allowTasteExclusion = true,
                         onTrackLikeChange = onTrackLikeChange,
                         onAlbumSaveChange = onAlbumSaveChange,
                         onArtistFollowChange = onArtistFollowChange,
+                        onRecommendationHidden = onRecommendationHidden,
+                        onTasteSignalExcluded = onTasteSignalExcluded,
+                    )
+                }
+            }
+            if (sectionVisibility.personalizationControls) {
+                item(key = "personalization-controls") {
+                    PersonalizationControls(
+                        enabled = state.tasteProfile.enabled,
+                        mode = state.tasteProfile.discoveryMode,
+                        signalCount = state.tasteProfile.signalCount,
+                        message = state.personalizationMessage,
+                        horizontalPadding = layoutSpec.horizontalPadding,
+                        onEnabledChange = onPersonalizationEnabledChange,
+                        onModeChange = onDiscoveryModeChange,
+                        onClearData = onClearPersonalizationData,
+                        onMessageConsumed = onPersonalizationMessageConsumed,
+                    )
+                }
+            }
+            if (sectionVisibility.mixes) {
+                items(
+                    items = state.mixes,
+                    key = { "mix-${it.id}" },
+                ) { mix ->
+                    TrackShelf(
+                        title = mix.title,
+                        subtitle = mix.subtitle,
+                        tracks = mix.tracks,
+                        layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
+                        onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
+                        allowRecommendationHide = true,
+                        allowTasteExclusion = true,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
+                        onRecommendationHidden = onRecommendationHidden,
+                        onTasteSignalExcluded = onTasteSignalExcluded,
                     )
                 }
             }
@@ -377,7 +479,10 @@ fun HomeScreen(
                     TrackShelf(
                         title = "Made for you",
                         subtitle = "Private recommendations ranked on this device from your Library and listening.",
-                        tracks = state.smartRecommendations,
+                        tracks = state.recommendations.map { it.track },
+                        recommendationReasons = state.recommendations.associate {
+                            it.track.id to it.reason
+                        },
                         layoutSpec = layoutSpec,
                         artworkRequestProvider = artworkRequestProvider,
                         onTrackPlay = onTrackPlay,
@@ -387,9 +492,43 @@ fun HomeScreen(
                         pendingTrackIds = pendingTrackIds,
                         pendingAlbumIds = pendingAlbumIds,
                         pendingArtistIds = pendingArtistIds,
+                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
+                        allowRecommendationHide = true,
+                        allowTasteExclusion = true,
                         onTrackLikeChange = onTrackLikeChange,
                         onAlbumSaveChange = onAlbumSaveChange,
                         onArtistFollowChange = onArtistFollowChange,
+                        onRecommendationHidden = onRecommendationHidden,
+                        onTasteSignalExcluded = onTasteSignalExcluded,
+                    )
+                }
+            }
+            if (sectionVisibility.radioStations) {
+                items(
+                    items = state.radioStations,
+                    key = { "radio-${it.id}" },
+                ) { station ->
+                    TrackShelf(
+                        title = station.title,
+                        subtitle = station.subtitle,
+                        tracks = station.tracks,
+                        layoutSpec = layoutSpec,
+                        artworkRequestProvider = artworkRequestProvider,
+                        onTrackPlay = onTrackPlay,
+                        likedTrackIds = likedTrackIds,
+                        savedAlbumIds = savedAlbumIds,
+                        followedArtistIds = followedArtistIds,
+                        pendingTrackIds = pendingTrackIds,
+                        pendingAlbumIds = pendingAlbumIds,
+                        pendingArtistIds = pendingArtistIds,
+                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
+                        allowRecommendationHide = true,
+                        allowTasteExclusion = true,
+                        onTrackLikeChange = onTrackLikeChange,
+                        onAlbumSaveChange = onAlbumSaveChange,
+                        onArtistFollowChange = onArtistFollowChange,
+                        onRecommendationHidden = onRecommendationHidden,
+                        onTasteSignalExcluded = onTasteSignalExcluded,
                     )
                 }
             }
@@ -462,6 +601,125 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PersonalizationControls(
+    enabled: Boolean,
+    mode: DiscoveryMode,
+    signalCount: Int,
+    message: String?,
+    horizontalPadding: Dp,
+    onEnabledChange: (Boolean) -> Unit,
+    onModeChange: (DiscoveryMode) -> Unit,
+    onClearData: () -> Unit,
+    onMessageConsumed: () -> Unit,
+) {
+    var confirmClear by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding, vertical = 12.dp)
+            .semantics { isTraversalGroup = true },
+        color = RakyzuSurfaceRaised.copy(alpha = 0.94f),
+        shape = RoundedCornerShape(22.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Your private taste profile",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        text = "$signalCount account-scoped signals · processed only on this device",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Private recommendations"
+                    },
+                )
+            }
+            Text(
+                text = "Choose how familiar or exploratory Made for you should feel.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(items = DiscoveryMode.entries, key = DiscoveryMode::storageValue) { item ->
+                    FilterChip(
+                        selected = item == mode,
+                        enabled = enabled,
+                        onClick = { onModeChange(item) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        label = { Text(item.name) },
+                    )
+                }
+            }
+            message?.let {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = it,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RakyzuAqua,
+                    )
+                    TextButton(onClick = onMessageConsumed) { Text("Dismiss") }
+                }
+            }
+            TextButton(
+                onClick = { confirmClear = true },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Reset listening history and taste controls")
+            }
+        }
+    }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Reset private personalization?") },
+            text = {
+                Text(
+                    "This removes listening history, hidden recommendations, and excluded taste " +
+                        "signals stored for this account on this device. Your Library is unchanged.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClear = false
+                        onClearData()
+                    },
+                ) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 
@@ -904,9 +1162,15 @@ internal fun TrackShelf(
     pendingTrackIds: Set<String> = emptySet(),
     pendingAlbumIds: Set<String> = emptySet(),
     pendingArtistIds: Set<String> = emptySet(),
+    recommendationReasons: Map<String, String> = emptyMap(),
+    excludedTasteTrackIds: Set<String> = emptySet(),
+    allowRecommendationHide: Boolean = false,
+    allowTasteExclusion: Boolean = false,
     onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
     onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
     onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
+    onRecommendationHidden: (Track) -> Unit = {},
+    onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
 ) {
     val shelfListState = rememberLazyListState()
     Column(
@@ -991,6 +1255,15 @@ internal fun TrackShelf(
                                 maxLines = layoutSpec.trackTextMaxLines,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            recommendationReasons[track.id]?.let { reason ->
+                                Text(
+                                    text = reason,
+                                    color = RakyzuAqua,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                         TrackLibraryMenu(
                             track = track,
@@ -1003,6 +1276,11 @@ internal fun TrackShelf(
                             onTrackLikeChange = onTrackLikeChange,
                             onAlbumSaveChange = onAlbumSaveChange,
                             onArtistFollowChange = onArtistFollowChange,
+                            excludedFromTaste = track.id in excludedTasteTrackIds,
+                            allowRecommendationHide = allowRecommendationHide,
+                            allowTasteExclusion = allowTasteExclusion,
+                            onRecommendationHidden = onRecommendationHidden,
+                            onTasteSignalExcluded = onTasteSignalExcluded,
                             modifier = Modifier.align(Alignment.TopEnd),
                         )
                     }
@@ -1024,6 +1302,11 @@ private fun TrackLibraryMenu(
     onTrackLikeChange: (Track, Boolean) -> Unit,
     onAlbumSaveChange: (Track, Boolean) -> Unit,
     onArtistFollowChange: (Track, Boolean) -> Unit,
+    excludedFromTaste: Boolean = false,
+    allowRecommendationHide: Boolean = false,
+    allowTasteExclusion: Boolean = false,
+    onRecommendationHidden: (Track) -> Unit = {},
+    onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1072,6 +1355,31 @@ private fun TrackLibraryMenu(
                     },
                 )
             }
+            if (allowRecommendationHide) {
+                DropdownMenuItem(
+                    text = { Text("Hide this recommendation") },
+                    leadingIcon = { Icon(Icons.Rounded.Block, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        onRecommendationHidden(track)
+                    },
+                )
+            }
+            if (allowTasteExclusion) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (excludedFromTaste) "Use this in my taste profile" else
+                                "Don't use this in my taste profile",
+                        )
+                    },
+                    leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        onTasteSignalExcluded(track, !excludedFromTaste)
+                    },
+                )
+            }
         }
     }
 }
@@ -1092,6 +1400,6 @@ internal fun Track.homeSubtitle(): String {
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.5.10")
+        HomeScreen(versionName = "0.8.8")
     }
 }

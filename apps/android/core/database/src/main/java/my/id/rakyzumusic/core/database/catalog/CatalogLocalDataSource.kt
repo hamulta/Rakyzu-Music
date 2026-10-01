@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.map
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
@@ -18,6 +19,16 @@ interface CatalogLocalDataSource {
     suspend fun replaceCatalog(snapshot: CatalogSnapshot, syncedAtEpochMillis: Long)
 
     suspend fun recordRecentlyPlayed(userId: String, trackId: String, playedAtEpochMillis: Long): Boolean
+
+    suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean = false
+
+    suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean = false
+
+    suspend fun setRecommendationHidden(userId: String, trackId: String, hidden: Boolean): Boolean = false
+
+    suspend fun setTasteSignalExcluded(userId: String, trackId: String, excluded: Boolean): Boolean = false
+
+    suspend fun clearPersonalizationData(userId: String): Boolean = false
 }
 
 data class RakyzuLocalDataSources(
@@ -46,6 +57,7 @@ fun createCatalogLocalDataSource(context: Context): CatalogLocalDataSource =
 
 internal class RoomCatalogLocalDataSource(
     private val database: RakyzuDatabase,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
 ) : CatalogLocalDataSource {
     private val dao = database.catalogDao()
 
@@ -71,22 +83,37 @@ internal class RoomCatalogLocalDataSource(
             "library_liked_tracks",
             "library_saved_albums",
             "library_followed_artists",
+            "personalization_preferences",
+            "recommendation_feedback",
             "sync_metadata",
         )
         .map {
             val catalog = dao.readSnapshot().toDomain()
             val tracksById = catalog.tracks.associateBy(Track::id)
-            val recentIds = dao.getRecentlyPlayedTrackIds(userId, RECENTLY_PLAYED_LIMIT)
+            val listeningSignals = dao.getListeningSignals(userId, RECENTLY_PLAYED_LIMIT)
+            val recentIds = listeningSignals.map(StoredListeningSignal::trackId)
+            val likedTrackIds = dao.getLikedTrackIds(userId, SIGNAL_LIMIT)
+            val savedAlbumIds = dao.getSavedAlbumIds(userId, SIGNAL_LIMIT)
+            val followedArtistIds = dao.getFollowedArtistIds(userId, SIGNAL_LIMIT)
+            val personalization = buildPersonalization(
+                userId = userId,
+                tracks = catalog.tracks,
+                listeningSignals = listeningSignals,
+                likedTrackIds = likedTrackIds,
+                savedAlbumIds = savedAlbumIds,
+                followedArtistIds = followedArtistIds,
+                feedback = dao.getRecommendationFeedback(userId),
+                preference = dao.getPersonalizationPreference(userId),
+                rotationBucket = currentTimeMillis().coerceAtLeast(0L) / MILLIS_PER_DAY,
+            )
             HomeFeedSnapshot(
                 catalog = catalog,
                 recentlyPlayed = recentIds.mapNotNull(tracksById::get),
-                smartRecommendations = rankSmartRecommendations(
-                    tracks = catalog.tracks,
-                    recentTrackIds = recentIds,
-                    likedTrackIds = dao.getLikedTrackIds(userId, SIGNAL_LIMIT),
-                    savedAlbumIds = dao.getSavedAlbumIds(userId, SIGNAL_LIMIT),
-                    followedArtistIds = dao.getFollowedArtistIds(userId, SIGNAL_LIMIT),
-                ),
+                listeningHistory = personalization.history,
+                recommendations = personalization.recommendations,
+                mixes = personalization.mixes,
+                radioStations = personalization.radioStations,
+                tasteProfile = personalization.tasteProfile,
             )
         }
 
@@ -123,59 +150,85 @@ internal class RoomCatalogLocalDataSource(
         )
     }
 
+    override suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean {
+        if (userId.isBlank()) return false
+        val current = dao.getPersonalizationPreference(userId)
+        dao.upsertPersonalizationPreference(
+            PersonalizationPreferenceEntity(
+                userId = userId,
+                enabled = enabled,
+                discoveryMode = current?.discoveryMode ?: DiscoveryMode.Balanced.storageValue,
+                updatedAtEpochMillis = currentTimeMillis().coerceAtLeast(0L),
+            ),
+        )
+        return true
+    }
+
+    override suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean {
+        if (userId.isBlank()) return false
+        val current = dao.getPersonalizationPreference(userId)
+        dao.upsertPersonalizationPreference(
+            PersonalizationPreferenceEntity(
+                userId = userId,
+                enabled = current?.enabled ?: true,
+                discoveryMode = mode.storageValue,
+                updatedAtEpochMillis = currentTimeMillis().coerceAtLeast(0L),
+            ),
+        )
+        return true
+    }
+
+    override suspend fun setRecommendationHidden(
+        userId: String,
+        trackId: String,
+        hidden: Boolean,
+    ): Boolean = updateFeedback(userId, trackId) { it.copy(isHidden = hidden) }
+
+    override suspend fun setTasteSignalExcluded(
+        userId: String,
+        trackId: String,
+        excluded: Boolean,
+    ): Boolean = updateFeedback(userId, trackId) { it.copy(excludedFromTaste = excluded) }
+
+    override suspend fun clearPersonalizationData(userId: String): Boolean {
+        if (userId.isBlank()) return false
+        dao.clearPersonalizationData(userId)
+        return true
+    }
+
+    private suspend fun updateFeedback(
+        userId: String,
+        trackId: String,
+        transform: (RecommendationFeedbackEntity) -> RecommendationFeedbackEntity,
+    ): Boolean {
+        if (userId.isBlank() || trackId.isBlank() || !dao.containsTrack(trackId)) return false
+        val current = dao.getRecommendationFeedback(userId, trackId)
+            ?: RecommendationFeedbackEntity(
+                userId = userId,
+                trackId = trackId,
+                isHidden = false,
+                excludedFromTaste = false,
+                updatedAtEpochMillis = 0L,
+            )
+        val updated = transform(current).copy(
+            userId = userId,
+            trackId = trackId,
+            updatedAtEpochMillis = currentTimeMillis().coerceAtLeast(0L),
+        )
+        if (!updated.isHidden && !updated.excludedFromTaste) {
+            dao.deleteRecommendationFeedback(userId, trackId)
+        } else {
+            dao.upsertRecommendationFeedback(updated)
+        }
+        return true
+    }
+
     private companion object {
         const val RECENTLY_PLAYED_LIMIT = 20
         const val SIGNAL_LIMIT = 100
+        const val MILLIS_PER_DAY = 86_400_000L
     }
 }
-
-internal fun rankSmartRecommendations(
-    tracks: List<Track>,
-    recentTrackIds: List<String>,
-    likedTrackIds: List<String>,
-    savedAlbumIds: List<String>,
-    followedArtistIds: List<String>,
-    limit: Int = 20,
-): List<Track> {
-    if (limit <= 0 || tracks.isEmpty()) return emptyList()
-    val tracksById = tracks.associateBy(Track::id)
-    val recentIds = recentTrackIds.toSet()
-    val likedIds = likedTrackIds.toSet()
-    val savedAlbums = savedAlbumIds.toSet()
-    val followedArtists = followedArtistIds.toSet()
-    val recentTracks = recentTrackIds.mapNotNull(tracksById::get)
-    val affinityArtists = recentTracks.mapTo(mutableSetOf(), Track::artistId) +
-        likedTrackIds.mapNotNull(tracksById::get).map(Track::artistId)
-    val affinityAlbums = recentTracks.mapTo(mutableSetOf(), Track::albumId)
-    if (recentIds.isEmpty() && likedIds.isEmpty() && savedAlbums.isEmpty() &&
-        followedArtists.isEmpty()
-    ) return emptyList()
-
-    val ranked = tracks.asSequence()
-        .filterNot { it.id in recentIds || it.id in likedIds }
-        .map { track ->
-            val score =
-                (if (track.artistId in followedArtists) 12 else 0) +
-                    (if (track.albumId in savedAlbums) 10 else 0) +
-                    (if (track.artistId in affinityArtists) 6 else 0) +
-                    (if (track.albumId in affinityAlbums) 4 else 0)
-            track to score
-        }
-        .filter { (_, score) -> score > 0 }
-        .sortedWith(compareByDescending<Pair<Track, Int>> { it.second }.thenBy { it.first.id })
-
-    val artistCounts = mutableMapOf<String, Int>()
-    return ranked.mapNotNull { (track, _) ->
-        val artistCount = artistCounts[track.artistId] ?: 0
-        if (artistCount >= MAX_RECOMMENDATIONS_PER_ARTIST) null else {
-            artistCounts[track.artistId] = artistCount + 1
-            track
-        }
-    }.take(limit.coerceAtMost(MAX_SMART_RECOMMENDATIONS)).toList()
-}
-
-private const val MAX_RECOMMENDATIONS_PER_ARTIST = 2
-private const val MAX_SMART_RECOMMENDATIONS = 20
 
 internal fun CatalogEntitySnapshot.toDomain(): CatalogSnapshot {
     val artistsById = artists.associateBy(ArtistEntity::id)

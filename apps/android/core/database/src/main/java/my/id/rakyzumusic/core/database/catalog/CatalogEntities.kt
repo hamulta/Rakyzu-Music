@@ -111,6 +111,28 @@ internal data class RecentlyPlayedEntity(
     @ColumnInfo(name = "user_id") val userId: String,
     @ColumnInfo(name = "track_id") val trackId: String,
     @ColumnInfo(name = "played_at_epoch_ms") val playedAtEpochMs: Long,
+    @ColumnInfo(name = "play_count", defaultValue = "1") val playCount: Int = 1,
+)
+
+@Entity(tableName = "personalization_preferences")
+internal data class PersonalizationPreferenceEntity(
+    @PrimaryKey @ColumnInfo(name = "user_id") val userId: String,
+    val enabled: Boolean,
+    @ColumnInfo(name = "discovery_mode") val discoveryMode: String,
+    @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "recommendation_feedback",
+    primaryKeys = ["user_id", "track_id"],
+    indices = [Index(value = ["user_id", "updated_at_epoch_ms"])],
+)
+internal data class RecommendationFeedbackEntity(
+    @ColumnInfo(name = "user_id") val userId: String,
+    @ColumnInfo(name = "track_id") val trackId: String,
+    @ColumnInfo(name = "is_hidden") val isHidden: Boolean,
+    @ColumnInfo(name = "excluded_from_taste") val excludedFromTaste: Boolean,
+    @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMillis: Long,
 )
 
 @Entity(

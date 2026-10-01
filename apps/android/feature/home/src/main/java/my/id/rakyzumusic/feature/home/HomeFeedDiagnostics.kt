@@ -28,7 +28,10 @@ internal data class HomeFeedShape(
     val tracks: HomeContentCount,
     val shelves: HomeContentCount,
     val recentlyPlayed: HomeContentCount,
-    val smartRecommendations: HomeContentCount,
+    val recommendations: HomeContentCount,
+    val mixes: HomeContentCount,
+    val radioStations: HomeContentCount,
+    val tasteSignals: HomeContentCount,
 ) {
     companion object {
         fun from(feed: HomeFeedSnapshot): HomeFeedShape = HomeFeedShape(
@@ -37,7 +40,10 @@ internal data class HomeFeedShape(
             tracks = HomeContentCount.from(feed.catalog.tracks.size),
             shelves = HomeContentCount.from(feed.catalog.editorialShelves.size),
             recentlyPlayed = HomeContentCount.from(feed.recentlyPlayed.size),
-            smartRecommendations = HomeContentCount.from(feed.smartRecommendations.size),
+            recommendations = HomeContentCount.from(feed.recommendations.size),
+            mixes = HomeContentCount.from(feed.mixes.size),
+            radioStations = HomeContentCount.from(feed.radioStations.size),
+            tasteSignals = HomeContentCount.from(feed.tasteProfile.signalCount),
         )
     }
 }
@@ -192,7 +198,10 @@ internal fun HomeFeedDiagnosticEvent.toBoundedLogLine(): String {
         is HomeFeedDiagnosticEvent.FeedObserved ->
             "event=feed_observed artists=${shape.artists.wireName()} " +
                 "albums=${shape.albums.wireName()} tracks=${shape.tracks.wireName()} " +
-                "shelves=${shape.shelves.wireName()} recent=${shape.recentlyPlayed.wireName()}"
+                "shelves=${shape.shelves.wireName()} recent=${shape.recentlyPlayed.wireName()} " +
+                "recommendations=${shape.recommendations.wireName()} " +
+                "mixes=${shape.mixes.wireName()} radio=${shape.radioStations.wireName()} " +
+                "signals=${shape.tasteSignals.wireName()}"
         is HomeFeedDiagnosticEvent.ConnectivityObserved ->
             "event=connectivity_observed online=$isOnline recovery=$triggersRecovery"
         is HomeFeedDiagnosticEvent.RefreshStarted ->

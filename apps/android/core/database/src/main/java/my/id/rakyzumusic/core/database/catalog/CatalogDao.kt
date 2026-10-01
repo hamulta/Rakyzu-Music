@@ -11,6 +11,12 @@ internal data class StoredLibraryItem(
     val savedAtEpochMillis: Long,
 )
 
+internal data class StoredListeningSignal(
+    val trackId: String,
+    val playedAtEpochMs: Long,
+    val playCount: Int,
+)
+
 internal data class CatalogEntitySnapshot(
     val artists: List<ArtistEntity>,
     val albums: List<AlbumEntity>,
@@ -280,6 +286,30 @@ internal interface CatalogDao {
     suspend fun getRecentlyPlayedTrackIds(userId: String, limit: Int): List<String>
 
     @Query(
+        "SELECT track_id AS trackId, played_at_epoch_ms AS playedAtEpochMs, " +
+            "play_count AS playCount FROM recently_played WHERE user_id = :userId " +
+            "ORDER BY played_at_epoch_ms DESC, track_id LIMIT :limit",
+    )
+    suspend fun getListeningSignals(userId: String, limit: Int): List<StoredListeningSignal>
+
+    @Query("SELECT * FROM personalization_preferences WHERE user_id = :userId")
+    suspend fun getPersonalizationPreference(userId: String): PersonalizationPreferenceEntity?
+
+    @Query(
+        "SELECT * FROM recommendation_feedback WHERE user_id = :userId " +
+            "ORDER BY updated_at_epoch_ms DESC, track_id",
+    )
+    suspend fun getRecommendationFeedback(userId: String): List<RecommendationFeedbackEntity>
+
+    @Query(
+        "SELECT * FROM recommendation_feedback WHERE user_id = :userId AND track_id = :trackId",
+    )
+    suspend fun getRecommendationFeedback(
+        userId: String,
+        trackId: String,
+    ): RecommendationFeedbackEntity?
+
+    @Query(
         "SELECT track_id FROM library_liked_tracks WHERE user_id = :userId " +
             "ORDER BY saved_at_epoch_ms DESC, track_id LIMIT :limit",
     )
@@ -374,6 +404,42 @@ internal interface CatalogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecentlyPlayed(item: RecentlyPlayedEntity)
+
+    @Query(
+        "INSERT INTO recently_played(user_id, track_id, played_at_epoch_ms, play_count) " +
+            "VALUES(:userId, :trackId, :playedAtEpochMillis, 1) " +
+            "ON CONFLICT(user_id, track_id) DO UPDATE SET " +
+            "played_at_epoch_ms = excluded.played_at_epoch_ms, " +
+            "play_count = MIN(recently_played.play_count + 1, 10000)",
+    )
+    suspend fun incrementRecentlyPlayed(userId: String, trackId: String, playedAtEpochMillis: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPersonalizationPreference(preference: PersonalizationPreferenceEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRecommendationFeedback(feedback: RecommendationFeedbackEntity)
+
+    @Query(
+        "DELETE FROM recommendation_feedback WHERE user_id = :userId AND track_id = :trackId",
+    )
+    suspend fun deleteRecommendationFeedback(userId: String, trackId: String)
+
+    @Query("DELETE FROM recommendation_feedback WHERE user_id = :userId")
+    suspend fun clearRecommendationFeedback(userId: String)
+
+    @Query("DELETE FROM personalization_preferences WHERE user_id = :userId")
+    suspend fun clearPersonalizationPreference(userId: String)
+
+    @Query("DELETE FROM recently_played WHERE user_id = :userId")
+    suspend fun clearListeningHistory(userId: String)
+
+    @Transaction
+    suspend fun clearPersonalizationData(userId: String) {
+        clearRecommendationFeedback(userId)
+        clearPersonalizationPreference(userId)
+        clearListeningHistory(userId)
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLikedTracks(items: List<LibraryLikedTrackEntity>)
@@ -522,13 +588,7 @@ internal interface CatalogDao {
         limit: Int,
     ): Boolean {
         if (!containsTrack(trackId)) return false
-        insertRecentlyPlayed(
-            RecentlyPlayedEntity(
-                userId = userId,
-                trackId = trackId,
-                playedAtEpochMs = playedAtEpochMillis,
-            ),
-        )
+        incrementRecentlyPlayed(userId, trackId, playedAtEpochMillis)
         pruneRecentlyPlayed(userId, limit)
         return true
     }

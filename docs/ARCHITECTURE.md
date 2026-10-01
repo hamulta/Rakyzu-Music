@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.8.0` Android source adds first-party manual/LRC/SRT Lyrics Studio, rights-aware draft/publication projection, immutable revisions, account-isolated Room context caching, normalized credits, validated track links, release-notification preferences, and private on-device Smart Recommendation; publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.8.8` Android source adds a private on-device personalization layer over the first-party Lyrics Studio baseline: weighted history, explainable recommendations, daily mixes, track/Artist radio, deterministic discovery modes, feedback controls, adaptive Home layout, and privacy-bucketed diagnostics. Publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 
@@ -20,7 +20,7 @@ The initial UI modules are intentionally small. Data, domain, database, network,
 
 - `app`: application assembly, activity, navigation host, and build/release configuration.
 - `core:data`: Supabase client assembly, authentication/profile/media-request repositories, catalog, Library, Playlist, and WorkManager-backed offline-download orchestration, session state mapping, and encrypted Android persistence.
-- `core:database`: Room 3 catalog/editorial entities, account-isolated listening history, Library selections and mutation outbox, playlist metadata, offline-transfer state/preferences, transactional replacement DAOs, schema history, and observable local data sources.
+- `core:database`: Room 3 catalog/editorial entities, account-isolated weighted listening history and personalization controls, Library selections and mutation outbox, playlist metadata, offline-transfer state/preferences, transactional replacement DAOs, schema history, and observable local data sources.
 - `core:model`: platform-independent product models and formatting rules.
 - `core:playback`: Media3 player/session ownership, encrypted offline-first and authenticated network resolution, audio focus, system controls, and playback state.
 - `core:designsystem`: Rakyzu tokens, typography, colors, and reusable primitives.

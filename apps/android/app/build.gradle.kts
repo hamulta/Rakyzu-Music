@@ -66,8 +66,8 @@ android {
         applicationId = "my.id.rakyzumusic"
         minSdk = 26
         targetSdk = 37
-        versionCode = 98
-        versionName = "0.8.0"
+        versionCode = 106
+        versionName = "0.8.8"
 
         buildConfigField("String", "SUPABASE_URL", supabaseUrl.asBuildConfigString())
         buildConfigField(

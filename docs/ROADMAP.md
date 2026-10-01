@@ -222,8 +222,22 @@ This plan uses only the public product concepts described by Spotify's
 [song-credit guidance](https://support.spotify.com/article/song-credits/). Lyrics text, credit
 records, provider attribution, notification policy, and sharing infrastructure must be licensed
 or owned by Rakyzu; no Spotify catalog data, code, assets, or private behavior is copied.
-- `0.8.1`–`0.8.10`: personalization, radio, mixes, history, recommendations, plus the deferred
-  adaptive layout, accessibility, telemetry, threat-model, and cumulative release gates.
+- [x] `0.8.1` — persist account-scoped weighted listening history in Room schema 12 and surface
+  bounded play counts without sending listening activity to a third party.
+- [x] `0.8.2` — add a private taste profile with pause/resume and per-track taste exclusion.
+- [x] `0.8.3` — generate deterministic daily Rakyzu Mixes locally from listening and Library signals.
+- [x] `0.8.4` — derive bounded track and Artist radio stations without an external recommender API.
+- [x] `0.8.5` — explain each recommendation and persist account-scoped hide/exclude feedback.
+- [x] `0.8.6` — add Familiar, Balanced, and Explore discovery modes with stable daily rotation and
+  an artist-diversity ceiling.
+- [x] `0.8.7` — adapt Home spacing/cards for compact, medium, expanded, and large-text layouts;
+  preserve headings, traversal groups, live regions, and 48 dp interaction targets.
+- [x] `0.8.8` — add transactional personalization reset, privacy-bucketed diagnostics, bounded
+  counters, failure-safe controls, migration coverage, and the cumulative release gate.
+- [ ] `0.8.9` — harden recommendation cold-start quality, catalog churn handling, and restoration
+  coverage from the `0.8.8` production baseline.
+- [ ] `0.8.10` — complete the `0.8.x` accessibility, performance, security, and release audit before
+  opening the `0.9.x` subscription and entitlement train.
 - `0.9.x`: subscriptions/entitlements, privacy, and advanced trust-and-safety governance.
 - `0.10.x`: release candidate hardening, accessibility, localization, performance, security, Play readiness.
 - `1.0.0`: signed production release after all quality gates pass.

@@ -17,7 +17,7 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.8.0" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.8.8" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 

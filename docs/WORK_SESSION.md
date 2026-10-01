@@ -1,5 +1,42 @@
 # Rakyzu Music — engineering work sessions
 
+## Active cumulative 0.8.1–0.8.8 batch — 2026-09-30 to 2026-10-01
+
+- [x] Audit the tagged `v0.8.0` baseline and preserve the unrelated `gradlew` mode change.
+- [x] `0.8.1`: add bounded weighted, account-scoped listening history in Room schema 12.
+- [x] `0.8.2`: add local private taste-profile enablement and per-track taste exclusion.
+- [x] `0.8.3`: add deterministic daily Rakyzu Mixes.
+- [x] `0.8.4`: add local track and Artist radio.
+- [x] `0.8.5`: add explanation, hide, and restore controls for recommendations and signals.
+- [x] `0.8.6`: add Familiar/Balanced/Explore modes, daily rotation, and Artist diversity bounds.
+- [x] `0.8.7`: add compact/medium/expanded/large-text Home layout and accessibility coverage.
+- [x] `0.8.8`: add transactional reset, bounded privacy diagnostics, failure containment, dead-code
+  cleanup, migration coverage, and synchronized release metadata.
+- [x] Complete Android, Worker, database, dependency, secret, APK identity/signature, and diff gates.
+- [x] Deploy Worker `0.8.8` and verify production health.
+- [ ] Push, tag, publish, download, and audit the
+  cumulative GitHub Release artifact.
+
+All recommendation computation and listener feedback remain account-scoped and device-local. No
+third-party recommendation API or new Supabase personalization table is used.
+
+The Android gate passed 249 unit tests with zero failures, errors, or skips; all 14 module lint
+reports completed; and the debug APK, 14 Android-test APKs, and minified/resource-shrunk release
+APK assembled. The signed debug candidate identifies as `my.id.rakyzumusic`, versionName `0.8.8`,
+versionCode `106`, min SDK 26, target/compile SDK 37, and one APK Signature Scheme v2 signer. It is
+29,646,058 bytes with SHA-256
+`af18f14e53ec5117746de59def40e085f293e7a1b2c21b75558e8c00eaebb743`. Room schema 12 and its
+11→12 migration test are checked in; the migration preserves existing history with play count one
+and adds account-scoped preferences/feedback.
+
+Worker validation passed 79 tests, generated-binding verification, both TypeScript targets, a
+no-write deployment dry-run, and a production dependency audit with zero vulnerabilities.
+Cloudflare uploaded Worker version `0d6faca2-a3cd-40cd-aaf7-f267a07d05d6`; production
+`/v1/health` returns `status: ok`, version `0.8.8`, with the R2 binding intact. All 20 local
+Supabase migrations match production and remote `public`/`private` lint returned no findings; no
+database migration was required for device-local personalization. The tracked credential-prefix
+scan is clean and `credential.env` remains ignored.
+
 ## Active cumulative 0.7.8 and 0.8.0 batch — 2026-09-30
 
 - [x] Audit the `0.7.7` baseline and confirm listener lyrics use the owned Rakyzu API/database.
