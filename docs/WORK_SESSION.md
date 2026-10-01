@@ -353,7 +353,7 @@ release APK is byte-identical to the main CI artifact: 28,821,044 bytes with SHA
 `184a4cb8c5dc188cb74c652522849f146780cbd0f5e340ccf5e860ce0c14d0f7`. It identifies as
 `my.id.rakyzumusic`, versionName `0.5.30`, versionCode `76`, min SDK 26, target SDK 37, and has one
 valid APK Signature Scheme v2 signer. Release URL:
-<https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.30>.
+<https://github.com/hamulta/Rakyzu-Music/releases/tag/v0.5.30>.
 
 ## Active cumulative 0.5.16–0.5.20 batch — 2026-09-15
 
@@ -413,7 +413,7 @@ Annotated tag and GitHub Release `v0.5.20` point to the validated feature commit
 release APK is byte-identical to the Android CI artifact: 28,640,820 bytes with SHA-256
 `ffd547e6a7e56fe7c560ded179302f07b17e19bb0db053b8094c8d525c71c481`. Its package/version,
 single v2 signer, and privileged-secret scan were revalidated after download. Release URL:
-<https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.20>.
+<https://github.com/hamulta/Rakyzu-Music/releases/tag/v0.5.20>.
 
 ## Active cumulative 0.5.11–0.5.15 batch — 2026-09-15
 
@@ -463,7 +463,7 @@ Annotated tag and GitHub release `v0.5.15` point to the validated code. The down
 is byte-identical to the Android CI artifact: 28,575,284 bytes with SHA-256
 `b544642d3b3d50e2595a072e0e169fc1e1f4287686fa37ccc851f22880e51d8c`. Its package/version,
 single v2 signer, and privileged-secret scan were revalidated after download. Release URL:
-<https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.15>.
+<https://github.com/hamulta/Rakyzu-Music/releases/tag/v0.5.15>.
 
 ## Active cumulative 0.5.6–0.5.10 batch — 2026-09-14
 
@@ -756,5 +756,25 @@ archive verification; the APK passed package/version inspection and Android v2 s
 verification with one signer. The published APK was downloaded again through the authenticated
 GitHub API and matched the CI artifact byte for byte: 28,722,740 bytes, SHA-256
 `664fb51a0b01d05decd5ea1fe585baa691971d51389d065b889e11e21a77925d`.
-Release: <https://github.com/Rakyzu-Development/Rakyzu-Music/releases/tag/v0.5.25>.
+Release: <https://github.com/hamulta/Rakyzu-Music/releases/tag/v0.5.25>.
 No Appetize, emulator, ADB, or physical-device runtime test is claimed for this batch.
+
+## Public repository migration — 2026-10-01
+
+- [x] Establish `hamulta/Rakyzu-Music` as the public primary repository with `main` as the default branch.
+- [x] Preserve the complete Git history, the two candidate branches, and all 45 local tags.
+- [x] Migrate 45 GitHub Releases and all 54 assets (1,234,383,898 bytes) with matching titles,
+  draft/prerelease states, notes, asset names, and asset sizes.
+- [x] Configure the eight Android, database, Worker, Supabase, and Cloudflare Actions secrets from
+  the ignored local credential store without exposing their values.
+- [x] Enable Issues, Projects, Wiki, secret scanning, push protection, Dependabot security updates,
+  vulnerability alerts, and automatic deletion of merged branches.
+- [x] Make the personal public repository the local `origin`; retain the former organization URL as
+  read-only migration provenance under `legacy-origin`.
+
+The migration changes repository hosting only. Android remains at `0.8.8`/versionCode `106`; no
+application source, database schema, Worker runtime, release tag, or APK content changed. Release
+metadata and asset inventories were compared through the GitHub API. The old and new normalized
+release manifests share SHA-256 `6244d4988b2ccc3f39737c629ad6f174a575b46925fe41801dab73e2e819478c`,
+and normalized release-note content shares SHA-256
+`053c730e97b170d0897856b7df2225c9e74d9e40534ac9d9430d4a518df02573`.
