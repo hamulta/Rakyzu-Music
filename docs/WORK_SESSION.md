@@ -1,6 +1,6 @@
 # Rakyzu Music — engineering work sessions
 
-## Active authentication UI hotfix 0.8.8.1 — 2026-10-02
+## Completed authentication UI hotfix 0.8.8.1 — 2026-10-02
 
 - [x] Audit the complete Welcome, Sign In gateway, Log In, and Sign Up navigation graph.
 - [x] Integrate the Rakyzu logo and Google, Facebook, and Apple provider marks across the gateway
@@ -14,8 +14,8 @@
 - [x] Synchronize Android versionName `0.8.8.1`, integer versionCode `107`, CI artifact names,
   Worker API version, documentation, and release metadata.
 - [x] Complete local Android, Worker, dependency, credential, APK identity/signature, and diff gates.
-- [ ] Push the validated commit and verify GitHub CI/CD.
-- [ ] Tag and publish the `v0.8.8.1` Android prerelease, download its APK, and verify byte identity.
+- [x] Push the validated commit and verify GitHub CI/CD.
+- [x] Tag and publish the `v0.8.8.1` Android prerelease, download its APK, and verify byte identity.
 
 Local Android evidence: 249 unit tests passed with zero failures/errors/skips; all 14 debug lint
 reports completed; the debug APK, all Android-test APKs, and the minified/resource-shrunk release
@@ -29,6 +29,18 @@ Wrangler deployment dry-run retained the R2 binding, and the production dependen
 zero vulnerabilities. Public Supabase, Rakyzu API, and Google OAuth configuration values are
 present in the APK; privileged-token pattern scans of both source and APK are clean. No Supabase
 schema change is part of this UI hotfix.
+
+Commit `633d087` was pushed to `main` and both triggered pipelines completed successfully: Android
+run `37067519980` passed the cumulative Gradle gate, APK configuration check, report upload, and
+artifact upload; Worker run `37067519973` passed verification and deployment. Cloudflare Worker
+version `e7a51cab-ba18-41f9-8a0a-5d3c6684a411` reports `status: ok`, API version `0.8.8.1`, and
+the production privacy, terms, and data-deletion pages each return HTTP 200 with Rakyzu content.
+
+Annotated tag `v0.8.8.1` and the matching GitHub Android prerelease were published. The downloaded
+`Rakyzu-Music-0.8.8.1-debug.apk` is byte-identical to the validated local candidate: 34,089,840
+bytes, SHA-256 `cc2163cd106bd5425bab40f1b67a3e30e34878382cc2ec2ed714db047a84dd84`, package
+`my.id.rakyzumusic`, versionName `0.8.8.1`, versionCode `107`, min SDK 26, target/compile SDK 37,
+and one valid v2 signer.
 
 ## Completed cumulative 0.8.1–0.8.8 batch — 2026-09-30 to 2026-10-01
 
