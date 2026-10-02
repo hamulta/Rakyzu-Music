@@ -17,8 +17,34 @@ describe("Rakyzu Music API", () => {
     const response = await execute("/v1/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.8.8" });
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", version: "0.8.8.1" });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it.each([
+    ["/", "Rakyzu Music"],
+    ["/privacy", "Kebijakan Privasi"],
+    ["/terms", "Ketentuan Layanan"],
+    ["/data-deletion", "Penghapusan Data"],
+  ])("serves the public legal page %s without authentication", async (path, heading) => {
+    const response = await execute(path);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(response.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(await response.text()).toContain(heading);
+  });
+
+  it("supports HEAD and rejects mutations on public legal pages", async () => {
+    const head = await execute("/privacy", { method: "HEAD" });
+    expect(head.status).toBe(200);
+    expect(head.headers.get("allow")).toBe("GET, HEAD");
+    expect(await head.text()).toBe("");
+
+    const mutation = await execute("/privacy", { method: "POST" });
+    expect(mutation.status).toBe(405);
+    expect(mutation.headers.get("allow")).toBe("GET, HEAD");
   });
 
   it("requires a bearer session for media", async () => {

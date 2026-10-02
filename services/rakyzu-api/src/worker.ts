@@ -18,8 +18,9 @@ import { errorResponse, jsonResponse, responseHeaders } from "./responses";
 import type { AdminRpcName, RakyzuApiEnv, RequestDependencies, StaffContext } from "./types";
 import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
+import { legalPageResponse, resolveLegalPage } from "./legal";
 
-const API_VERSION = "0.8.8";
+const API_VERSION = "0.8.8.1";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
@@ -80,6 +81,10 @@ export function createWorker(
       let origin: string | null = null;
       try {
         const url = new URL(request.url);
+        const legalPage = resolveLegalPage(url.pathname);
+        if (legalPage) {
+          return legalPageResponse(legalPage, request.method, requestId);
+        }
         origin = allowedOrigin(request, env);
         if (request.headers.has("origin") && origin === null) {
           return errorResponse("origin_denied", "Origin is not allowed.", 403, requestId, null);

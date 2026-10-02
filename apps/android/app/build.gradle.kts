@@ -20,6 +20,9 @@ val supabasePublishableKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY"
 val rakyzuApiBaseUrl = providers.gradleProperty("RAKYZU_API_BASE_URL")
     .orElse(providers.environmentVariable("RAKYZU_API_BASE_URL"))
     .getOrElse("")
+val googleOAuthWebClientId = providers.gradleProperty("GOOGLE_OAUTH_WEB_CLIENT_ID")
+    .orElse(providers.environmentVariable("GOOGLE_OAUTH_WEB_CLIENT_ID"))
+    .getOrElse("201396501756-dkipfptsqtbqnln8q7q6jrp66v0l3brg.apps.googleusercontent.com")
 
 val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
     group = "verification"
@@ -27,11 +30,14 @@ val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
     inputs.property("supabaseUrl", supabaseUrl)
     inputs.property("supabasePublishableKey", supabasePublishableKey)
     inputs.property("rakyzuApiBaseUrl", rakyzuApiBaseUrl)
+    inputs.property("googleOAuthWebClientId", googleOAuthWebClientId)
     doLast {
         val configuredSupabaseUrl = inputs.properties.getValue("supabaseUrl") as String
         val configuredPublishableKey =
             inputs.properties.getValue("supabasePublishableKey") as String
         val configuredApiBaseUrl = inputs.properties.getValue("rakyzuApiBaseUrl") as String
+        val configuredGoogleClientId =
+            inputs.properties.getValue("googleOAuthWebClientId") as String
         val supabaseUri = runCatching { URI(configuredSupabaseUrl) }.getOrNull()
         check(
             supabaseUri?.scheme == "https" &&
@@ -64,6 +70,12 @@ val verifyPublicConfiguration = tasks.register("verifyPublicConfiguration") {
         check(configuredApiBaseUrl == "https://api.rakyzu.my.id") {
             "RAKYZU_API_BASE_URL must use the production Rakyzu API origin."
         }
+        check(
+            configuredGoogleClientId.endsWith(".apps.googleusercontent.com") &&
+                configuredGoogleClientId.none(Char::isWhitespace),
+        ) {
+            "GOOGLE_OAUTH_WEB_CLIENT_ID must be a valid public Google Web client ID."
+        }
     }
 }
 
@@ -75,8 +87,8 @@ android {
         applicationId = "my.id.rakyzumusic"
         minSdk = 26
         targetSdk = 37
-        versionCode = 106
-        versionName = "0.8.8"
+        versionCode = 107
+        versionName = "0.8.8.1"
 
         buildConfigField("String", "SUPABASE_URL", supabaseUrl.asBuildConfigString())
         buildConfigField(
@@ -88,6 +100,11 @@ android {
             "String",
             "RAKYZU_API_BASE_URL",
             rakyzuApiBaseUrl.asBuildConfigString(),
+        )
+        buildConfigField(
+            "String",
+            "GOOGLE_OAUTH_WEB_CLIENT_ID",
+            googleOAuthWebClientId.asBuildConfigString(),
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

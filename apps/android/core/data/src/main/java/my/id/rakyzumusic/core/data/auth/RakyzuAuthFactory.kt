@@ -114,6 +114,7 @@ object RakyzuAuthFactory {
             encodeDefaults = true
             ignoreUnknownKeys = true
         }
+        val encryptedSessionManager = EncryptedSessionManager(encryptedStore, sessionJson)
         val client = createSupabaseClient(
             supabaseUrl = configuration.url,
             supabaseKey = configuration.publishableKey,
@@ -125,7 +126,7 @@ object RakyzuAuthFactory {
                 alwaysAutoRefresh = true
                 autoLoadFromStorage = true
                 autoSaveToStorage = true
-                sessionManager = EncryptedSessionManager(encryptedStore, sessionJson)
+                sessionManager = encryptedSessionManager
                 codeVerifierCache = EncryptedCodeVerifierCache(encryptedStore)
             }
             install(Postgrest) {
@@ -143,6 +144,7 @@ object RakyzuAuthFactory {
         return RakyzuRepositories(
             authRepository = SupabaseAuthRepository(
                 auth = client.auth,
+                sessionManager = encryptedSessionManager,
                 recoveryState = PasswordRecoveryState(encryptedStore),
                 applicationScope = applicationScope,
             ),
@@ -268,9 +270,20 @@ private data object UnavailableAuthRepository : AuthRepository {
         AuthSessionState.RecoveryRequired(AuthFailure.InvalidConfiguration),
     )
 
-    override suspend fun signIn(email: String, password: String): AuthActionResult = unavailable()
+    override suspend fun signIn(
+        email: String,
+        password: String,
+        rememberMe: Boolean,
+    ): AuthActionResult = unavailable()
 
     override suspend fun signUp(email: String, password: String): AuthActionResult = unavailable()
+
+    override suspend fun signInWithFacebook(): AuthActionResult = unavailable()
+
+    override suspend fun signInWithGoogleIdToken(
+        idToken: String,
+        rawNonce: String,
+    ): AuthActionResult = unavailable()
 
     override suspend fun requestPasswordReset(email: String): AuthActionResult = unavailable()
 

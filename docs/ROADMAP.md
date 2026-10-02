@@ -234,6 +234,9 @@ or owned by Rakyzu; no Spotify catalog data, code, assets, or private behavior i
   preserve headings, traversal groups, live regions, and 48 dp interaction targets.
 - [x] `0.8.8` — add transactional personalization reset, privacy-bucketed diagnostics, bounded
   counters, failure-safe controls, migration coverage, and the cumulative release gate.
+- [x] `0.8.8.1` — deliver branded interactive Welcome, Sign In, Log In, and Sign Up screens;
+  wire password auth, native Google, Supabase Facebook, the Apple availability notice, first-run
+  persistence, sign-out routing, app icon, and public legal pages without changing the 0.8 train.
 - [ ] `0.8.9` — harden recommendation cold-start quality, catalog churn handling, and restoration
   coverage from the `0.8.8` production baseline.
 - [ ] `0.8.10` — complete the `0.8.x` accessibility, performance, security, and release audit before

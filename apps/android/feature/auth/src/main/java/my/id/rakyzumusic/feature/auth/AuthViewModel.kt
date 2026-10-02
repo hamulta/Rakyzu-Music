@@ -11,6 +11,7 @@ import my.id.rakyzumusic.core.data.auth.AuthPassword
 import my.id.rakyzumusic.core.data.auth.AuthRepository
 import my.id.rakyzumusic.core.data.auth.CredentialValidation
 import my.id.rakyzumusic.core.data.auth.EmailValidation
+import my.id.rakyzumusic.core.data.auth.OAuthProvider
 import my.id.rakyzumusic.core.data.auth.PasswordValidation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,9 +32,12 @@ data class AuthUiState(
     val password: String = "",
     val passwordConfirmation: String = "",
     val isPasswordVisible: Boolean = false,
+    val rememberMe: Boolean = true,
     val isSubmitting: Boolean = false,
+    val externalProvider: OAuthProvider? = null,
     val message: String? = null,
     val messageIsError: Boolean = false,
+    val navigateToGateway: Boolean = false,
 )
 
 class AuthViewModel(
@@ -60,17 +64,101 @@ class AuthViewModel(
         mutableUiState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
     }
 
-    fun switchMode() {
+    fun updateRememberMe(rememberMe: Boolean) {
+        mutableUiState.update { it.copy(rememberMe = rememberMe) }
+    }
+
+    fun showSignIn() {
+        showCredentialMode(AuthMode.SignIn)
+    }
+
+    fun showSignUp() {
+        showCredentialMode(AuthMode.SignUp)
+    }
+
+    private fun showCredentialMode(mode: AuthMode) {
         mutableUiState.update {
             it.copy(
-                mode = if (it.mode == AuthMode.SignIn) AuthMode.SignUp else AuthMode.SignIn,
+                mode = mode,
                 password = "",
                 passwordConfirmation = "",
                 isPasswordVisible = false,
+                externalProvider = null,
+                message = null,
+                messageIsError = false,
+                navigateToGateway = false,
+            )
+        }
+    }
+
+    fun showGateway() {
+        mutableUiState.update {
+            it.copy(
+                mode = AuthMode.SignIn,
+                password = "",
+                passwordConfirmation = "",
+                isPasswordVisible = false,
+                isSubmitting = false,
+                externalProvider = null,
+                message = null,
+                messageIsError = false,
+                navigateToGateway = false,
+            )
+        }
+    }
+
+    fun onGatewayNavigationHandled() {
+        mutableUiState.update { it.copy(navigateToGateway = false) }
+    }
+
+    fun signInWithFacebook() {
+        if (!beginExternalSignIn(OAuthProvider.Facebook)) return
+
+        viewModelScope.launch {
+            handleResult(repository.signInWithFacebook())
+        }
+    }
+
+    fun beginGoogleSignIn(): Boolean = beginExternalSignIn(OAuthProvider.Google)
+
+    fun completeGoogleSignIn(
+        idToken: String,
+        rawNonce: String,
+    ) {
+        if (mutableUiState.value.externalProvider != OAuthProvider.Google) return
+        viewModelScope.launch {
+            handleResult(repository.signInWithGoogleIdToken(idToken, rawNonce))
+        }
+    }
+
+    fun cancelGoogleSignIn() {
+        mutableUiState.update {
+            if (it.externalProvider == OAuthProvider.Google) {
+                it.copy(externalProvider = null, message = null, messageIsError = false)
+            } else {
+                it
+            }
+        }
+    }
+
+    fun failGoogleSignIn(message: String) {
+        if (mutableUiState.value.externalProvider == OAuthProvider.Google) {
+            showError(message)
+        }
+    }
+
+    private fun beginExternalSignIn(provider: OAuthProvider): Boolean {
+        val state = mutableUiState.value
+        if (state.isSubmitting || state.externalProvider != null) return false
+
+        mutableUiState.update {
+            it.copy(
+                externalProvider = provider,
                 message = null,
                 messageIsError = false,
             )
         }
+        return true
     }
 
     fun showForgotPassword() {
@@ -141,11 +229,17 @@ class AuthViewModel(
             return
         }
 
-        mutableUiState.update { it.copy(isSubmitting = true, message = null) }
+        mutableUiState.update {
+            it.copy(isSubmitting = true, externalProvider = null, message = null)
+        }
         viewModelScope.launch {
             val credentials = validation.credentials
             val result = if (state.mode == AuthMode.SignIn) {
-                repository.signIn(credentials.email, credentials.password)
+                repository.signIn(
+                    email = credentials.email,
+                    password = credentials.password,
+                    rememberMe = state.rememberMe,
+                )
             } else {
                 repository.signUp(credentials.email, credentials.password)
             }
@@ -204,6 +298,7 @@ class AuthViewModel(
                     password = "",
                     passwordConfirmation = "",
                     isSubmitting = false,
+                    externalProvider = null,
                     message = null,
                 )
             }
@@ -214,8 +309,10 @@ class AuthViewModel(
                     password = "",
                     passwordConfirmation = "",
                     isSubmitting = false,
+                    externalProvider = null,
                     message = "If this is a new account, check your email to confirm it, then sign in.",
                     messageIsError = false,
+                    navigateToGateway = true,
                 )
             }
             is AuthActionResult.RecoveryEmailSent -> mutableUiState.update {
@@ -225,6 +322,7 @@ class AuthViewModel(
                     password = "",
                     passwordConfirmation = "",
                     isSubmitting = false,
+                    externalProvider = null,
                     message = "If an account exists for this email, a password reset link is on its way.",
                     messageIsError = false,
                 )
@@ -237,6 +335,7 @@ class AuthViewModel(
         mutableUiState.update {
             it.copy(
                 isSubmitting = false,
+                externalProvider = null,
                 message = message,
                 messageIsError = true,
             )

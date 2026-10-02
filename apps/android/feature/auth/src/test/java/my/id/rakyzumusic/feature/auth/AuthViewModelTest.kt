@@ -58,6 +58,7 @@ class AuthViewModelTest {
         testScheduler.advanceUntilIdle()
 
         assertEquals("listener@rakyzu.my.id", repository.lastEmail)
+        assertTrue(repository.lastRememberMe == true)
         assertEquals("", viewModel.uiState.value.password)
         assertFalse(viewModel.uiState.value.isSubmitting)
     }
@@ -69,7 +70,7 @@ class AuthViewModelTest {
         )
         val viewModel = AuthViewModel(repository)
 
-        viewModel.switchMode()
+        viewModel.showSignUp()
         viewModel.updateEmail("listener@rakyzu.my.id")
         viewModel.updatePassword("Secure-Password1")
         viewModel.updatePasswordConfirmation("Secure-Password1")
@@ -91,7 +92,7 @@ class AuthViewModelTest {
         )
         val viewModel = AuthViewModel(repository)
 
-        viewModel.switchMode()
+        viewModel.showSignUp()
         viewModel.updateEmail("listener@rakyzu.my.id")
         viewModel.updatePassword("Secure-Password1")
         viewModel.updatePasswordConfirmation("Secure-Password1")
@@ -164,11 +165,17 @@ private class FakeAuthRepository(
     var signInCalls = 0
     var signUpCalls = 0
     var lastEmail: String? = null
+    var lastRememberMe: Boolean? = null
     var updatePasswordCalls = 0
 
-    override suspend fun signIn(email: String, password: String): AuthActionResult {
+    override suspend fun signIn(
+        email: String,
+        password: String,
+        rememberMe: Boolean,
+    ): AuthActionResult {
         signInCalls += 1
         lastEmail = email
+        lastRememberMe = rememberMe
         return signInResult
     }
 
@@ -177,6 +184,13 @@ private class FakeAuthRepository(
         lastEmail = email
         return signUpResult
     }
+
+    override suspend fun signInWithFacebook(): AuthActionResult = AuthActionResult.Success
+
+    override suspend fun signInWithGoogleIdToken(
+        idToken: String,
+        rawNonce: String,
+    ): AuthActionResult = AuthActionResult.Success
 
     override suspend fun signOut(): AuthActionResult = AuthActionResult.Success
 

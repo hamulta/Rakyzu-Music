@@ -5,9 +5,20 @@ import kotlinx.coroutines.flow.StateFlow
 interface AuthRepository {
     val sessionState: StateFlow<AuthSessionState>
 
-    suspend fun signIn(email: String, password: String): AuthActionResult
+    suspend fun signIn(
+        email: String,
+        password: String,
+        rememberMe: Boolean = true,
+    ): AuthActionResult
 
     suspend fun signUp(email: String, password: String): AuthActionResult
+
+    suspend fun signInWithFacebook(): AuthActionResult
+
+    suspend fun signInWithGoogleIdToken(
+        idToken: String,
+        rawNonce: String,
+    ): AuthActionResult
 
     suspend fun requestPasswordReset(email: String): AuthActionResult
 
@@ -16,6 +27,11 @@ interface AuthRepository {
     suspend fun signOut(): AuthActionResult
 
     fun handleAuthCallback(callback: AuthCallback)
+}
+
+enum class OAuthProvider {
+    Google,
+    Facebook,
 }
 
 sealed interface AuthSessionState {

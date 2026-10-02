@@ -10,8 +10,20 @@ internal class EncryptedSessionManager(
     private val store: EncryptedAuthStore,
     private val json: Json,
 ) : SessionManager {
+    @Volatile
+    private var persistenceEnabled = true
+
+    suspend fun setPersistenceEnabled(enabled: Boolean) {
+        persistenceEnabled = enabled
+        if (!enabled) deleteSession()
+    }
+
     override suspend fun saveSession(session: UserSession) {
-        store.putString(SESSION_KEY, json.encodeToString(session))
+        if (persistenceEnabled) {
+            store.putString(SESSION_KEY, json.encodeToString(session))
+        } else {
+            store.remove(SESSION_KEY)
+        }
     }
 
     override suspend fun loadSession(): UserSession {

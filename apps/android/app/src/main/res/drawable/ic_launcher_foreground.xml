@@ -1,12 +1,10 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#00E5D4"
-        android:pathData="M68,25 L68,62.5 C64.7,60.3 60.8,59 56.5,59 C46.8,59 39,65.5 39,73.5 C39,81.5 46.8,88 56.5,88 C66.2,88 74,81.5 74,73.5 L74,42 L88,38 L88,25 Z" />
-    <path
-        android:fillColor="#BFA7FF"
-        android:pathData="M30,25 L30,57.5 C27.4,55.9 24.3,55 21,55 C13.3,55 7,60.4 7,67 C7,73.6 13.3,79 21,79 C28.7,79 35,73.6 35,67 L35,38 L49,34 L49,25 Z" />
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="66dp"
+        android:height="57dp"
+        android:gravity="center">
+        <bitmap
+            android:gravity="fill"
+            android:src="@drawable/rakyzu_logo" />
+    </item>
+</layer-list>

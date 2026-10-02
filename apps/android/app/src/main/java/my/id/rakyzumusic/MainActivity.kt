@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
             RakyzuMusicTheme(darkTheme = true) {
                 RakyzuMusicApp(
                     versionName = BuildConfig.VERSION_NAME,
+                    googleWebClientId = BuildConfig.GOOGLE_OAUTH_WEB_CLIENT_ID,
                     authRepository = rakyzuApplication.authRepository,
                     profileRepository = rakyzuApplication.profileRepository,
                     catalogRepository = rakyzuApplication.catalogRepository,

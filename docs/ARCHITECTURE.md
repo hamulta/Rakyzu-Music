@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.8.8` Android source adds a private on-device personalization layer over the first-party Lyrics Studio baseline: weighted history, explainable recommendations, daily mixes, track/Artist radio, deterministic discovery modes, feedback controls, adaptive Home layout, and privacy-bucketed diagnostics. Publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.8.8.1` Android source retains the private on-device personalization layer and adds the interactive branded authentication experience: first-run Welcome, Sign In gateway, Log In/Sign Up forms, native Google sign-in, Supabase Facebook OAuth, Apple availability notice, optional encrypted session persistence, and deterministic navigation after sign-out. Publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 

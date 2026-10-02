@@ -1,6 +1,7 @@
 package my.id.rakyzumusic
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -116,6 +117,8 @@ import my.id.rakyzumusic.core.playback.PlaybackStatus
 import my.id.rakyzumusic.core.playback.PlaybackPreferences
 import my.id.rakyzumusic.core.playback.PlaybackQuality
 import my.id.rakyzumusic.feature.auth.AuthRoute
+import my.id.rakyzumusic.feature.auth.WelcomeScreen
+import my.id.rakyzumusic.feature.auth.clearNativeCredentialState
 import my.id.rakyzumusic.feature.admin.AdminRoute
 import my.id.rakyzumusic.feature.admin.AdminViewModel
 import my.id.rakyzumusic.feature.home.HomeRoute
@@ -181,9 +184,13 @@ private val artistWorkspaceDestination = TopLevelDestination(
     Icons.Rounded.Album,
 )
 
+private const val ExperiencePreferences = "rakyzu_experience"
+private const val WelcomeCompletedKey = "welcome_completed"
+
 @Composable
 fun RakyzuMusicApp(
     versionName: String,
+    googleWebClientId: String,
     authRepository: AuthRepository,
     profileRepository: ProfileRepository,
     catalogRepository: CatalogRepository,
@@ -213,17 +220,20 @@ fun RakyzuMusicApp(
 
     when (val state = sessionState) {
         AuthSessionState.Initializing -> SessionLoadingScreen(modifier)
-        AuthSessionState.SignedOut -> AuthRoute(
-            repository = authRepository,
+        AuthSessionState.SignedOut -> SignedOutExperience(
+            authRepository = authRepository,
+            googleWebClientId = googleWebClientId,
             modifier = modifier,
         )
         is AuthSessionState.RecoveryRequired -> AuthRoute(
             repository = authRepository,
+            googleWebClientId = googleWebClientId,
             sessionMessage = state.failure.toSessionMessage(),
             modifier = modifier,
         )
         is AuthSessionState.PasswordRecovery -> AuthRoute(
             repository = authRepository,
+            googleWebClientId = googleWebClientId,
             passwordRecoveryRequired = true,
             modifier = modifier,
         )
@@ -247,6 +257,39 @@ fun RakyzuMusicApp(
             offlineDownloadRepository = offlineDownloadRepository,
             pendingTrackLink = pendingTrackLink,
             onTrackLinkConsumed = onTrackLinkConsumed,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun SignedOutExperience(
+    authRepository: AuthRepository,
+    googleWebClientId: String,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences(ExperiencePreferences, Context.MODE_PRIVATE)
+    }
+    var shouldShowWelcome by remember(preferences) {
+        mutableStateOf(!preferences.getBoolean(WelcomeCompletedKey, false))
+    }
+    if (shouldShowWelcome) {
+        WelcomeScreen(
+            onGetStarted = {
+                preferences.edit()
+                    .putBoolean(WelcomeCompletedKey, true)
+                    .apply()
+                shouldShowWelcome = false
+            },
+            modifier = modifier,
+        )
+    } else {
+        AuthRoute(
+            repository = authRepository,
+            googleWebClientId = googleWebClientId,
+            onExit = { shouldShowWelcome = true },
             modifier = modifier,
         )
     }
@@ -563,7 +606,10 @@ private fun AuthenticatedRakyzuMusicApp(
                             return@launch
                         }
                         when (val result = authRepository.signOut()) {
-                            AuthActionResult.Success -> showAccount = false
+                            AuthActionResult.Success -> {
+                                clearNativeCredentialState(context)
+                                showAccount = false
+                            }
                             is AuthActionResult.ConfirmationRequired -> showAccount = false
                             is AuthActionResult.RecoveryEmailSent -> showAccount = false
                             is AuthActionResult.Failure -> {

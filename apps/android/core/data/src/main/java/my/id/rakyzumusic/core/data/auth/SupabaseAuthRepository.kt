@@ -6,6 +6,9 @@ import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.exception.AuthWeakPasswordException
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.auth.providers.Facebook
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.exceptions.HttpRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -20,6 +23,7 @@ import kotlinx.coroutines.launch
 
 internal class SupabaseAuthRepository(
     private val auth: Auth,
+    private val sessionManager: EncryptedSessionManager,
     private val recoveryState: PasswordRecoveryState,
     private val applicationScope: CoroutineScope,
 ) : AuthRepository {
@@ -36,8 +40,13 @@ internal class SupabaseAuthRepository(
             initialValue = AuthSessionState.Initializing,
         )
 
-    override suspend fun signIn(email: String, password: String): AuthActionResult = authRequest {
+    override suspend fun signIn(
+        email: String,
+        password: String,
+        rememberMe: Boolean,
+    ): AuthActionResult = authRequest {
         callbackState.value = AuthCallbackState.Idle
+        sessionManager.setPersistenceEnabled(rememberMe)
         auth.signInWith(Email) {
             this.email = email
             this.password = password
@@ -47,6 +56,7 @@ internal class SupabaseAuthRepository(
 
     override suspend fun signUp(email: String, password: String): AuthActionResult = authRequest {
         callbackState.value = AuthCallbackState.Idle
+        sessionManager.setPersistenceEnabled(true)
         val user = auth.signUpWith(Email, redirectUrl = EMAIL_CONFIRMATION_REDIRECT) {
             this.email = email
             this.password = password
@@ -60,6 +70,27 @@ internal class SupabaseAuthRepository(
         } else {
             AuthActionResult.Success
         }
+    }
+
+    override suspend fun signInWithFacebook(): AuthActionResult = authRequest {
+        callbackState.value = AuthCallbackState.Idle
+        sessionManager.setPersistenceEnabled(true)
+        auth.signInWith(Facebook, redirectUrl = OAUTH_REDIRECT)
+        AuthActionResult.Success
+    }
+
+    override suspend fun signInWithGoogleIdToken(
+        idToken: String,
+        rawNonce: String,
+    ): AuthActionResult = authRequest {
+        callbackState.value = AuthCallbackState.Idle
+        sessionManager.setPersistenceEnabled(true)
+        auth.signInWith(IDToken) {
+            this.idToken = idToken
+            provider = Google
+            nonce = rawNonce
+        }
+        AuthActionResult.Success
     }
 
     override suspend fun requestPasswordReset(email: String): AuthActionResult = authRequest {
@@ -125,6 +156,7 @@ internal class SupabaseAuthRepository(
     private companion object {
         const val EMAIL_CONFIRMATION_REDIRECT = "my.id.rakyzumusic://auth"
         const val PASSWORD_RECOVERY_REDIRECT = "my.id.rakyzumusic://auth/recovery"
+        const val OAUTH_REDIRECT = "my.id.rakyzumusic://auth/oauth"
     }
 }
 

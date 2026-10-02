@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets
 enum class AuthCallbackPurpose {
     EmailConfirmation,
     PasswordRecovery,
+    OAuth,
 }
 
 sealed interface AuthCallback {
@@ -36,6 +37,7 @@ fun parseAuthCallback(uriValue: String?): AuthCallback? {
     val purpose = when (uri.rawPath.orEmpty()) {
         EMAIL_CONFIRMATION_PATH -> AuthCallbackPurpose.EmailConfirmation
         PASSWORD_RECOVERY_PATH -> AuthCallbackPurpose.PasswordRecovery
+        OAUTH_PATH -> AuthCallbackPurpose.OAuth
         else -> return null
     }
     return parsePkceCode(purpose, uri.rawQuery, uri.rawFragment)
@@ -91,6 +93,7 @@ private val AuthCallbackPurpose.allowedImplicitTypes: Set<String>
     get() = when (this) {
         AuthCallbackPurpose.EmailConfirmation -> setOf(SIGNUP_TYPE_VALUE)
         AuthCallbackPurpose.PasswordRecovery -> setOf(RECOVERY_TYPE_VALUE)
+        AuthCallbackPurpose.OAuth -> emptySet()
     }
 
 private fun validToken(value: String?): Boolean =
@@ -104,6 +107,7 @@ private const val CALLBACK_SCHEME = "my.id.rakyzumusic"
 private const val CALLBACK_AUTHORITY = "auth"
 private const val EMAIL_CONFIRMATION_PATH = ""
 private const val PASSWORD_RECOVERY_PATH = "/recovery"
+private const val OAUTH_PATH = "/oauth"
 private const val AUTH_CODE_PARAMETER = "code"
 private const val CALLBACK_TYPE_PARAMETER = "type"
 private const val SIGNUP_TYPE_VALUE = "signup"

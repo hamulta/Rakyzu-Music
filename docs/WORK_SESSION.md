@@ -1,5 +1,35 @@
 # Rakyzu Music — engineering work sessions
 
+## Active authentication UI hotfix 0.8.8.1 — 2026-10-02
+
+- [x] Audit the complete Welcome, Sign In gateway, Log In, and Sign Up navigation graph.
+- [x] Integrate the Rakyzu logo and Google, Facebook, and Apple provider marks across the gateway
+  and both credential forms; apply the Rakyzu logo to the Android launcher icon.
+- [x] Wire native Google ID-token authentication, Supabase Facebook OAuth, password Log In/Sign Up,
+  forgot/reset password, Remember Me, loading/error states, and the Apple coming-soon notice.
+- [x] Preserve first-run Welcome behavior while allowing Sign In Back to reopen Welcome and keeping
+  sign-out routed directly to Sign In.
+- [x] Publish detailed public privacy, terms, and data-deletion pages from the Rakyzu Worker with
+  strict browser security headers and explicit GET/HEAD-only behavior.
+- [x] Synchronize Android versionName `0.8.8.1`, integer versionCode `107`, CI artifact names,
+  Worker API version, documentation, and release metadata.
+- [x] Complete local Android, Worker, dependency, credential, APK identity/signature, and diff gates.
+- [ ] Push the validated commit and verify GitHub CI/CD.
+- [ ] Tag and publish the `v0.8.8.1` Android prerelease, download its APK, and verify byte identity.
+
+Local Android evidence: 249 unit tests passed with zero failures/errors/skips; all 14 debug lint
+reports completed; the debug APK, all Android-test APKs, and the minified/resource-shrunk release
+APK assembled. The signed debug candidate is `my.id.rakyzumusic`, versionName `0.8.8.1`,
+versionCode `107`, min SDK 26, target/compile SDK 37, and one valid APK Signature Scheme v2 signer.
+It is 34,089,840 bytes with SHA-256
+`cc2163cd106bd5425bab40f1b67a3e30e34878382cc2ec2ed714db047a84dd84`.
+
+Worker evidence: generated bindings and both TypeScript targets passed, 84 tests passed, the
+Wrangler deployment dry-run retained the R2 binding, and the production dependency audit found
+zero vulnerabilities. Public Supabase, Rakyzu API, and Google OAuth configuration values are
+present in the APK; privileged-token pattern scans of both source and APK are clean. No Supabase
+schema change is part of this UI hotfix.
+
 ## Completed cumulative 0.8.1–0.8.8 batch — 2026-09-30 to 2026-10-01
 
 - [x] Audit the tagged `v0.8.0` baseline and preserve the unrelated `gradlew` mode change.
