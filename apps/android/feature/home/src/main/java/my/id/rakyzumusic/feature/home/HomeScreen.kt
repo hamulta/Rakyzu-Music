@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -209,6 +210,7 @@ fun HomeRoute(
     displayName: String,
     avatarAvailable: Boolean = false,
     avatarRevision: String? = null,
+    artworkRevision: Long = 0L,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
@@ -235,7 +237,7 @@ fun HomeRoute(
     val artworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository) {
         mediaDeliveryRepository::artworkRequest
     }
-    val recommendationArtworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository) {
+    val recommendationArtworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository, artworkRevision) {
         mediaDeliveryRepository::recommendationArtworkRequest
     }
     val profileArtworkRequestProvider: ArtworkRequestProvider = remember(mediaDeliveryRepository, avatarRevision) {
@@ -247,6 +249,7 @@ fun HomeRoute(
             displayName = displayName,
             personalizationSeed = userId,
             avatarId = userId.takeIf { avatarAvailable },
+            artworkRevision = artworkRevision,
             profileArtworkRequestProvider = profileArtworkRequestProvider,
             state = state,
             artworkRequestProvider = artworkRequestProvider,
@@ -283,6 +286,7 @@ fun HomeScreen(
     displayName: String = "Rakyzu Listener",
     personalizationSeed: String = "preview",
     avatarId: String? = null,
+    artworkRevision: Long = 0L,
     state: HomeUiState = HomeUiState(),
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 28.dp),
@@ -378,6 +382,7 @@ fun HomeScreen(
                     displayName = displayName,
                     avatarId = avatarId,
                     profileArtworkRequestProvider = profileArtworkRequestProvider,
+                    artworkRevision = artworkRevision,
                     horizontalPadding = horizontalPadding,
                     hasNotification = !notificationsViewed && state.derivedSections.newReleaseTracks.isNotEmpty(),
                     onProfileClick = onProfileClick,
@@ -424,6 +429,8 @@ fun HomeScreen(
                             cardSize = 150.dp,
                             horizontalPadding = horizontalPadding,
                             imageOnly = false,
+                            cardStyle = HomeEditorialCardStyle.TopMix,
+                            artworkRevision = artworkRevision,
                             artworkRequestProvider = artworkRequestProvider,
                             recommendationArtworkRequestProvider = recommendationArtworkRequestProvider,
                             canManageEditorial = canManageEditorial,
@@ -443,6 +450,8 @@ fun HomeScreen(
                             cardSize = 182.dp,
                             horizontalPadding = horizontalPadding,
                             imageOnly = true,
+                            cardStyle = HomeEditorialCardStyle.RecentListening,
+                            artworkRevision = artworkRevision,
                             artworkRequestProvider = artworkRequestProvider,
                             recommendationArtworkRequestProvider = recommendationArtworkRequestProvider,
                             canManageEditorial = canManageEditorial,
@@ -482,6 +491,7 @@ private fun ModernHomeHeader(
     displayName: String,
     avatarId: String?,
     profileArtworkRequestProvider: ArtworkRequestProvider,
+    artworkRevision: Long,
     horizontalPadding: Dp,
     hasNotification: Boolean,
     onProfileClick: () -> Unit,
@@ -504,6 +514,7 @@ private fun ModernHomeHeader(
                         albumId = avatarId,
                         colors = listOf(Color(0xFF155C65), HomeAqua),
                         artworkRequestProvider = profileArtworkRequestProvider,
+                        artworkRevision = artworkRevision,
                         shape = CircleShape,
                         modifier = Modifier.size(34.dp),
                     )
@@ -639,6 +650,8 @@ private fun GlobalGroupSection(
     cardSize: Dp,
     horizontalPadding: Dp,
     imageOnly: Boolean,
+    cardStyle: HomeEditorialCardStyle,
+    artworkRevision: Long,
     artworkRequestProvider: ArtworkRequestProvider,
     recommendationArtworkRequestProvider: ArtworkRequestProvider,
     canManageEditorial: Boolean,
@@ -660,12 +673,14 @@ private fun GlobalGroupSection(
     ) {
         items(shelves, key = EditorialShelf::id) { shelf ->
             GlobalGroupCard(
-                shelf,
-                cardSize,
-                imageOnly,
-                artworkRequestProvider,
-                recommendationArtworkRequestProvider,
-                Modifier.combinedClickable(
+                shelf = shelf,
+                size = cardSize,
+                imageOnly = imageOnly,
+                cardStyle = cardStyle,
+                artworkRevision = artworkRevision,
+                artworkRequestProvider = artworkRequestProvider,
+                recommendationArtworkRequestProvider = recommendationArtworkRequestProvider,
+                modifier = Modifier.combinedClickable(
                     role = Role.Button,
                     onClickLabel = "Play ${shelf.title}",
                     onLongClickLabel = if (canManageEditorial) "Manage ${shelf.title}" else null,
@@ -957,18 +972,24 @@ private fun HomeEditorialGroupEditor(
     )
 }
 
+private enum class HomeEditorialCardStyle { TopMix, RecentListening }
+
 @Composable
 private fun GlobalGroupCard(
     shelf: EditorialShelf,
     size: Dp,
     imageOnly: Boolean,
+    cardStyle: HomeEditorialCardStyle,
+    artworkRevision: Long,
     artworkRequestProvider: ArtworkRequestProvider,
     recommendationArtworkRequestProvider: ArtworkRequestProvider,
     modifier: Modifier = Modifier,
 ) {
     val accent = shelf.colorHex.toHomeColor()
     Box(
-        modifier = modifier.size(size).clip(RoundedCornerShape(10.dp))
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(if (cardStyle == HomeEditorialCardStyle.TopMix) 2.dp else 4.dp))
             .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.55f)))),
     ) {
         val firstTrack = shelf.tracks.first()
@@ -980,36 +1001,58 @@ private fun GlobalGroupCard(
             } else {
                 artworkRequestProvider
             },
-            shape = RoundedCornerShape(10.dp),
+            artworkRevision = artworkRevision,
+            shape = RoundedCornerShape(if (cardStyle == HomeEditorialCardStyle.TopMix) 2.dp else 4.dp),
             modifier = Modifier.fillMaxSize(),
         )
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = if (imageOnly) 0.72f else 0.42f),
+                        Color.Black.copy(alpha = if (cardStyle == HomeEditorialCardStyle.TopMix) 0.22f else 0.04f),
+                        Color.Black.copy(alpha = if (imageOnly) 0.74f else 0.44f),
                     ),
                 ),
             ),
         )
-        if (!imageOnly) {
+        if (cardStyle == HomeEditorialCardStyle.TopMix) {
+            // The Home Top Mix treatment is still the same editorial Card Group data,
+            // but its presentation is the blueprint's direct-play cover: title, circles,
+            // and genre accent stripe. It must not look like the Explore landing card.
             Box(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(7.dp)
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = (-18).dp, y = (-18).dp)
+                    .size(44.dp)
+                    .background(Color.White.copy(alpha = 0.78f), CircleShape),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = 23.dp)
+                    .size(72.dp)
+                    .background(Color.White.copy(alpha = 0.82f), CircleShape),
+            )
+            Text(
+                shelf.cardLabel ?: shelf.title,
+                color = Color.White,
+                fontSize = 15.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+            )
+            Box(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(6.dp)
+                    .background(accent),
+            )
+        } else if (!imageOnly) {
+            Box(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(6.dp)
                     .background(accent),
             )
         }
-        Text(
-            if (imageOnly) shelf.title else shelf.cardLabel ?: shelf.title,
-            color = Color.White,
-            fontSize = 15.sp,
-            lineHeight = 18.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.6.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
-        )
     }
 }
 
@@ -1450,6 +1493,6 @@ private val HOME_COLOR_HEX = Regex("^#[0-9A-Fa-f]{6}$")
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.8.8.2")
+        HomeScreen(versionName = "0.8.8.3")
     }
 }

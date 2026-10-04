@@ -315,9 +315,9 @@ private fun ExploreGroupCard(
     val color = group.colorHex.toComposeColor()
     Box(modifier.clip(RoundedCornerShape(4.dp)).background(color)) {
         val firstTrack = group.tracks.firstOrNull()
-        firstTrack?.let { track ->
+        if (firstTrack != null) {
             ExploreArtwork(
-                id = if (group.hasCustomArtwork) group.id else track.albumId,
+                id = if (group.hasCustomArtwork) group.id else firstTrack.albumId,
                 provider = if (group.hasCustomArtwork) recommendationArtworkProvider else artworkProvider,
                 color = color,
                 shape = RoundedCornerShape(3.dp),
@@ -331,12 +331,12 @@ private fun ExploreGroupCard(
         Text(
             group.cardLabel?.ifBlank { group.title } ?: group.title,
             color = Color.White,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
-            lineHeight = 18.sp,
+            lineHeight = 17.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.TopStart).padding(start = 15.dp, top = 12.dp, end = 68.dp),
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 15.dp, top = 12.dp, end = 15.dp),
         )
     }
 }
@@ -389,13 +389,23 @@ internal fun EditorialGroupDetail(
         IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).size(48.dp)) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to Explore", tint = Color.White)
         }
-        ExploreArtwork(
-            id = if (category.hasCustomArtwork) category.id else category.tracks.firstOrNull()?.albumId.orEmpty(),
-            provider = if (category.hasCustomArtwork) recommendationArtworkProvider else artworkProvider,
-            color = color,
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.size(224.dp).align(Alignment.CenterHorizontally),
-        )
+        if (category.hasCustomArtwork) {
+            ExploreArtwork(
+                id = category.id,
+                provider = recommendationArtworkProvider,
+                color = color,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(224.dp).align(Alignment.CenterHorizontally),
+            )
+        } else {
+            Box(
+                modifier = Modifier.size(224.dp).align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(8.dp)).background(color),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.MusicNote, null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(52.dp))
+            }
+        }
         Text(
             category.title,
             color = Color.White,

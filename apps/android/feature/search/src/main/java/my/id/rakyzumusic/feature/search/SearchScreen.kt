@@ -1,5 +1,6 @@
 package my.id.rakyzumusic.feature.search
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -82,11 +84,13 @@ import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.Track
 import my.id.rakyzumusic.core.model.EditorialGroupMutation
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
+import my.id.rakyzumusic.feature.auth.R as AuthR
 
 @Composable
 fun SearchRoute(
     viewModel: SearchViewModel,
     mediaDeliveryRepository: MediaDeliveryRepository? = null,
+    artworkRevision: Long = 0L,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onTrackPlayNext: ((Track) -> Unit)? = null,
@@ -106,6 +110,16 @@ fun SearchRoute(
     onDownloadGroup: (BrowseCategory) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val artworkProvider = remember(mediaDeliveryRepository) {
+        mediaDeliveryRepository?.let { repository -> repository::artworkRequest }
+            ?: unavailableExploreArtworkProvider
+    }
+    // Recreate the provider after an editorial artwork mutation so ExploreArtwork's
+    // request key changes even when the shelf id and URL stay stable.
+    val recommendationArtworkProvider = remember(mediaDeliveryRepository, artworkRevision) {
+        mediaDeliveryRepository?.let { repository -> repository::recommendationArtworkRequest }
+            ?: unavailableExploreArtworkProvider
+    }
     SearchScreen(
         state = state,
         onQueryChange = viewModel::updateQuery,
@@ -125,10 +139,8 @@ fun SearchRoute(
         likedTrackIds = likedTrackIds,
         pendingTrackIds = pendingTrackIds,
         onTrackLikeChange = onTrackLikeChange,
-        artworkProvider = mediaDeliveryRepository?.let { repository -> repository::artworkRequest }
-            ?: unavailableExploreArtworkProvider,
-        recommendationArtworkProvider = mediaDeliveryRepository?.let { repository -> repository::recommendationArtworkRequest }
-            ?: unavailableExploreArtworkProvider,
+        artworkProvider = artworkProvider,
+        recommendationArtworkProvider = recommendationArtworkProvider,
         canManageEditorial = canManageEditorial,
         onSaveEditorialGroup = onSaveEditorialGroup,
         onDeleteEditorialGroup = onDeleteEditorialGroup,
@@ -238,13 +250,19 @@ fun SearchScreen(
                     modifier = Modifier.size(48.dp).background(RakyzuAqua.copy(alpha = 0.16f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = RakyzuAqua)
+                    Image(
+                        painter = painterResource(AuthR.drawable.rakyzu_logo),
+                        contentDescription = "Rakyzu Music logo",
+                        modifier = Modifier.size(40.dp),
+                    )
                 }
                 Text(
                     text = "Search",
                     color = RakyzuAqua,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 10.dp).semantics { heading() },
                 )
             }
@@ -259,7 +277,9 @@ fun SearchScreen(
                     .focusRequester(focusRequester)
                     .testTag(SEARCH_FIELD_TAG),
                 singleLine = true,
-                placeholder = { Text("Songs, Artists, Podcasts & More") },
+                placeholder = {
+                    Text("Songs, Artists, Podcasts & More", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Search,

@@ -66,10 +66,11 @@ internal fun AlbumArtwork(
     albumId: String,
     colors: List<Color>,
     artworkRequestProvider: ArtworkRequestProvider,
+    artworkRevision: Long = 0L,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(18.dp),
 ) {
-    val deliveryResult = remember(albumId, artworkRequestProvider) {
+    val deliveryResult = remember(albumId, artworkRequestProvider, artworkRevision) {
         if (albumId.isBlank()) {
             ArtworkRequestResult.Failure(ArtworkRequestFailure.InvalidAlbumId)
         } else {
@@ -77,7 +78,7 @@ internal fun AlbumArtwork(
         }
     }
     val artworkRequest = (deliveryResult as? ArtworkRequestResult.Ready)?.request
-    var visualState by remember(albumId, deliveryResult) {
+    var visualState by remember(albumId, deliveryResult, artworkRevision) {
         mutableStateOf(
             initialArtworkVisualState(
                 albumId = albumId,
@@ -96,7 +97,7 @@ internal fun AlbumArtwork(
         ArtworkFallback(visualState)
         artworkRequest?.let { request ->
             val context = LocalContext.current
-            val imageRequest = remember(context, request) {
+            val imageRequest = remember(context, request, artworkRevision) {
                 request.toCoilRequest(context)
             }
             AsyncImage(

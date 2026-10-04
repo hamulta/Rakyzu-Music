@@ -1,5 +1,19 @@
 # Rakyzu Music — engineering work sessions
 
+# Completed UI correction 0.8.8.3 — 2026-10-04
+
+- [x] Reconcile the Home and Explore blueprints: shared editorial Card Group data remains intact;
+  Home Top Mixes uses its 150×150 direct-play cover treatment with header/genre stripe, Home recent
+  listening uses 182×182 artwork, and Explore restores the tilted mini-album preview.
+- [x] Invalidate artwork request state after editorial image replacement/removal and render the
+  current profile photo in the account sheet after avatar upload.
+- [x] Replace the Search header glyph with the approved Rakyzu logo and bound header/placeholder
+  typography to prevent visual overflow.
+- [x] Synchronize versionName `0.8.8.3`, versionCode `109`, playback user-agent, CI artifact names,
+  roadmap, release notes, and README metadata.
+- [x] Per CEO instruction, local Gradle/test execution was skipped. `git diff --check` and explicit
+  source review were used before publication; the pushed GitHub workflow remains the CI gate.
+
 # Completed Explore milestone 0.8.8.2 — 2026-10-04
 
 - [x] Implement the branded Explore landing and group-detail surfaces with private Recommended For

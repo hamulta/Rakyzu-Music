@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.8.8.2` Android source retains private on-device personalization and adds the interactive branded Explore experience: always-present Recommended For You cards, governed global Your Top Genres/Browse All Card Groups, long-press editing, real group detail playback, artwork/ambient colors, and engagement-ranked global ordering. Publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.8.8.3` Android source retains private on-device personalization and aligns Home/Explore editorial cards with the approved blueprints, including direct-play Home treatments, tilted Explore album previews, cache-safe artwork replacement, profile photo rendering, and the branded Search header. Publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 

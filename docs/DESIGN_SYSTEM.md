@@ -1,6 +1,6 @@
 # Rakyzu Music — Android design system
 
-Status: **normative for Android 0.8.8.2 and later**
+Status: **normative for Android 0.8.8.3 and later**
 
 This document is the visual and interaction source of truth for Rakyzu Music. Welcome, Sign In,
 Log In, Sign Up, Home, Explore, and every future Android screen must use this system. A screen may

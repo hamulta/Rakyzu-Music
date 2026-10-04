@@ -80,6 +80,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -97,6 +102,7 @@ import my.id.rakyzumusic.core.data.context.NotificationSettingsResult
 import my.id.rakyzumusic.core.data.library.LibraryRepository
 import my.id.rakyzumusic.core.data.download.OfflineDownloadRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
+import my.id.rakyzumusic.core.data.media.ArtworkRequestResult
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
 import my.id.rakyzumusic.core.data.playlist.PlaylistRepository
 import my.id.rakyzumusic.core.data.profile.ProfileRepository
@@ -542,6 +548,7 @@ private fun AuthenticatedRakyzuMusicApp(
     val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
+    var editorialArtworkRevision by remember(userId) { mutableStateOf(0L) }
     var isSigningOut by remember { mutableStateOf(false) }
     var signOutMessage by remember { mutableStateOf<String?>(null) }
     var releaseNotificationPreference by remember {
@@ -583,6 +590,7 @@ private fun AuthenticatedRakyzuMusicApp(
             onUpdateArtistBiography = onUpdateArtistBiography,
             onUploadAvatar = onUploadAvatar,
             onDeleteAvatar = onDeleteAvatar,
+            mediaDeliveryRepository = mediaDeliveryRepository,
             onSaveProfile = onSaveProfile,
             playbackPreferences = playbackPreferenceState,
             onWifiQualityChanged = playbackPreferences::setWifiQuality,
@@ -697,6 +705,7 @@ private fun AuthenticatedRakyzuMusicApp(
                             displayName = displayName,
                             avatarAvailable = profile.avatarAvailable,
                             avatarRevision = profile.avatarVersion,
+                            artworkRevision = editorialArtworkRevision,
                             onTrackPlay = playbackController::playQueue,
                             onProfileClick = {
                                 signOutMessage = null
@@ -711,9 +720,13 @@ private fun AuthenticatedRakyzuMusicApp(
                                 adminViewModel.deleteRecommendation(shelf.id)
                             },
                             onDeleteGlobalCardArtwork = { shelf ->
+                                editorialArtworkRevision++
                                 adminViewModel.deleteRecommendationArtwork(shelf.id)
                             },
-                            onSaveGlobalCard = adminViewModel::saveEditorialGroup,
+                            onSaveGlobalCard = { mutation, artworkBytes ->
+                                if (artworkBytes != null) editorialArtworkRevision++
+                                adminViewModel.saveEditorialGroup(mutation, artworkBytes)
+                            },
                             likedTrackIds = libraryState.likedTrackIds,
                             savedAlbumIds = libraryState.savedAlbumIds,
                             followedArtistIds = libraryState.followedArtistIds,
@@ -735,6 +748,7 @@ private fun AuthenticatedRakyzuMusicApp(
                         SearchRoute(
                             viewModel = searchViewModel,
                             mediaDeliveryRepository = mediaDeliveryRepository,
+                            artworkRevision = editorialArtworkRevision,
                             onTrackPlay = playbackController::playQueue,
                             onTrackPlayNext = playbackController::playNext,
                             onTrackAddToQueue = playbackController::addToQueue,
@@ -760,9 +774,15 @@ private fun AuthenticatedRakyzuMusicApp(
                                 )
                             },
                             canManageEditorial = canManageEditorial,
-                            onSaveEditorialGroup = adminViewModel::saveEditorialGroup,
+                            onSaveEditorialGroup = { mutation, artworkBytes ->
+                                if (artworkBytes != null) editorialArtworkRevision++
+                                adminViewModel.saveEditorialGroup(mutation, artworkBytes)
+                            },
                             onDeleteEditorialGroup = adminViewModel::deleteRecommendation,
-                            onDeleteEditorialArtwork = adminViewModel::deleteRecommendationArtwork,
+                            onDeleteEditorialArtwork = { shelfId ->
+                                editorialArtworkRevision++
+                                adminViewModel.deleteRecommendationArtwork(shelfId)
+                            },
                             onAddGroupToQueue = { tracks -> tracks.forEach(playbackController::addToQueue) },
                             onDownloadGroup = { group ->
                                 offlineDownloadsViewModel.downloadEditorial(
@@ -1127,6 +1147,7 @@ private fun SessionLoadingScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun AccountSheet(
     profile: ListenerProfile,
+    mediaDeliveryRepository: MediaDeliveryRepository,
     email: String?,
     displayName: String,
     displayNameDraft: String,
@@ -1165,6 +1186,9 @@ private fun AccountSheet(
     var notificationPermissionMessage by remember { mutableStateOf<String?>(null) }
     var pendingNotificationPreference by remember {
         mutableStateOf<ReleaseNotificationPreference?>(null)
+    }
+    val avatarRequest = remember(mediaDeliveryRepository, profile.userId, profile.avatarVersion) {
+        (mediaDeliveryRepository.profileAvatarRequest(profile.userId) as? ArtworkRequestResult.Ready)?.request
     }
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -1218,6 +1242,22 @@ private fun AccountSheet(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
+            avatarRequest?.let { request ->
+                val headers = NetworkHeaders.Builder().apply {
+                    request.requestHeaders().forEach { (name, value) -> set(name, value) }
+                }.build()
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(request.url)
+                        .httpHeaders(headers)
+                        .memoryCachePolicy(CachePolicy.DISABLED)
+                        .diskCachePolicy(CachePolicy.DISABLED)
+                        .networkCachePolicy(CachePolicy.DISABLED)
+                        .build(),
+                    contentDescription = "Current profile photo",
+                    modifier = Modifier.size(88.dp).clip(CircleShape),
+                )
+            }
             if (canOpenAdmin || canOpenArtistWorkspace) {
                 Text(
                     text = "Workspaces",
