@@ -43,20 +43,22 @@ select ok(
 );
 
 select results_eq(
-  $$ select count(*)::integer from public.editorial_shelves $$,
-  array[2],
-  'bootstrap data should contain two editorial shelves'
+  $$ select count(*)::integer from public.editorial_shelves where position between 0 and 106 $$,
+  array[5],
+  'bootstrap data should contain the five governed Home editorial shelves'
 );
 
 select results_eq(
-  $$ select count(*)::integer from public.editorial_shelf_tracks $$,
-  array[6],
-  'bootstrap editorial shelves should contain six ordered entries'
+  $$ select count(*)::integer from public.editorial_shelf_tracks where shelf_id in (
+    select id from public.editorial_shelves where position between 0 and 106
+  ) $$,
+  array[15],
+  'bootstrap Home editorial shelves should contain fifteen ordered entries'
 );
 
 select results_eq(
-  $$ select title from public.editorial_shelves order by position $$,
-  array['Rakyzu Essentials'::text, 'After Dark'::text],
+  $$ select title from public.editorial_shelves where position between 0 and 106 order by position $$,
+  array['Pop Mix'::text, 'Chill Mix'::text, 'Fresh Mix'::text, 'After Hours'::text, 'Daily Discovery'::text],
   'editorial shelves should retain their intended order'
 );
 
@@ -72,7 +74,7 @@ select results_eq(
     'a3000000-0000-4000-8000-000000000002'::uuid,
     'a3000000-0000-4000-8000-000000000003'::uuid
   ],
-  'Rakyzu Essentials should retain deterministic track order'
+  'Pop Mix should retain deterministic track order'
 );
 
 select col_is_fk(

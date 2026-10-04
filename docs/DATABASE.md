@@ -64,7 +64,7 @@ leaving Library content unchanged.
 ### Explore editorial groups — 0.8.8.2
 
 Forward migrations add `card_label`, validated `color_hex`, and a privacy-preserving `global_score`
-to `public.editorial_shelves`. Placement ranges reserve seven Home Top Mix slots, seven Home
+to `public.editorial_shelves`. Staff RPC validation reserves seven Home Top Mix slots, seven Home
 listening slots, eight Your Top Genres slots, and twelve Browse All slots. The seeded Explore graph
 contains four Your Top Genres groups and six Browse All groups with real published track membership;
 existing Home groups receive their labels and distinct palette colors.

@@ -33,13 +33,15 @@ select set_config(
 );
 
 select results_eq(
-  $$ select title from public.editorial_shelves order by position $$,
-  array['Rakyzu Essentials'::text, 'After Dark'::text],
+  $$ select title from public.editorial_shelves where position between 0 and 106 order by position $$,
+  array['Pop Mix'::text, 'Chill Mix'::text, 'Fresh Mix'::text, 'After Hours'::text, 'Daily Discovery'::text],
   'authenticated listeners should read only published editorial shelves'
 );
 select results_eq(
-  $$ select count(*)::integer from public.editorial_shelf_tracks $$,
-  array[6],
+  $$ select count(*)::integer from public.editorial_shelf_tracks where shelf_id in (
+    select id from public.editorial_shelves where position between 0 and 106
+  ) $$,
+  array[15],
   'authenticated listeners should read entries only from published shelves and tracks'
 );
 
