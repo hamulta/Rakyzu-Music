@@ -1,5 +1,17 @@
 # Rakyzu Music — engineering work sessions
 
+# Completed artwork reliability correction 0.8.8.4 — 2026-10-04
+
+- [x] Keep the Explore mini-album cover rendered for every Card Group, including groups whose
+  artwork request is unavailable; the fallback now has a visible framed/tilted cover treatment.
+- [x] Move editorial artwork invalidation from upload start to successful admin-action completion,
+  preventing a cached initial 404 from masking newly uploaded Home/Explore artwork.
+- [x] Add an immediate profile-photo preview and clear it if the authenticated upload reports an
+  error; the server-backed avatar remains the source of truth after `avatarVersion` changes.
+- [x] Synchronize versionName `0.8.8.4`, versionCode `110`, playback user-agent, roadmap, README,
+  architecture note, release note, and CI artifact identity. Local Gradle/test execution remains
+  skipped per the active CEO instruction; GitHub Actions is the validation gate.
+
 # Completed UI correction 0.8.8.3 — 2026-10-04
 
 - [x] Reconcile the Home and Explore blueprints: shared editorial Card Group data remains intact;

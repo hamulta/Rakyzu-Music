@@ -2,7 +2,7 @@
 
 Rakyzu Music is a full-stack music platform being delivered Android-first. The current release train targets a production-ready Android `1.0.0`; Web and iOS begin only after that milestone is stable.
 
-Current Android source version: **0.8.8.3** (Home/Explore Card Group visual correction, tilted Explore album previews, cache-safe artwork updates, profile photo preview, and branded Search header; versionCode 109). Release status is recorded in [WORK_SESSION.md](docs/WORK_SESSION.md).
+Current Android source version: **0.8.8.4** (visible tilted Explore album covers, post-upload artwork invalidation, and profile-photo preview reliability; versionCode 110). Release status is recorded in [WORK_SESSION.md](docs/WORK_SESSION.md).
 
 ## Technology baseline
 
@@ -36,7 +36,7 @@ cd apps/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.8.8.3-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
+The debug APK is written to `apps/android/app/build/outputs/apk/debug/Rakyzu-Music-0.8.8.4-debug.apk`. When invoked by the release gate, the unsigned release variant is used only for R8/resource-shrinking validation until production signing is provisioned.
 
 ## Configuration and security
 

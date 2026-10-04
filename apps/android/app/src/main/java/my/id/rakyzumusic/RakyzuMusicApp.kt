@@ -549,6 +549,14 @@ private fun AuthenticatedRakyzuMusicApp(
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
     var editorialArtworkRevision by remember(userId) { mutableStateOf(0L) }
+    // Artwork uploads complete asynchronously. Invalidate media only after the
+    // admin action reports success; invalidating before the PUT finishes leaves
+    // Coil holding the initial 404 and makes a new image appear to be ignored.
+    LaunchedEffect(adminState.message, adminState.messageIsError) {
+        if (adminState.message != null && !adminState.messageIsError) {
+            editorialArtworkRevision++
+        }
+    }
     var isSigningOut by remember { mutableStateOf(false) }
     var signOutMessage by remember { mutableStateOf<String?>(null) }
     var releaseNotificationPreference by remember {
@@ -720,11 +728,9 @@ private fun AuthenticatedRakyzuMusicApp(
                                 adminViewModel.deleteRecommendation(shelf.id)
                             },
                             onDeleteGlobalCardArtwork = { shelf ->
-                                editorialArtworkRevision++
                                 adminViewModel.deleteRecommendationArtwork(shelf.id)
                             },
                             onSaveGlobalCard = { mutation, artworkBytes ->
-                                if (artworkBytes != null) editorialArtworkRevision++
                                 adminViewModel.saveEditorialGroup(mutation, artworkBytes)
                             },
                             likedTrackIds = libraryState.likedTrackIds,
@@ -775,12 +781,10 @@ private fun AuthenticatedRakyzuMusicApp(
                             },
                             canManageEditorial = canManageEditorial,
                             onSaveEditorialGroup = { mutation, artworkBytes ->
-                                if (artworkBytes != null) editorialArtworkRevision++
                                 adminViewModel.saveEditorialGroup(mutation, artworkBytes)
                             },
                             onDeleteEditorialGroup = adminViewModel::deleteRecommendation,
                             onDeleteEditorialArtwork = { shelfId ->
-                                editorialArtworkRevision++
                                 adminViewModel.deleteRecommendationArtwork(shelfId)
                             },
                             onAddGroupToQueue = { tracks -> tracks.forEach(playbackController::addToQueue) },
@@ -1190,6 +1194,12 @@ private fun AccountSheet(
     val avatarRequest = remember(mediaDeliveryRepository, profile.userId, profile.avatarVersion) {
         (mediaDeliveryRepository.profileAvatarRequest(profile.userId) as? ArtworkRequestResult.Ready)?.request
     }
+    var localAvatarPreview by remember(profile.userId, profile.avatarVersion) {
+        mutableStateOf<ByteArray?>(null)
+    }
+    LaunchedEffect(profileMessage, profileMessageIsError) {
+        if (profileMessageIsError) localAvatarPreview = null
+    }
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -1219,7 +1229,10 @@ private fun AccountSheet(
         if (uri != null) {
             scope.launch {
                 val bytes = withContext(Dispatchers.IO) { decodeProfilePhoto(context, uri) }
-                if (bytes != null) onUploadAvatar(bytes)
+                if (bytes != null) {
+                    localAvatarPreview = bytes
+                    onUploadAvatar(bytes)
+                }
             }
         }
     }
@@ -1242,21 +1255,29 @@ private fun AccountSheet(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
-            avatarRequest?.let { request ->
-                val headers = NetworkHeaders.Builder().apply {
-                    request.requestHeaders().forEach { (name, value) -> set(name, value) }
-                }.build()
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(request.url)
-                        .httpHeaders(headers)
-                        .memoryCachePolicy(CachePolicy.DISABLED)
-                        .diskCachePolicy(CachePolicy.DISABLED)
-                        .networkCachePolicy(CachePolicy.DISABLED)
-                        .build(),
-                    contentDescription = "Current profile photo",
+            when {
+                localAvatarPreview != null -> AsyncImage(
+                    model = localAvatarPreview,
+                    contentDescription = "Selected profile photo",
                     modifier = Modifier.size(88.dp).clip(CircleShape),
                 )
+                avatarRequest != null -> {
+                    val request = requireNotNull(avatarRequest)
+                    val headers = NetworkHeaders.Builder().apply {
+                        request.requestHeaders().forEach { (name, value) -> set(name, value) }
+                    }.build()
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(request.url)
+                            .httpHeaders(headers)
+                            .memoryCachePolicy(CachePolicy.DISABLED)
+                            .diskCachePolicy(CachePolicy.DISABLED)
+                            .networkCachePolicy(CachePolicy.DISABLED)
+                            .build(),
+                        contentDescription = "Current profile photo",
+                        modifier = Modifier.size(88.dp).clip(CircleShape),
+                    )
+                }
             }
             if (canOpenAdmin || canOpenArtistWorkspace) {
                 Text(
@@ -1344,7 +1365,7 @@ private fun AccountSheet(
             }
             if (profile.avatarAvailable) {
                 Button(
-                    onClick = onDeleteAvatar,
+                    onClick = { localAvatarPreview = null; onDeleteAvatar() },
                     enabled = !isSavingProfile && !isSigningOut,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Remove profile photo") }

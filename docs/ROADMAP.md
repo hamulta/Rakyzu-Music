@@ -244,6 +244,9 @@ or owned by Rakyzu; no Spotify catalog data, code, assets, or private behavior i
 - [x] `0.8.8.3` — align Home/Explore Card Group presentations with the approved blueprints, restore
   tilted Explore album previews, invalidate artwork after replacement, show updated profile photos,
   and apply the Rakyzu Search header logo.
+- [x] `0.8.8.4` — make the Explore tilted mini-album visible even before artwork exists, refresh
+  Home/Explore artwork only after a successful upload/delete action, and provide an optimistic
+  profile-photo preview while the authenticated avatar is being persisted.
 - [ ] `0.8.9` — harden recommendation cold-start quality, catalog churn handling, and restoration
   coverage from the `0.8.8` production baseline.
 - [ ] `0.8.10` — complete the `0.8.x` accessibility, performance, security, and release audit before

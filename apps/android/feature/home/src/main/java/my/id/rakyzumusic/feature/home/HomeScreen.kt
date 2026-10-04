@@ -1493,6 +1493,6 @@ private val HOME_COLOR_HEX = Regex("^#[0-9A-Fa-f]{6}$")
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.8.8.3")
+        HomeScreen(versionName = "0.8.8.4")
     }
 }

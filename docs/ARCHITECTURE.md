@@ -1,6 +1,6 @@
 # Android Architecture
 
-Status: `0.8.8.3` Android source retains private on-device personalization and aligns Home/Explore editorial cards with the approved blueprints, including direct-play Home treatments, tilted Explore album previews, cache-safe artwork replacement, profile photo rendering, and the branded Search header. Publication evidence is recorded in `WORK_SESSION.md`.
+Status: `0.8.8.4` Android source retains private on-device personalization and aligns Home/Explore editorial cards with the approved blueprints, including direct-play Home treatments, always-visible tilted Explore album covers, post-upload artwork invalidation, profile photo rendering, and the branded Search header. Publication evidence is recorded in `WORK_SESSION.md`.
 
 ## Goals
 

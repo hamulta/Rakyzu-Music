@@ -68,7 +68,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -313,21 +315,28 @@ private fun ExploreGroupCard(
     modifier: Modifier,
 ) {
     val color = group.colorHex.toComposeColor()
-    Box(modifier.clip(RoundedCornerShape(4.dp)).background(color)) {
+    val cardShape = RoundedCornerShape(4.dp)
+    Box(modifier.clip(cardShape).background(color)) {
         val firstTrack = group.tracks.firstOrNull()
-        if (firstTrack != null) {
-            ExploreArtwork(
-                id = if (group.hasCustomArtwork) group.id else firstTrack.albumId,
-                provider = if (group.hasCustomArtwork) recommendationArtworkProvider else artworkProvider,
-                color = color,
-                shape = RoundedCornerShape(3.dp),
-                modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer {
+        // The tilted mini-album is part of the Explore Card Group treatment,
+        // not an optional decoration. Keep the cover visible even when a
+        // group has no album artwork yet; an empty state must never remove it.
+        ExploreArtwork(
+            id = if (group.hasCustomArtwork) group.id else firstTrack?.albumId.orEmpty(),
+            provider = if (group.hasCustomArtwork) recommendationArtworkProvider else artworkProvider,
+            color = color,
+            shape = RoundedCornerShape(3.dp),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp)
+                .shadow(8.dp, RoundedCornerShape(3.dp), clip = false)
+                .graphicsLayer {
                     rotationZ = -27.5f
                     translationX = 13.dp.toPx()
                     translationY = 9.dp.toPx()
-                }.size(85.dp),
-            )
-        }
+                }
+                .size(85.dp),
+        )
         Text(
             group.cardLabel?.ifBlank { group.title } ?: group.title,
             color = Color.White,
@@ -660,7 +669,13 @@ private fun ExploreArtwork(
     shape: RoundedCornerShape,
 ) {
     val request = remember(id, provider) { (provider(id) as? ArtworkRequestResult.Ready)?.request }
-    Box(modifier.clip(shape).background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.52f)))), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(color.copy(alpha = 0.96f), RakyzuBlack.copy(alpha = 0.78f))))
+            .border(1.dp, Color.White.copy(alpha = 0.52f), shape),
+        contentAlignment = Alignment.Center,
+    ) {
         Icon(Icons.Rounded.MusicNote, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(30.dp))
         request?.let {
             AsyncImage(
