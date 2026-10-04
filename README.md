@@ -25,6 +25,8 @@ docs/               Product, architecture, and release documentation
 
 Web and iOS roots are created only when their planned phase begins.
 
+The Android visual and interaction contract is documented in the [Rakyzu Music design system](docs/DESIGN_SYSTEM.md).
+
 ## Build Android
 
 Prerequisites: JDK 17 and Android SDK 37.
