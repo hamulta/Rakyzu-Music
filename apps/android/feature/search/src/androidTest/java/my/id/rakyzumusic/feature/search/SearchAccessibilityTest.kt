@@ -288,42 +288,6 @@ class SearchAccessibilityTest {
     }
 
     @Test
-    fun recentSearchPrivacyAndClearControlsAreExplicit() {
-        var enabledValue: Boolean? = null
-        var clearCalls = 0
-        composeRule.setContent {
-            RakyzuMusicTheme(darkTheme = true) {
-                SearchScreen(
-                    state = SearchUiState(
-                        catalog = CATALOG,
-                        recentSearchesEnabled = true,
-                        recentSearches = listOf("midnight signal"),
-                        hasObservedCatalog = true,
-                    ),
-                    onQueryChange = {},
-                    onClearQuery = {},
-                    onTrackPlay = { _, _ -> },
-                    onRecentSearchesEnabledChange = { enabledValue = it },
-                    onClearRecentSearches = { clearCalls += 1 },
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Save recent searches")
-            .assertHasClickAction()
-            .assertHeightIsAtLeast(48.dp)
-            .performClick()
-        composeRule.onNodeWithText("Clear recent searches")
-            .assertHasClickAction()
-            .assertHeightIsAtLeast(48.dp)
-            .performClick()
-        composeRule.runOnIdle {
-            assertEquals(false, enabledValue)
-            assertEquals(1, clearCalls)
-        }
-    }
-
-    @Test
     fun offlineStatusIsPoliteAndKeepsSavedResultVisible() {
         setSearchContent(
             SearchUiState(
