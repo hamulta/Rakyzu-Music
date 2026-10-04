@@ -16,6 +16,30 @@
 Release publication evidence (production migration, Worker health, CI run, APK checksum, tag, and
 downloaded GitHub asset) is appended here after the final release gate.
 
+Final publication evidence:
+
+- Android CI [run 37210430170](https://github.com/hamulta/Rakyzu-Music/actions/runs/37210430170)
+  passed the complete non-parallel cumulative gate in 7m54s: unit tests, lint, debug/Android-test
+  compilation, minified release build, public configuration validation, report upload, and APK
+  upload. The follow-up Search and Admin accessibility test contract fixes are included in the
+  final commit history; no failing CI run is used as release evidence.
+- Database CI [run 37209510481](https://github.com/hamulta/Rakyzu-Music/actions/runs/37209510481)
+  passed pgTAP, replay, lint, and forward deployment. Production now contains the editorial artwork,
+  Home global-group, Explore group, and legacy-position compatibility migrations. Explore seed data
+  verifies four Top Genres groups and six Browse All groups with three published tracks each; the
+  engagement receipt table remains forced-RLS protected.
+- Worker CI [run 37209316098](https://github.com/hamulta/Rakyzu-Music/actions/runs/37209316098)
+  passed generated bindings, TypeScript checks, 84 tests, dependency audit, and the Wrangler
+  deployment dry-run. Production `https://api.rakyzu.my.id/v1/health` returns
+  `{"service":"rakyzu-music-api","status":"ok","version":"0.8.8.2"}` with the R2 binding.
+- The CI-built debug APK is `Rakyzu-Music-0.8.8.2-debug.apk`, 34,856,572 bytes, SHA-256
+  `10c31e5ff60aad312f3122ce8ba7a24295591aaced423d07fded47a4f55d51e5`. Source and CI identity
+  checks confirm package `my.id.rakyzumusic`, versionName `0.8.8.2`, versionCode `108`, min SDK 26,
+  and target/compile SDK 37; no privileged Supabase, Cloudflare, or R2 credential is shipped.
+- Annotated tag `v0.8.8.2` was pushed from commit `50eaad1`. The GitHub Android prerelease asset
+  was downloaded again and matched the CI checksum byte-for-byte:
+  [Rakyzu Music Android 0.8.8.2](https://github.com/hamulta/Rakyzu-Music/releases/tag/v0.8.8.2).
+
 ## Completed authentication UI hotfix 0.8.8.1 — 2026-10-02
 
 - [x] Audit the complete Welcome, Sign In gateway, Log In, and Sign Up navigation graph.
