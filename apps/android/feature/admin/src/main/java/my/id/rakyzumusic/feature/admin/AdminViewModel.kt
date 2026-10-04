@@ -19,6 +19,7 @@ import my.id.rakyzumusic.core.data.admin.AdminRepository
 import my.id.rakyzumusic.core.data.admin.EditableLyrics
 import my.id.rakyzumusic.core.data.admin.LyricsSourceFormat
 import my.id.rakyzumusic.core.data.admin.StaffRole
+import my.id.rakyzumusic.core.model.EditorialGroupMutation
 
 data class AdminUiState(
     val isLoading: Boolean = true,
@@ -180,15 +181,50 @@ class AdminViewModel(
 
     fun upsertRecommendation(
         id: String?, title: String, subtitle: String?, position: Int,
-        trackId: String?, published: Boolean,
+        trackId: String?, published: Boolean, cardLabel: String? = null,
+        colorHex: String = "#4A558F",
     ) = runAction {
-        repository.upsertRecommendation(id, title, subtitle, position, trackId, published)
+        repository.upsertRecommendation(
+            id, title, subtitle, position, trackId, published, cardLabel, colorHex,
+        )
+    }
+
+    fun saveEditorialGroup(
+        mutation: EditorialGroupMutation,
+        artwork: ByteArray?,
+    ) = runAction {
+        val saved = repository.upsertRecommendation(
+            id = mutation.id,
+            title = mutation.title,
+            subtitle = mutation.subtitle,
+            position = mutation.storedPosition,
+            trackId = mutation.trackIds.firstOrNull(),
+            published = mutation.published,
+            cardLabel = mutation.cardLabel,
+            colorHex = mutation.colorHex,
+        )
+        if (saved !is my.id.rakyzumusic.core.data.admin.AdminActionResult.Success) {
+            return@runAction saved
+        }
+        val tracks = repository.replaceRecommendationTracks(mutation.id, mutation.trackIds)
+        if (tracks !is my.id.rakyzumusic.core.data.admin.AdminActionResult.Success) {
+            return@runAction tracks
+        }
+        artwork?.let { repository.uploadRecommendationArtwork(mutation.id, it) } ?: tracks
     }
 
     fun deleteRecommendation(id: String) = runAction { repository.deleteRecommendation(id) }
 
     fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = runAction {
         repository.uploadRecommendationArtwork(id, bytes)
+    }
+
+    fun deleteRecommendationArtwork(id: String) = runAction {
+        repository.deleteRecommendationArtwork(id)
+    }
+
+    fun replaceRecommendationTracks(id: String, trackIds: List<String>) = runAction {
+        repository.replaceRecommendationTracks(id, trackIds)
     }
 
     fun enforceAccount(userId: String, action: String, reason: String, expiresAt: String?) = runAction {

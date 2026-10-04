@@ -103,9 +103,9 @@ class SearchCatalogTest {
         val second = track("track-2", "Afterglow Circuit")
         val snapshot = catalog(tracks = listOf(first, second)).copy(
             editorialShelves = listOf(
-                EditorialShelf("later", "Late Night", null, 2, listOf(second)),
-                EditorialShelf("first", "Fresh Signals", "Made for discovery", 0, listOf(first, first)),
-                EditorialShelf("invalid", "Missing", null, 1, listOf(track("missing", "Hidden"))),
+                EditorialShelf("later", "Late Night", null, 202, listOf(second)),
+                EditorialShelf("first", "Fresh Signals", "Made for discovery", 200, listOf(first, first)),
+                EditorialShelf("invalid", "Missing", null, 201, listOf(track("missing", "Hidden"))),
             ),
         )
 

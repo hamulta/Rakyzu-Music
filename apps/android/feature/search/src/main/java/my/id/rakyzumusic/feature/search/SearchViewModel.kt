@@ -26,6 +26,8 @@ import my.id.rakyzumusic.core.data.search.RecentSearchState
 import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
+import my.id.rakyzumusic.core.model.EditorialPlacement
+import my.id.rakyzumusic.core.model.EditorialShelf
 import my.id.rakyzumusic.core.model.Track
 
 data class SearchAlbumResult(
@@ -58,6 +60,11 @@ data class BrowseCategory(
     val title: String,
     val subtitle: String?,
     val tracks: List<Track>,
+    val position: Int = 0,
+    val hasCustomArtwork: Boolean = false,
+    val cardLabel: String? = null,
+    val colorHex: String = "#4A558F",
+    val globalScore: Long = 0L,
 )
 
 enum class RemoteSearchStatus {
@@ -82,6 +89,7 @@ data class SearchUiState(
     val remoteSearchFailure: CatalogSearchFailure? = null,
     val nextRemoteOffset: Int? = null,
     val isLoadingMore: Boolean = false,
+    val recommendedTracks: List<Track> = emptyList(),
 ) {
     val selectedBrowseCategory: BrowseCategory?
         get() = browseCategories.firstOrNull { it.id == selectedBrowseCategoryId }
@@ -137,6 +145,7 @@ class SearchViewModel internal constructor(
 
     init {
         observeCatalog()
+        observeRecommendations()
         observeRecentSearches()
         observeConnectivity()
     }
@@ -189,6 +198,7 @@ class SearchViewModel internal constructor(
                 isLoadingMore = false,
             )
         }
+        viewModelScope.launch { repository.recordEditorialGroupOpen(category.id) }
     }
 
     fun closeBrowseCategory() {
@@ -288,6 +298,18 @@ class SearchViewModel internal constructor(
                         hasObservedCatalog = true,
                     )
                 }
+            }
+        }
+    }
+
+    private fun observeRecommendations() {
+        viewModelScope.launch {
+            repository.observeHomeFeed(userId).collect { feed ->
+                val recommendations = buildList {
+                    addAll(feed.recommendations.map { it.track })
+                    addAll(feed.catalog.tracks)
+                }.distinctBy(Track::id).take(18)
+                mutableUiState.update { it.copy(recommendedTracks = recommendations) }
             }
         }
     }
@@ -494,13 +516,26 @@ class SearchViewModel internal constructor(
 internal fun CatalogSnapshot.browseCategories(): List<BrowseCategory> {
     val trackIds = tracks.mapTo(mutableSetOf(), Track::id)
     return editorialShelves.asSequence()
-        .sortedWith(compareBy({ it.position }, { it.id }))
+        .filter { EditorialPlacement.fromPosition(it.position) in setOf(
+            EditorialPlacement.ExploreTopGenre,
+            EditorialPlacement.ExploreBrowse,
+        ) }
+        .groupBy { EditorialPlacement.fromPosition(it.position) }
+        .values
+        .flatMap { shelves -> shelves.sortedWith(
+            compareByDescending<EditorialShelf> { it.globalScore }.thenBy { it.position }.thenBy { it.id },
+        ) }
         .map { shelf ->
             BrowseCategory(
                 id = shelf.id,
                 title = shelf.title.trim(),
                 subtitle = shelf.subtitle?.trim()?.takeIf(String::isNotEmpty),
                 tracks = shelf.tracks.filter { it.id in trackIds }.distinctBy(Track::id),
+                position = shelf.position,
+                hasCustomArtwork = shelf.hasCustomArtwork,
+                cardLabel = shelf.cardLabel,
+                colorHex = shelf.colorHex,
+                globalScore = shelf.globalScore,
             )
         }
         .filter { it.id.isNotBlank() && it.title.isNotBlank() && it.tracks.isNotEmpty() }
@@ -559,7 +594,7 @@ internal const val SAVED_SEARCH_QUERY_KEY = "search_query"
 internal const val SAVED_BROWSE_CATEGORY_KEY = "search_browse_category"
 internal const val REMOTE_PAGE_SIZE = 30
 private const val MIN_REMOTE_QUERY_LENGTH = 2
-private const val MAX_BROWSE_CATEGORIES = 12
+private const val MAX_BROWSE_CATEGORIES = 20
 private const val TEST_USER_ID = "test-listener"
 private const val NANOS_PER_MILLISECOND = 1_000_000L
 

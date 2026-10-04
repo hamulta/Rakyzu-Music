@@ -40,7 +40,9 @@ select set_config('request.jwt.claims',
   '{"sub":"b3000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 select is(public.admin_create_artist('Test Identity Artist', 'artist-identity@rakyzu.test')->>'accountStatus',
   'pending_consent', 'exact existing email creates a pending Artist profile');
-select is(public.admin_upsert_editorial_shelf(null, 'Test Identity Card', 'New music', 0, null, true)->>'title',
+select is(public.admin_upsert_editorial_shelf(
+  null, 'Test Identity Card', 'New music', 0, null, true, 'Test Mix', '#4A558F'
+)->>'title',
   'Test Identity Card', 'CEO can create an editorial card without a target track');
 select ok(jsonb_array_length(public.admin_list_recommendations()) > 0,
   'Admin can list editable placeholder and newly created recommendation cards');

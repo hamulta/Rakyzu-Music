@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.LibraryMusic
@@ -43,6 +42,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +56,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
@@ -167,25 +168,13 @@ private data class TopLevelDestination(
 
 private val listenerDestinations = listOf(
     TopLevelDestination(RakyzuRoute.Home, "Home", Icons.Rounded.Home),
-    TopLevelDestination(RakyzuRoute.Search, "Search", Icons.Rounded.Search),
-    TopLevelDestination(RakyzuRoute.Library, "Your Library", Icons.Rounded.LibraryMusic),
-    TopLevelDestination(RakyzuRoute.Create, "Create", Icons.Rounded.AddCircle),
-)
-
-private val adminDestination = TopLevelDestination(
-    RakyzuRoute.Admin,
-    "Admin",
-    Icons.Rounded.AdminPanelSettings,
-)
-
-private val artistWorkspaceDestination = TopLevelDestination(
-    RakyzuRoute.ArtistWorkspace,
-    "Artist",
-    Icons.Rounded.Album,
+    TopLevelDestination(RakyzuRoute.Search, "Explore", Icons.Rounded.Search),
+    TopLevelDestination(RakyzuRoute.Library, "Library", Icons.Rounded.LibraryMusic),
 )
 
 private const val ExperiencePreferences = "rakyzu_experience"
 private const val WelcomeCompletedKey = "welcome_completed"
+private const val NotificationPromptedPrefix = "notification_prompted_"
 
 @Composable
 fun RakyzuMusicApp(
@@ -416,6 +405,40 @@ private fun AuthenticatedRakyzuMusicApp(
     val context = LocalContext.current
     val backStack = rememberNavBackStack(RakyzuRoute.Home)
     val currentRoute = backStack.lastOrNull()
+    var showNotificationPrimer by remember(userId) { mutableStateOf(false) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        context.getSharedPreferences(ExperiencePreferences, Context.MODE_PRIVATE)
+            .edit().putBoolean(NotificationPromptedPrefix + userId.lowercase(), true).apply()
+    }
+    LaunchedEffect(userId, currentRoute) {
+        if (currentRoute != RakyzuRoute.Home || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return@LaunchedEffect
+        }
+        val preferences = context.getSharedPreferences(ExperiencePreferences, Context.MODE_PRIVATE)
+        val promptKey = NotificationPromptedPrefix + userId.lowercase()
+        if (
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            !preferences.getBoolean(promptKey, false)
+        ) {
+            showNotificationPrimer = true
+        }
+    }
+    if (showNotificationPrimer) {
+        NotificationPermissionPrimer(
+            onEnable = {
+                showNotificationPrimer = false
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            },
+            onNotNow = {
+                showNotificationPrimer = false
+                context.getSharedPreferences(ExperiencePreferences, Context.MODE_PRIVATE)
+                    .edit().putBoolean(NotificationPromptedPrefix + userId.lowercase(), true).apply()
+            },
+        )
+    }
     val playbackSnapshot by playbackController.snapshot.collectAsStateWithLifecycle()
     val pendingTrackId by pendingTrackLink.collectAsStateWithLifecycle()
     var trackLinkMessage by remember { mutableStateOf<String?>(null) }
@@ -505,18 +528,17 @@ private fun AuthenticatedRakyzuMusicApp(
         factory = AdminViewModel.factory(adminRepository),
     )
     val adminState by adminViewModel.uiState.collectAsStateWithLifecycle()
-    val staffDestinations = if (
-        adminState.dashboard?.context?.let {
-            it.isStaff && it.can(StaffPermission.AdminAccess)
-        } == true
-    ) {
-        listenerDestinations + adminDestination
-    } else {
-        listenerDestinations
+    LaunchedEffect(adminState.dashboard?.recommendations) {
+        if (adminState.dashboard != null) catalogRepository.refresh()
     }
-    val topLevelDestinations = if (profile.artist?.isActive == true) {
-        staffDestinations + artistWorkspaceDestination
-    } else staffDestinations
+    val canOpenAdmin = adminState.dashboard?.context?.let {
+        it.isStaff && it.can(StaffPermission.AdminAccess)
+    } == true
+    val canManageEditorial = adminState.dashboard?.context?.let {
+        it.isStaff && it.can(StaffPermission.EditorialManage)
+    } == true
+    val canOpenArtistWorkspace = profile.artist?.isActive == true
+    val topLevelDestinations = listenerDestinations
     val libraryState by libraryViewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     var showAccount by remember { mutableStateOf(false) }
@@ -588,6 +610,16 @@ private fun AuthenticatedRakyzuMusicApp(
                 }
             },
             offlineTrackContextCount = offlineTrackContextCount,
+            canOpenAdmin = canOpenAdmin,
+            canOpenArtistWorkspace = canOpenArtistWorkspace,
+            onOpenAdmin = {
+                showAccount = false
+                selectTopLevelRoute(backStack, RakyzuRoute.Admin)
+            },
+            onOpenArtistWorkspace = {
+                showAccount = false
+                selectTopLevelRoute(backStack, RakyzuRoute.ArtistWorkspace)
+            },
             onDismiss = {
                 if (!isSigningOut && !isSavingProfile) {
                     onResetProfileDraft()
@@ -646,9 +678,9 @@ private fun AuthenticatedRakyzuMusicApp(
         modifier = modifier.fillMaxSize(),
         containerColor = RakyzuBlack,
         navigationSuiteColors = androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults.colors(
-            navigationBarContainerColor = RakyzuSurface,
-            navigationRailContainerColor = RakyzuSurface,
-            navigationDrawerContainerColor = RakyzuSurface,
+            navigationBarContainerColor = Color(0xFF121111),
+            navigationRailContainerColor = Color(0xFF121111),
+            navigationDrawerContainerColor = Color(0xFF121111),
         ),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -670,6 +702,18 @@ private fun AuthenticatedRakyzuMusicApp(
                                 signOutMessage = null
                                 showAccount = true
                             },
+                            onSettingsClick = {
+                                signOutMessage = null
+                                showAccount = true
+                            },
+                            canManageEditorial = canManageEditorial,
+                            onDeleteGlobalCard = { shelf ->
+                                adminViewModel.deleteRecommendation(shelf.id)
+                            },
+                            onDeleteGlobalCardArtwork = { shelf ->
+                                adminViewModel.deleteRecommendationArtwork(shelf.id)
+                            },
+                            onSaveGlobalCard = adminViewModel::saveEditorialGroup,
                             likedTrackIds = libraryState.likedTrackIds,
                             savedAlbumIds = libraryState.savedAlbumIds,
                             followedArtistIds = libraryState.followedArtistIds,
@@ -690,6 +734,7 @@ private fun AuthenticatedRakyzuMusicApp(
                     entry<RakyzuRoute.Search> {
                         SearchRoute(
                             viewModel = searchViewModel,
+                            mediaDeliveryRepository = mediaDeliveryRepository,
                             onTrackPlay = playbackController::playQueue,
                             onTrackPlayNext = playbackController::playNext,
                             onTrackAddToQueue = playbackController::addToQueue,
@@ -712,6 +757,18 @@ private fun AuthenticatedRakyzuMusicApp(
                                     LibraryItemKind.Track,
                                     track.id,
                                     saved,
+                                )
+                            },
+                            canManageEditorial = canManageEditorial,
+                            onSaveEditorialGroup = adminViewModel::saveEditorialGroup,
+                            onDeleteEditorialGroup = adminViewModel::deleteRecommendation,
+                            onDeleteEditorialArtwork = adminViewModel::deleteRecommendationArtwork,
+                            onAddGroupToQueue = { tracks -> tracks.forEach(playbackController::addToQueue) },
+                            onDownloadGroup = { group ->
+                                offlineDownloadsViewModel.downloadEditorial(
+                                    group.id,
+                                    group.title,
+                                    group.tracks,
                                 )
                             },
                         )
@@ -997,6 +1054,41 @@ private fun AuthenticatedRakyzuMusicApp(
 }
 
 @Composable
+private fun NotificationPermissionPrimer(
+    onEnable: () -> Unit,
+    onNotNow: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onNotNow,
+        containerColor = Color(0xFF252525),
+        icon = {
+            Box(
+                modifier = Modifier.size(82.dp).clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = RakyzuBlack, modifier = Modifier.size(42.dp))
+            }
+        },
+        title = { Text("Turn on notifications", fontWeight = FontWeight.Black) },
+        text = {
+            Text(
+                "Be the first to hear about events, Rakyzu Music updates, and new song or radio releases. " +
+                    "You stay in control and can change this anytime in Settings.",
+            )
+        },
+        confirmButton = {
+            Button(onClick = onEnable, modifier = Modifier.fillMaxWidth()) {
+                Text("Turn on notifications")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onNotNow, modifier = Modifier.fillMaxWidth()) { Text("Not now") }
+        },
+    )
+}
+
+@Composable
 private fun SessionLoadingScreen(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
@@ -1058,6 +1150,10 @@ private fun AccountSheet(
     notificationPreferenceMessage: String?,
     onReleaseNotificationPreferenceChanged: (ReleaseNotificationPreference) -> Unit,
     offlineTrackContextCount: Int,
+    canOpenAdmin: Boolean,
+    canOpenArtistWorkspace: Boolean,
+    onOpenAdmin: () -> Unit,
+    onOpenArtistWorkspace: () -> Unit,
     onDismiss: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -1122,6 +1218,35 @@ private fun AccountSheet(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
+            if (canOpenAdmin || canOpenArtistWorkspace) {
+                Text(
+                    text = "Workspaces",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (canOpenAdmin) {
+                    Button(
+                        onClick = onOpenAdmin,
+                        enabled = !isSavingProfile && !isSigningOut,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    ) {
+                        Icon(Icons.Rounded.AdminPanelSettings, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Open Admin")
+                    }
+                }
+                if (canOpenArtistWorkspace) {
+                    Button(
+                        onClick = onOpenArtistWorkspace,
+                        enabled = !isSavingProfile && !isSigningOut,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    ) {
+                        Icon(Icons.Rounded.Album, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Open Artist workspace")
+                    }
+                }
+            }
             IdentityName(profile = profile)
             if (profile.verified) {
                 Text(

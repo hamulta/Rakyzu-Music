@@ -60,6 +60,16 @@ class OfflineDownloadsViewModel internal constructor(
         )
     }
 
+    fun downloadEditorial(groupId: String, title: String, tracks: List<Track>) = perform {
+        repository.enqueueCollection(
+            userId,
+            DownloadCollectionKind.Editorial,
+            groupId,
+            title,
+            tracks,
+        )
+    }
+
     fun pause(trackId: String) = perform { repository.pause(userId, trackId) }
     fun resume(trackId: String) = perform { repository.resume(userId, trackId) }
     fun cancel(trackId: String) = perform { repository.cancel(userId, trackId) }

@@ -10,12 +10,15 @@ import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.DiscoveryMode
 import my.id.rakyzumusic.core.model.HomeFeedSnapshot
 import my.id.rakyzumusic.core.model.Track
+import my.id.rakyzumusic.core.model.EditorialPlacement
 
 internal interface CatalogRemoteDataSource {
     suspend fun fetchCatalog(): CatalogSnapshot
 
     suspend fun searchCatalog(query: String, offset: Int, limit: Int): CatalogSearchPage =
         throw UnsupportedOperationException("Remote catalog search is unavailable")
+
+    suspend fun recordEditorialGroupOpen(shelfId: String): Boolean = false
 }
 
 internal class OfflineFirstCatalogRepository(
@@ -34,6 +37,14 @@ internal class OfflineFirstCatalogRepository(
             trackId = trackId,
             playedAtEpochMillis = currentTimeMillis(),
         )
+
+    override suspend fun recordEditorialGroupOpen(shelfId: String): Boolean = try {
+        if (shelfId.isBlank()) false else remoteDataSource.recordEditorialGroupOpen(shelfId)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Throwable) {
+        false
+    }
 
     override suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean =
         localDataSource.setPersonalizationEnabled(userId, enabled)
@@ -146,12 +157,24 @@ private fun CatalogSnapshot.isValidCatalog(): Boolean {
     val trackIds = tracks.mapTo(mutableSetOf(), Track::id)
     val shelfIds = mutableSetOf<String>()
     val shelfPositions = mutableSetOf<Int>()
+    val placementCounts = editorialShelves.groupingBy { shelf ->
+        EditorialPlacement.fromPosition(shelf.position)
+    }.eachCount()
+    if (
+        placementCounts[null] != null ||
+        EditorialPlacement.entries.any { placement ->
+            (placementCounts[placement] ?: 0) > placement.maximumCards
+        }
+    ) return false
     return editorialShelves.all { shelf ->
         shelf.id.isNotBlank() &&
             shelf.title.trim().length in 1..80 &&
             (shelf.subtitle?.let { it.trim().length in 1..160 } ?: true) &&
-            shelf.position in 0..1_000 &&
-            shelf.tracks.isNotEmpty() &&
+            EditorialPlacement.fromPosition(shelf.position) != null &&
+            (shelf.cardLabel?.let { it.trim().length in 1..40 } ?: true) &&
+            COLOR_HEX.matches(shelf.colorHex) &&
+            shelf.globalScore >= 0L &&
+            shelf.tracks.size in 1..MAX_EDITORIAL_TRACKS &&
             shelfIds.add(shelf.id) &&
             shelfPositions.add(shelf.position) &&
             shelf.tracks.map { it.id }.let { ids ->
@@ -159,6 +182,9 @@ private fun CatalogSnapshot.isValidCatalog(): Boolean {
             }
     }
 }
+
+private val COLOR_HEX = Regex("^#[0-9A-Fa-f]{6}$")
+private const val MAX_EDITORIAL_TRACKS = 50
 
 private fun <T> List<T>.hasDuplicates(): Boolean = size != toSet().size
 

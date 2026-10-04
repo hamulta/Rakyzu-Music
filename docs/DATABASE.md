@@ -61,6 +61,22 @@ the device; no new Supabase table or third-party recommendation service is intro
 single Room transaction that clears only the active account's history and personalization state,
 leaving Library content unchanged.
 
+### Explore editorial groups — 0.8.8.2
+
+Forward migrations add `card_label`, validated `color_hex`, and a privacy-preserving `global_score`
+to `public.editorial_shelves`. Placement ranges reserve seven Home Top Mix slots, seven Home
+listening slots, eight Your Top Genres slots, and twelve Browse All slots. The seeded Explore graph
+contains four Your Top Genres groups and six Browse All groups with real published track membership;
+existing Home groups receive their labels and distinct palette colors.
+
+`editorial_shelf_opens` is forced-RLS and has no authenticated table privileges. An authenticated
+listener can call only `record_editorial_shelf_open(uuid)`, which records at most one receipt per
+listener, shelf, and UTC day and increments the global score through a locked-down definer function.
+Staff use permission-checked RPCs to edit metadata, reorder groups, replace 1–50 tracks, manage
+artwork, publish/unpublish, and delete. All RPCs use an empty search path, validate placement and
+track limits, and write the existing staff audit trail. Room schema 13 mirrors card labels, colors,
+and scores with an additive automatic 12→13 migration.
+
 `public.liked_tracks`, `public.saved_albums`, and `public.followed_artists` store canonical account Library relationships. Forced RLS and owner-only policies restrict authenticated reads and mutations to `auth.uid()`; anonymous table and RPC access is revoked. Bounded `get_library_items_page`, `get_library_sync_anchor`, and `get_library_changes` functions use invoker rights and preserve RLS. The append-only `library_changes` stream records insertions and deletion tombstones for resumable per-listener synchronization. Room mirrors canonical IDs and adds a coalescing account/item mutation outbox; snapshot replacement and cursor application preserve newer pending intents.
 
 `public.playlists` stores owner-scoped playlist metadata. Forced RLS and security-invoker `get_my_playlists` and `create_playlist` functions keep reads and creates inside `auth.uid()`, normalize bounded names/descriptions, and deny anonymous execution. `revision` begins at one as the optimistic-concurrency snapshot boundary for later ordered-item and collaboration migrations. Room schema 5 caches only the authenticated listener's validated collection and updates it transactionally without storing the owner identifier in the domain/UI model.

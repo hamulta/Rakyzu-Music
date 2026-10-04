@@ -38,9 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
@@ -55,6 +56,7 @@ import androidx.compose.ui.unit.sp
 
 private val WelcomeBackground = Color(0xFF41C3D6)
 private val WelcomeSurface = Color(0xFF121111)
+private val WelcomeBubbleBase = Color.Black
 private val WelcomeButton = Color(0xFF059FB4)
 private val WelcomeAccent = Color(0xFF76D7E5)
 private val WelcomeAccentBright = Color(0xFF7BEEFF)
@@ -229,9 +231,12 @@ private fun WelcomeCircle(
         modifier = Modifier
             .offset(x = x, y = y)
             .size(size)
-            .graphicsLayer { this.alpha = alpha }
+            .graphicsLayer {
+                this.alpha = alpha
+                blendMode = BlendMode.Softlight
+            }
             .clip(CircleShape)
-            .background(WelcomeSurface),
+            .background(WelcomeBubbleBase),
     )
 }
 

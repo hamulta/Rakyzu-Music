@@ -22,12 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.Explore
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
@@ -41,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -84,10 +80,13 @@ import my.id.rakyzumusic.core.model.Album
 import my.id.rakyzumusic.core.model.Artist
 import my.id.rakyzumusic.core.model.CatalogSnapshot
 import my.id.rakyzumusic.core.model.Track
+import my.id.rakyzumusic.core.model.EditorialGroupMutation
+import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 
 @Composable
 fun SearchRoute(
     viewModel: SearchViewModel,
+    mediaDeliveryRepository: MediaDeliveryRepository? = null,
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onTrackPlayNext: ((Track) -> Unit)? = null,
@@ -99,6 +98,12 @@ fun SearchRoute(
     likedTrackIds: Set<String> = emptySet(),
     pendingTrackIds: Set<String> = emptySet(),
     onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
+    canManageEditorial: Boolean = false,
+    onSaveEditorialGroup: (EditorialGroupMutation, ByteArray?) -> Unit = { _, _ -> },
+    onDeleteEditorialGroup: (String) -> Unit = {},
+    onDeleteEditorialArtwork: (String) -> Unit = {},
+    onAddGroupToQueue: (List<Track>) -> Unit = {},
+    onDownloadGroup: (BrowseCategory) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SearchScreen(
@@ -110,9 +115,6 @@ fun SearchRoute(
         onCloseBrowseCategory = viewModel::closeBrowseCategory,
         onLoadMore = viewModel::loadNextPage,
         onRetrySearch = viewModel::retrySearch,
-        onRecentSearchClick = viewModel::selectRecentSearch,
-        onRecentSearchesEnabledChange = viewModel::setRecentSearchesEnabled,
-        onClearRecentSearches = viewModel::clearRecentSearches,
         onTrackPlay = onTrackPlay,
         onTrackPlayNext = onTrackPlayNext,
         onTrackAddToQueue = onTrackAddToQueue,
@@ -123,6 +125,16 @@ fun SearchRoute(
         likedTrackIds = likedTrackIds,
         pendingTrackIds = pendingTrackIds,
         onTrackLikeChange = onTrackLikeChange,
+        artworkProvider = mediaDeliveryRepository?.let { repository -> repository::artworkRequest }
+            ?: unavailableExploreArtworkProvider,
+        recommendationArtworkProvider = mediaDeliveryRepository?.let { repository -> repository::recommendationArtworkRequest }
+            ?: unavailableExploreArtworkProvider,
+        canManageEditorial = canManageEditorial,
+        onSaveEditorialGroup = onSaveEditorialGroup,
+        onDeleteEditorialGroup = onDeleteEditorialGroup,
+        onDeleteEditorialArtwork = onDeleteEditorialArtwork,
+        onAddGroupToQueue = onAddGroupToQueue,
+        onDownloadGroup = onDownloadGroup,
         modifier = modifier,
     )
 }
@@ -140,9 +152,6 @@ fun SearchScreen(
     onCloseBrowseCategory: () -> Unit = {},
     onLoadMore: () -> Unit = {},
     onRetrySearch: () -> Unit = {},
-    onRecentSearchClick: (String) -> Unit = {},
-    onRecentSearchesEnabledChange: (Boolean) -> Unit = {},
-    onClearRecentSearches: () -> Unit = {},
     onTrackPlayNext: ((Track) -> Unit)? = null,
     onTrackAddToQueue: ((Track) -> Unit)? = null,
     onArtistClick: ((Artist) -> Unit)? = null,
@@ -152,6 +161,14 @@ fun SearchScreen(
     likedTrackIds: Set<String> = emptySet(),
     pendingTrackIds: Set<String> = emptySet(),
     onTrackLikeChange: ((Track, Boolean) -> Unit)? = null,
+    artworkProvider: ExploreArtworkProvider = unavailableExploreArtworkProvider,
+    recommendationArtworkProvider: ExploreArtworkProvider = unavailableExploreArtworkProvider,
+    canManageEditorial: Boolean = false,
+    onSaveEditorialGroup: (EditorialGroupMutation, ByteArray?) -> Unit = { _, _ -> },
+    onDeleteEditorialGroup: (String) -> Unit = {},
+    onDeleteEditorialArtwork: (String) -> Unit = {},
+    onAddGroupToQueue: (List<Track>) -> Unit = {},
+    onDownloadGroup: (BrowseCategory) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -197,10 +214,6 @@ fun SearchScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -216,29 +229,37 @@ fun SearchScreen(
             .semantics { isTraversalGroup = true },
         contentPadding = contentPadding,
     ) {
-        item(key = "search-header") {
-            Text(
-                text = "Search",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 28.dp, bottom = 18.dp)
-                    .semantics { heading() },
-            )
+        if (state.selectedBrowseCategory == null) item(key = "search-header") {
+            Row(
+                modifier = Modifier.padding(start = 19.dp, top = 28.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(48.dp).background(RakyzuAqua.copy(alpha = 0.16f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = RakyzuAqua)
+                }
+                Text(
+                    text = "Search",
+                    color = RakyzuAqua,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 10.dp).semantics { heading() },
+                )
+            }
         }
-        item(key = "search-input") {
+        if (state.selectedBrowseCategory == null) item(key = "search-input") {
             OutlinedTextField(
                 value = state.query,
                 onValueChange = onQueryChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 28.dp)
                     .focusRequester(focusRequester)
                     .testTag(SEARCH_FIELD_TAG),
                 singleLine = true,
-                label = { Text("Artists, albums, or tracks") },
+                placeholder = { Text("Songs, Artists, Podcasts & More") },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Search,
@@ -276,7 +297,7 @@ fun SearchScreen(
                     null
                 },
             )
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(28.dp))
         }
 
         if (state.query.isNotBlank()) {
@@ -326,31 +347,34 @@ fun SearchScreen(
                 )
             }
             state.isReadyToBrowse -> item(key = "search-browse") {
-                BrowseCatalogSummary(
-                    catalog = state.catalog,
-                    categories = state.browseCategories,
-                    recentSearchesEnabled = state.recentSearchesEnabled,
-                    recentSearches = state.recentSearches,
-                    onCategoryClick = onBrowseCategoryClick,
-                    onRecentSearchClick = onRecentSearchClick,
-                    onRecentSearchesEnabledChange = onRecentSearchesEnabledChange,
-                    onClearRecentSearches = onClearRecentSearches,
+                ExploreLanding(
+                    state = state,
+                    canManageEditorial = canManageEditorial,
+                    artworkProvider = artworkProvider,
+                    recommendationArtworkProvider = recommendationArtworkProvider,
+                    onTrackPlay = onTrackPlay,
+                    onOpenGroup = onBrowseCategoryClick,
+                    onSaveGroup = onSaveEditorialGroup,
+                    onDeleteGroup = onDeleteEditorialGroup,
+                    onDeleteArtwork = onDeleteEditorialArtwork,
                 )
             }
             state.isBrowsingCategory -> {
                 val category = requireNotNull(state.selectedBrowseCategory)
                 item(key = "browse-category-header") {
-                    BrowseCategoryHeader(category, onCloseBrowseCategory)
-                }
-                itemsIndexed(
-                    items = category.tracks,
-                    key = { _, track -> "browse-track-${track.id}" },
-                ) { index, track ->
-                    TrackSearchResultRow(
-                        track = track,
-                        traversalOrder = index.toFloat(),
-                        onPlay = { onTrackPlay(category.tracks, index) },
-                        onMoreClick = { contextualTrack = track },
+                    EditorialGroupDetail(
+                        category = category,
+                        artworkProvider = artworkProvider,
+                        recommendationArtworkProvider = recommendationArtworkProvider,
+                        onBack = onCloseBrowseCategory,
+                        onPlay = onTrackPlay,
+                        onShuffle = { tracks ->
+                            val shuffled = tracks.shuffled()
+                            if (shuffled.isNotEmpty()) onTrackPlay(shuffled, 0)
+                        },
+                        onAddToQueue = onAddGroupToQueue,
+                        onDownload = onDownloadGroup,
+                        onTrackMore = { contextualTrack = it },
                     )
                 }
             }
@@ -434,264 +458,6 @@ fun SearchScreen(
 }
 
 internal const val SEARCH_FIELD_TAG = "search_field"
-
-@Composable
-private fun BrowseCatalogSummary(
-    catalog: CatalogSnapshot,
-    categories: List<BrowseCategory>,
-    recentSearchesEnabled: Boolean,
-    recentSearches: List<String>,
-    onCategoryClick: (String) -> Unit,
-    onRecentSearchClick: (String) -> Unit,
-    onRecentSearchesEnabledChange: (Boolean) -> Unit,
-    onClearRecentSearches: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = "Browse your catalog",
-            color = MaterialTheme.colorScheme.onBackground,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text = "Explore curated collections offline, or submit a query for the authenticated full catalog.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        BrowseMetric(Icons.Rounded.Person, "Artists", catalog.artists.size)
-        BrowseMetric(Icons.Rounded.Album, "Albums", catalog.albums.size)
-        BrowseMetric(Icons.Rounded.MusicNote, "Tracks", catalog.tracks.size)
-
-        if (categories.isNotEmpty()) {
-            Text(
-                text = "Explore categories",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .padding(top = 12.dp)
-                    .semantics { heading() },
-            )
-            categories.forEach { category ->
-                BrowseCategoryRow(category, onCategoryClick)
-            }
-        }
-
-        RecentSearchControls(
-            enabled = recentSearchesEnabled,
-            queries = recentSearches,
-            onQueryClick = onRecentSearchClick,
-            onEnabledChange = onRecentSearchesEnabledChange,
-            onClear = onClearRecentSearches,
-        )
-    }
-}
-
-@Composable
-private fun BrowseCategoryRow(
-    category: BrowseCategory,
-    onClick: (String) -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = RakyzuSurfaceRaised,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .clickable(
-                onClickLabel = "Open ${category.title} category",
-                role = Role.Button,
-                onClick = { onClick(category.id) },
-            ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Rounded.Explore, contentDescription = null, tint = RakyzuAqua)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 14.dp),
-            ) {
-                Text(
-                    text = category.title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = category.subtitle ?: "${category.tracks.size} curated tracks",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Text(
-                text = category.tracks.size.toString(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BrowseCategoryHeader(
-    category: BrowseCategory,
-    onBack: () -> Unit,
-) {
-    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back to browse",
-                )
-            }
-            Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-                Text(
-                    text = category.title,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() },
-                )
-                category.subtitle?.let { subtitle ->
-                    Text(
-                        text = subtitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
-        Text(
-            text = "${category.tracks.size} curated tracks · available from your saved catalog",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-        )
-    }
-}
-
-@Composable
-private fun RecentSearchControls(
-    enabled: Boolean,
-    queries: List<String>,
-    onQueryClick: (String) -> Unit,
-    onEnabledChange: (Boolean) -> Unit,
-    onClear: () -> Unit,
-) {
-    Text(
-        text = "Recent searches",
-        color = MaterialTheme.colorScheme.onBackground,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier
-            .padding(top = 12.dp)
-            .semantics { heading() },
-    )
-    Surface(shape = RoundedCornerShape(18.dp), color = RakyzuSurfaceRaised) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.History, contentDescription = null, tint = RakyzuAqua)
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 14.dp),
-                ) {
-                    Text("Save recent searches", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Off by default · encrypted and isolated to this listener",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = onEnabledChange,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .semantics { contentDescription = "Save recent searches" },
-                )
-            }
-            if (enabled && queries.isEmpty()) {
-                Text(
-                    text = "No saved searches yet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-            }
-            queries.forEach { query ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .clickable(
-                            onClickLabel = "Search again for $query",
-                            role = Role.Button,
-                            onClick = { onQueryClick(query) },
-                        )
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Rounded.Search, contentDescription = null, tint = RakyzuAqua)
-                    Text(
-                        text = query,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(horizontal = 14.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (queries.isNotEmpty()) {
-                TextButton(onClick = onClear, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Clear recent searches")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BrowseMetric(icon: ImageVector, label: String, count: Int) {
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = RakyzuSurfaceRaised,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 64.dp)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, tint = RakyzuAqua)
-            Text(
-                text = label,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 14.dp),
-            )
-            Text(
-                text = count.toString(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-    }
-}
 
 @Composable
 private fun SearchResultSummary(results: SearchResults) {

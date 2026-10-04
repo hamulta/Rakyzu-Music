@@ -5,6 +5,7 @@ import java.io.InputStream
 enum class DownloadCollectionKind {
     Album,
     Playlist,
+    Editorial,
 }
 
 enum class OfflineDownloadStatus {

@@ -273,6 +273,10 @@ internal fun CatalogEntitySnapshot.toDomain(): CatalogSnapshot {
                     .sortedBy(EditorialShelfTrackEntity::position)
                     .mapNotNull { tracksById[it.trackId] }
                     .map { it.toDomainTrack() },
+                hasCustomArtwork = shelf.hasCustomArtwork,
+                cardLabel = shelf.cardLabel,
+                colorHex = shelf.colorHex,
+                globalScore = shelf.globalScore,
             )
         },
         lastSyncedAtEpochMillis = lastSyncedAtEpochMillis,
@@ -303,4 +307,8 @@ private fun EditorialShelf.toEntity() = EditorialShelfEntity(
     title = title,
     subtitle = subtitle,
     position = position,
+    hasCustomArtwork = hasCustomArtwork,
+    cardLabel = cardLabel,
+    colorHex = colorHex,
+    globalScore = globalScore,
 )

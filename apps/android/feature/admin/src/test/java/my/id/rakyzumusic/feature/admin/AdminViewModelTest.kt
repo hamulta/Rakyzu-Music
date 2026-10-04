@@ -126,7 +126,7 @@ class AdminViewModelTest {
         override suspend fun setAuditRetention(days: Int) = ok()
         override suspend fun upsertRecommendation(
             id: String?, title: String, subtitle: String?, position: Int,
-            trackId: String?, published: Boolean,
+            trackId: String?, published: Boolean, cardLabel: String?, colorHex: String,
         ) = ok()
         override suspend fun deleteRecommendation(id: String) = ok()
         override suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = ok()

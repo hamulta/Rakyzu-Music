@@ -20,7 +20,7 @@ import { playlistAccess, playlistArtwork } from "./playlist-artwork";
 import { profileAvatar } from "./profile-avatar";
 import { legalPageResponse, resolveLegalPage } from "./legal";
 
-const API_VERSION = "0.8.8.1";
+const API_VERSION = "0.8.8.2";
 const AUDIO_QUALITY_HEADER = "x-rakyzu-audio-quality";
 const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const PLAYLIST_ARTWORK_ROUTE = /^\/v1\/playlists\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/artwork\/?$/i;
@@ -39,6 +39,9 @@ const ADMIN_ALBUM_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/?$`, "i");
 const ADMIN_RECOMMENDATION_ROUTE = new RegExp(`^/v1/admin/recommendations/${UUID}/?$`, "i");
 const ADMIN_RECOMMENDATION_ARTWORK_ROUTE = new RegExp(
   `^/v1/admin/recommendations/${UUID}/artwork/?$`, "i",
+);
+const ADMIN_RECOMMENDATION_TRACKS_ROUTE = new RegExp(
+  `^/v1/admin/recommendations/${UUID}/tracks/?$`, "i",
 );
 const ADMIN_ALBUM_SCHEDULE_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/schedule/?$`, "i");
 const ADMIN_ARTWORK_UPLOAD_ROUTE = new RegExp(`^/v1/admin/albums/${UUID}/artwork/?$`, "i");
@@ -134,6 +137,7 @@ export function createWorker(
           ADMIN_ALBUM_ROUTE.test(url.pathname) ||
           ADMIN_RECOMMENDATION_ROUTE.test(url.pathname) ||
           ADMIN_RECOMMENDATION_ARTWORK_ROUTE.test(url.pathname) ||
+          ADMIN_RECOMMENDATION_TRACKS_ROUTE.test(url.pathname) ||
           ADMIN_ALBUM_SCHEDULE_ROUTE.test(url.pathname) ||
           ADMIN_ARTWORK_UPLOAD_ROUTE.test(url.pathname) ||
           ADMIN_AUDIO_ROUTE.test(url.pathname) ||
@@ -805,9 +809,11 @@ async function adminRequest(
         target_shelf_id: readOptionalUuid(body, "id"),
         shelf_title: readString(body, "title", 80),
         shelf_subtitle: readNullableString(body, "subtitle", 160),
-        shelf_position: readInteger(body, "position", 0, 1_000),
+        shelf_position: readEditorialPosition(body, "position"),
         target_track_id: readOptionalUuid(body, "trackId"),
         published: readBoolean(body, "published"),
+        shelf_card_label: readNullableString(body, "cardLabel", 40),
+        shelf_color_hex: readColorHex(body, "colorHex"),
       }, "editorial.manage", context, token, env, requestDependencies, requestId, origin, 201);
     }
     const recommendationMatch = path.match(ADMIN_RECOMMENDATION_ROUTE);
@@ -822,6 +828,31 @@ async function adminRequest(
         request, env, recommendationArtworkMatch[1].toLowerCase(), context, token,
         requestDependencies, requestId, origin,
       );
+    }
+    if (recommendationArtworkMatch?.[1] && request.method === "DELETE") {
+      return await deleteRecommendationArtwork(
+        env, recommendationArtworkMatch[1].toLowerCase(), context, token,
+        requestDependencies, requestId, origin,
+      );
+    }
+    const recommendationTracksMatch = path.match(ADMIN_RECOMMENDATION_TRACKS_ROUTE);
+    if (recommendationTracksMatch?.[1] && request.method === "PUT") {
+      const body = await readJsonObject(request);
+      const rawTrackIds = body.trackIds;
+      if (!Array.isArray(rawTrackIds) || rawTrackIds.length < 1 || rawTrackIds.length > 50) {
+        throw new AdminRequestRejected(422);
+      }
+      const trackIds = rawTrackIds.map((value) => {
+        if (typeof value !== "string" || !new RegExp(`^${UUID}$`, "i").test(value)) {
+          throw new AdminRequestRejected(422);
+        }
+        return value.toLowerCase();
+      });
+      if (new Set(trackIds).size !== trackIds.length) throw new AdminRequestRejected(422);
+      return await rpcResponse("admin_replace_editorial_tracks", {
+        target_shelf_id: recommendationTracksMatch[1].toLowerCase(),
+        target_track_ids: trackIds,
+      }, "editorial.manage", context, token, env, requestDependencies, requestId, origin);
     }
     if (path === "/v1/admin/albums" && request.method === "POST") {
       const body = await readJsonObject(request);
@@ -1119,7 +1150,9 @@ async function uploadRecommendationArtwork(
   requestId: string,
   origin: string | null,
 ): Promise<Response> {
-  if (!context.permissions.includes("editorial.manage")) return adminForbidden(requestId, origin);
+  if (!context.fullAccess && !context.permissions.includes("editorial.manage")) {
+    return adminForbidden(requestId, origin);
+  }
   if (request.headers.get("content-type")?.split(";", 1)[0]?.trim() !== "image/webp") {
     return errorResponse("invalid_artwork", "Upload WebP artwork.", 415, requestId, origin);
   }
@@ -1150,6 +1183,25 @@ async function uploadRecommendationArtwork(
     await env.MEDIA.delete(objectKey);
     throw error;
   }
+}
+
+async function deleteRecommendationArtwork(
+  env: RakyzuApiEnv,
+  shelfId: string,
+  context: StaffContext,
+  token: string,
+  requestDependencies: RequestDependencies,
+  requestId: string,
+  origin: string | null,
+): Promise<Response> {
+  if (!context.fullAccess && !context.permissions.includes("editorial.manage")) {
+    return adminForbidden(requestId, origin);
+  }
+  const result = await requestDependencies.adminRpc("admin_delete_editorial_artwork", {
+    target_shelf_id: shelfId,
+  }, token, env);
+  await env.MEDIA.delete(`media/recommendations/${shelfId}/artwork.webp`);
+  return jsonResponse(result, 200, requestId, origin);
 }
 
 async function rpcResponse(
@@ -1404,6 +1456,20 @@ function readOptionalString(body: Record<string, unknown>, key: string, max: num
 function readNullableString(body: Record<string, unknown>, key: string, max: number): string | null {
   const value = readOptionalString(body, key, max);
   return value.length === 0 ? null : value;
+}
+
+function readColorHex(body: Record<string, unknown>, key: string): string {
+  if (body[key] === undefined || body[key] === null || body[key] === "") return "#4A558F";
+  const value = readString(body, key, 7).toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(value)) throw new AdminRequestRejected(422);
+  return value;
+}
+
+function readEditorialPosition(body: Record<string, unknown>, key: string): number {
+  const value = readInteger(body, key, 0, 311);
+  if ((value >= 0 && value <= 6) || (value >= 100 && value <= 106) ||
+      (value >= 200 && value <= 207) || (value >= 300 && value <= 311)) return value;
+  throw new AdminRequestRejected(422);
 }
 
 function readOptionalUuid(body: Record<string, unknown>, key: string): string | null {

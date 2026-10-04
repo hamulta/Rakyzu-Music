@@ -44,7 +44,46 @@ data class EditorialShelf(
     val position: Int,
     val tracks: List<Track>,
     val hasCustomArtwork: Boolean = false,
+    val cardLabel: String? = null,
+    val colorHex: String = "#4A558F",
+    val globalScore: Long = 0L,
 )
+
+enum class EditorialPlacement(
+    val positionRange: IntRange,
+    val maximumCards: Int,
+) {
+    HomeTopMix(0..6, 7),
+    HomeListening(100..106, 7),
+    ExploreTopGenre(200..207, 8),
+    ExploreBrowse(300..311, 12),
+    ;
+
+    fun displayPosition(position: Int): Int = position - positionRange.first + 1
+
+    fun storedPosition(displayPosition: Int): Int =
+        positionRange.first + displayPosition.coerceIn(1, maximumCards) - 1
+
+    companion object {
+        fun fromPosition(position: Int): EditorialPlacement? = entries
+            .firstOrNull { position in it.positionRange }
+    }
+}
+
+data class EditorialGroupMutation(
+    val id: String,
+    val title: String,
+    val subtitle: String?,
+    val placement: EditorialPlacement,
+    val displayPosition: Int,
+    val cardLabel: String?,
+    val colorHex: String,
+    val published: Boolean,
+    val trackIds: List<String>,
+) {
+    val storedPosition: Int
+        get() = placement.storedPosition(displayPosition)
+}
 
 data class HomeFeedSnapshot(
     val catalog: CatalogSnapshot,

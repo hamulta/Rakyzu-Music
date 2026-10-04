@@ -155,6 +155,11 @@ class HomeViewModel internal constructor(
 
     fun refresh() = startRefresh(HomeRefreshTrigger.Manual)
 
+    fun recordEditorialGroupOpen(shelfId: String) {
+        if (shelfId.isBlank()) return
+        viewModelScope.launch { repository.recordEditorialGroupOpen(shelfId) }
+    }
+
     fun setPersonalizationEnabled(enabled: Boolean) = updatePersonalization(
         successMessage = if (enabled) "Private recommendations enabled" else "Private recommendations paused",
     ) { repository.setPersonalizationEnabled(userId, enabled) }

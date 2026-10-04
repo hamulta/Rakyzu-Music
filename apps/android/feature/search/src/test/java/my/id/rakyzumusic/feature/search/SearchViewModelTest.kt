@@ -129,7 +129,7 @@ class SearchViewModelTest {
         val catalog = CATALOG.copy(
             tracks = CATALOG.tracks + categoryTrack,
             editorialShelves = listOf(
-                EditorialShelf("shelf-1", "Fresh Signals", "New discoveries", 0, listOf(categoryTrack)),
+                EditorialShelf("shelf-1", "Fresh Signals", "New discoveries", 200, listOf(categoryTrack)),
             ),
         )
         val viewModel = SearchViewModel(FakeCatalogRepository(catalog))

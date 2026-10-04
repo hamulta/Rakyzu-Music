@@ -237,6 +237,10 @@ or owned by Rakyzu; no Spotify catalog data, code, assets, or private behavior i
 - [x] `0.8.8.1` — deliver branded interactive Welcome, Sign In, Log In, and Sign Up screens;
   wire password auth, native Google, Supabase Facebook, the Apple availability notice, first-run
   persistence, sign-out routing, app icon, and public legal pages without changing the 0.8 train.
+- [x] `0.8.8.2` — ship the interactive Explore surface with four Your Top Genres groups, six Browse
+  All groups, private Recommended For You cards, long-press Card Group editing, real group detail
+  playback, artwork/ambient colors, permission-checked editorial RPCs, privacy-preserving engagement
+  ranking, notification primer, and Room schema 13 metadata migration.
 - [ ] `0.8.9` — harden recommendation cold-start quality, catalog churn handling, and restoration
   coverage from the `0.8.8` production baseline.
 - [ ] `0.8.10` — complete the `0.8.x` accessibility, performance, security, and release audit before

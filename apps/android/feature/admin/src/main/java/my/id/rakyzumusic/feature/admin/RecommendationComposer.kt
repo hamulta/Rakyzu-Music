@@ -32,9 +32,11 @@ import kotlinx.coroutines.withContext
 internal fun RecommendationComposer(
     enabled: Boolean,
     recommendations: List<RecommendationCard>,
-    onSave: (String?, String, String?, Int, String?, Boolean) -> Unit,
+    onSave: (String?, String, String?, Int, String?, Boolean, String?, String) -> Unit,
     onDelete: (String) -> Unit,
     onUploadArtwork: (String, ByteArray) -> Unit,
+    onDeleteArtwork: (String) -> Unit,
+    onReplaceTracks: (String, List<String>) -> Unit,
 ) {
     var id by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
@@ -43,6 +45,9 @@ internal fun RecommendationComposer(
     var position by remember { mutableStateOf("0") }
     var published by remember { mutableStateOf(true) }
     var artworkTargetId by remember { mutableStateOf<String?>(null) }
+    var groupTrackIds by remember { mutableStateOf("") }
+    var cardLabel by remember { mutableStateOf("") }
+    var colorHex by remember { mutableStateOf("#4A558F") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val artworkPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -60,8 +65,11 @@ internal fun RecommendationComposer(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Home recommendation cards")
-            Text("Create or edit a card, choose its playable track, and control its exact order.")
+            Text("Global Card Groups")
+            Text(
+                "Stored order ranges: Home Top Mixes 0-6, Home listening 100-106, " +
+                    "Explore Top Genres 200-207, and Explore Browse All 300-311.",
+            )
             recommendations.forEach { card ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -79,6 +87,9 @@ internal fun RecommendationComposer(
                                     trackId = card.trackId.orEmpty()
                                     position = card.position.toString()
                                     published = card.published
+                                    groupTrackIds = card.trackIds.joinToString("\n")
+                                    cardLabel = card.cardLabel.orEmpty()
+                                    colorHex = card.colorHex
                                 },
                                 enabled = enabled,
                                 modifier = Modifier.weight(1f),
@@ -97,6 +108,13 @@ internal fun RecommendationComposer(
                             enabled = enabled,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(if (card.hasArtwork) "Change card image" else "Add card image") }
+                        if (card.hasArtwork) {
+                            Button(
+                                onClick = { onDeleteArtwork(card.id) },
+                                enabled = enabled,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Delete card image") }
+                        }
                     }
                 }
             }
@@ -113,9 +131,38 @@ internal fun RecommendationComposer(
                 modifier = Modifier.fillMaxWidth(), enabled = enabled,
             )
             OutlinedTextField(
+                cardLabel, { cardLabel = it.take(40) },
+                label = { Text("Front label (Top Mixes can differ)") },
+                modifier = Modifier.fillMaxWidth(), enabled = enabled, singleLine = true,
+            )
+            OutlinedTextField(
+                colorHex, { colorHex = it.take(7).uppercase() },
+                label = { Text("Card color (#RRGGBB)") },
+                modifier = Modifier.fillMaxWidth(), enabled = enabled, singleLine = true,
+            )
+            OutlinedTextField(
                 trackId, { trackId = it }, label = { Text("Featured audio track UUID (optional)") },
                 modifier = Modifier.fillMaxWidth(), enabled = enabled, singleLine = true,
             )
+            OutlinedTextField(
+                value = groupTrackIds,
+                onValueChange = { groupTrackIds = it.take(2_000) },
+                label = { Text("Group track UUIDs (one per line, max 50)") },
+                supportingText = { Text("Open an existing Card Group with Edit before replacing its songs.") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = enabled,
+                minLines = 3,
+            )
+            val parsedTrackIds = groupTrackIds
+                .split(Regex("[,\\s]+"))
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .distinct()
+            Button(
+                onClick = { onReplaceTracks(id.trim(), parsedTrackIds) },
+                enabled = enabled && id.isNotBlank() && parsedTrackIds.size in 1..50,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Replace Card Group songs") }
             OutlinedTextField(
                 position, { position = it.filter(Char::isDigit).take(4) },
                 label = { Text("Home order") }, modifier = Modifier.fillMaxWidth(), enabled = enabled,
@@ -130,10 +177,12 @@ internal fun RecommendationComposer(
                     onSave(
                         id.ifBlank { null }, title, subtitle.ifBlank { null },
                         position.toIntOrNull() ?: 0, trackId.ifBlank { null }, published,
+                        cardLabel.ifBlank { null }, colorHex,
                     )
                 },
                 enabled = enabled && title.isNotBlank() &&
-                    position.toIntOrNull()?.let { it in 0..1_000 } == true,
+                    position.toIntOrNull()?.let { it in 0..1_000 } == true &&
+                    Regex("^#[0-9A-Fa-f]{6}$").matches(colorHex),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Save recommendation card") }
         }

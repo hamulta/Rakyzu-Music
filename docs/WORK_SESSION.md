@@ -1,5 +1,21 @@
 # Rakyzu Music — engineering work sessions
 
+# Completed Explore milestone 0.8.8.2 — 2026-10-04
+
+- [x] Implement the branded Explore landing and group-detail surfaces with private Recommended For
+  You cards, four Your Top Genres groups, six Browse All groups, long-press editing, artwork upload/
+  replacement/removal, ambient colors, ordered track queues, and real play/queue/download actions.
+- [x] Add server-authoritative editorial metadata and RPCs, daily unique engagement receipts,
+  global-score ordering, forced-RLS coverage, seeded real memberships, and Room schema 13 migration.
+- [x] Add Android notification primer/permission flow after authentication and retain storage/media
+  permission requests only on upload actions.
+- [x] Validate Worker type generation, typecheck, 84 tests, and deploy dry-run; validate Android
+  debug unit tests, debug APK assembly, lint, and database AndroidTest APK compilation.
+- [x] Validate Supabase linked migration list and forward-only dry-run for the three pending migrations.
+
+Release publication evidence (production migration, Worker health, CI run, APK checksum, tag, and
+downloaded GitHub asset) is appended here after the final release gate.
+
 ## Completed authentication UI hotfix 0.8.8.1 — 2026-10-02
 
 - [x] Audit the complete Welcome, Sign In gateway, Log In, and Sign Up navigation graph.

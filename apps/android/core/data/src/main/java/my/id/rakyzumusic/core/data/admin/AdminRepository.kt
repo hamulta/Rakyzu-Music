@@ -154,6 +154,10 @@ data class RecommendationCard(
     val trackId: String?,
     val published: Boolean,
     val hasArtwork: Boolean,
+    val trackIds: List<String> = emptyList(),
+    val cardLabel: String? = null,
+    val colorHex: String = "#4A558F",
+    val globalScore: Long = 0L,
 )
 
 data class AuditSummary(
@@ -344,10 +348,15 @@ interface AdminRepository {
     suspend fun setAuditRetention(days: Int): AdminActionResult
     suspend fun upsertRecommendation(
         id: String?, title: String, subtitle: String?, position: Int,
-        trackId: String?, published: Boolean,
+        trackId: String?, published: Boolean, cardLabel: String? = null,
+        colorHex: String = "#4A558F",
     ): AdminActionResult
     suspend fun deleteRecommendation(id: String): AdminActionResult
     suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray): AdminActionResult
+    suspend fun deleteRecommendationArtwork(id: String): AdminActionResult =
+        AdminActionResult.Failure(AdminFailure.ServiceUnavailable)
+    suspend fun replaceRecommendationTracks(id: String, trackIds: List<String>): AdminActionResult =
+        AdminActionResult.Failure(AdminFailure.ServiceUnavailable)
     suspend fun enforceAccount(userId: String, action: String, reason: String, expiresAt: String?): AdminActionResult
     suspend fun decideAppeal(id: String, decision: String, notes: String): AdminActionResult
     suspend fun approveDeletion(id: String): AdminActionResult
@@ -742,7 +751,7 @@ internal class AuthenticatedAdminRepository(
 
     override suspend fun upsertRecommendation(
         id: String?, title: String, subtitle: String?, position: Int,
-        trackId: String?, published: Boolean,
+        trackId: String?, published: Boolean, cardLabel: String?, colorHex: String,
     ): AdminActionResult = action("POST", "/v1/admin/recommendations", buildJsonObject {
         if (id.isNullOrBlank()) put("id", JsonNull) else put("id", id.trim())
         put("title", title.trim())
@@ -750,6 +759,8 @@ internal class AuthenticatedAdminRepository(
         put("position", position)
         if (trackId.isNullOrBlank()) put("trackId", JsonNull) else put("trackId", trackId.trim())
         put("published", published)
+        if (cardLabel.isNullOrBlank()) put("cardLabel", JsonNull) else put("cardLabel", cardLabel.trim())
+        put("colorHex", colorHex.trim().uppercase())
     }, "Recommendation card saved")
 
     override suspend fun deleteRecommendation(id: String): AdminActionResult = action(
@@ -771,6 +782,25 @@ internal class AuthenticatedAdminRepository(
             binaryContentType = "image/webp",
         ).toActionResult("Recommendation artwork updated")
     }
+
+    override suspend fun deleteRecommendationArtwork(id: String): AdminActionResult = action(
+        "DELETE",
+        "/v1/admin/recommendations/${id.trim().lowercase()}/artwork",
+        buildJsonObject {},
+        "Recommendation artwork deleted",
+    )
+
+    override suspend fun replaceRecommendationTracks(
+        id: String,
+        trackIds: List<String>,
+    ): AdminActionResult = action(
+        "PUT",
+        "/v1/admin/recommendations/${id.trim().lowercase()}/tracks",
+        buildJsonObject {
+            put("trackIds", JsonArray(trackIds.map { JsonPrimitive(it) }))
+        },
+        "Recommendation tracks updated",
+    )
 
     override suspend fun setAuditRetention(days: Int): AdminActionResult = action(
         "POST", "/v1/admin/audit/retention", buildJsonObject { put("retentionDays", days) },
@@ -1027,6 +1057,12 @@ internal class AuthenticatedAdminRepository(
                 trackId = item.string("trackId"),
                 published = item.boolean("published") ?: false,
                 hasArtwork = item.boolean("hasArtwork") ?: false,
+                trackIds = item.array("trackIds").mapNotNull { value ->
+                    value.jsonPrimitive.contentOrNull
+                },
+                cardLabel = item.string("cardLabel"),
+                colorHex = item.string("colorHex") ?: "#4A558F",
+                globalScore = item.long("globalScore") ?: 0L,
             )
         }
 
@@ -1203,7 +1239,7 @@ internal data object UnavailableAdminRepository : AdminRepository {
     override suspend fun setAuditRetention(days: Int) = unavailable()
     override suspend fun upsertRecommendation(
         id: String?, title: String, subtitle: String?, position: Int,
-        trackId: String?, published: Boolean,
+        trackId: String?, published: Boolean, cardLabel: String?, colorHex: String,
     ) = unavailable()
     override suspend fun deleteRecommendation(id: String) = unavailable()
     override suspend fun uploadRecommendationArtwork(id: String, bytes: ByteArray) = unavailable()

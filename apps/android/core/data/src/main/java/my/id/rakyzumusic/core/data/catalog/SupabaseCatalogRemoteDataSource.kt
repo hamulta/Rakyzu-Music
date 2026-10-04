@@ -15,6 +15,11 @@ import my.id.rakyzumusic.core.model.Track
 internal class SupabaseCatalogRemoteDataSource(
     private val postgrest: Postgrest,
 ) : CatalogRemoteDataSource {
+    override suspend fun recordEditorialGroupOpen(shelfId: String): Boolean = postgrest.rpc(
+        function = RECORD_EDITORIAL_OPEN_FUNCTION,
+        parameters = buildJsonObject { put("target_shelf_id", shelfId) },
+    ).decodeAs<Boolean>()
+
     override suspend fun fetchCatalog(): CatalogSnapshot {
         val artistRows = postgrest[ARTISTS_TABLE]
             .select(ARTIST_COLUMNS)
@@ -73,6 +78,9 @@ internal class SupabaseCatalogRemoteDataSource(
                     .sortedWith(compareBy(EditorialShelfTrackRow::position, EditorialShelfTrackRow::trackId))
                     .map { tracksById[it.trackId] ?: throw InvalidCatalogPayloadException() },
                 hasCustomArtwork = row.artworkObjectKey != null,
+                cardLabel = row.cardLabel,
+                colorHex = row.colorHex,
+                globalScore = row.globalScore,
             )
         }.sortedWith(compareBy(EditorialShelf::position, EditorialShelf::id))
 
@@ -148,6 +156,7 @@ internal class SupabaseCatalogRemoteDataSource(
         const val EDITORIAL_SHELVES_TABLE = "editorial_shelves"
         const val EDITORIAL_SHELF_TRACKS_TABLE = "editorial_shelf_tracks"
         const val SEARCH_CATALOG_FUNCTION = "search_catalog"
+        const val RECORD_EDITORIAL_OPEN_FUNCTION = "record_editorial_shelf_open"
         const val SEARCH_KIND_ARTIST = "artist"
         const val SEARCH_KIND_ALBUM = "album"
         const val SEARCH_KIND_TRACK = "track"
@@ -163,7 +172,8 @@ internal class SupabaseCatalogRemoteDataSource(
             "is_explicit",
         )
         val EDITORIAL_SHELF_COLUMNS = Columns.list(
-            "id", "title", "subtitle", "position", "artwork_object_key",
+            "id", "title", "subtitle", "position", "artwork_object_key", "card_label",
+            "color_hex", "global_score",
         )
         val EDITORIAL_SHELF_TRACK_COLUMNS = Columns.list("shelf_id", "track_id", "position")
     }
@@ -218,6 +228,9 @@ private data class EditorialShelfRow(
     val subtitle: String?,
     val position: Int,
     @SerialName("artwork_object_key") val artworkObjectKey: String? = null,
+    @SerialName("card_label") val cardLabel: String? = null,
+    @SerialName("color_hex") val colorHex: String = "#4A558F",
+    @SerialName("global_score") val globalScore: Long = 0L,
 )
 
 @Serializable

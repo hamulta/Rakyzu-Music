@@ -1,7 +1,20 @@
 package my.id.rakyzumusic.feature.home
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,11 +22,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -26,46 +40,46 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
+import androidx.compose.material.icons.rounded.Analytics
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -74,39 +88,56 @@ import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.io.ByteArrayOutputStream
+import java.util.UUID
+import kotlin.math.absoluteValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import my.id.rakyzumusic.core.data.catalog.CatalogRepository
 import my.id.rakyzumusic.core.data.media.MediaDeliveryRepository
 import my.id.rakyzumusic.core.data.network.ConnectivityMonitor
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuAqua
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuBlack
 import my.id.rakyzumusic.core.designsystem.theme.RakyzuMusicTheme
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurple
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuPurpleSoft
-import my.id.rakyzumusic.core.designsystem.theme.RakyzuSurfaceRaised
 import my.id.rakyzumusic.core.model.DiscoveryMode
+import my.id.rakyzumusic.core.model.EditorialGroupMutation
+import my.id.rakyzumusic.core.model.EditorialPlacement
+import my.id.rakyzumusic.core.model.EditorialShelf
+import my.id.rakyzumusic.core.model.ListeningHistoryItem
+import my.id.rakyzumusic.core.model.PersonalizedCollection
 import my.id.rakyzumusic.core.model.Track
 
-private val catalogGradients = listOf(
-    listOf(Color(0xFF3B1B75), RakyzuAqua),
-    listOf(Color(0xFF7A2457), RakyzuPurpleSoft),
-    listOf(Color(0xFF123C5A), Color(0xFF59C7F1)),
+private val HomeBackground = Color(0xFF121111)
+private val HomeAqua = Color(0xFF00C2CB)
+private val CompactCard = Color(0xFF436369).copy(alpha = 0.20f)
+private val MixAccents = listOf(
+    Color(0xFFFF7777), Color(0xFFFFB677), Color(0xFFFFFA77), Color(0xFF77FF95),
+    Color(0xFF77D5FF), Color(0xFF777DFF), Color(0xFFC077FF),
+)
+private val artworkGradients = listOf(
+    listOf(Color(0xFFEF5350), Color(0xFF8E2430)),
+    listOf(Color(0xFFFFB74D), Color(0xFF7E4A10)),
+    listOf(Color(0xFFFDD835), Color(0xFF77721D)),
+    listOf(Color(0xFF43A047), Color(0xFF163F2A)),
+    listOf(Color(0xFF29B6F6), Color(0xFF12445D)),
+    listOf(Color(0xFF5C6BC0), Color(0xFF20284D)),
+    listOf(Color(0xFFAB47BC), Color(0xFF4A1E52)),
 )
 
-internal enum class HomeFilter(
-    val storageKey: String,
-    val label: String,
-) {
-    Music(storageKey = "music", label = "Music"),
-    MadeForYou(storageKey = "made-for-you", label = "Made for you"),
-    NewReleases(storageKey = "new-releases", label = "New releases"),
-    ;
+internal enum class HomeFilter(val storageKey: String, val label: String) {
+    Music("music", "Music"),
+    MadeForYou("made-for-you", "Made for you"),
+    NewReleases("new-releases", "New releases");
 
     companion object {
         fun restore(storageKey: String?): HomeFilter = entries
@@ -114,8 +145,6 @@ internal enum class HomeFilter(
             ?: Music
     }
 }
-
-private val homeFilters = HomeFilter.entries
 
 internal data class HomeSectionVisibility(
     val recentlyPlayed: Boolean,
@@ -128,21 +157,18 @@ internal data class HomeSectionVisibility(
     val personalizationControls: Boolean = false,
 )
 
-internal fun HomeUiState.toHomeSectionVisibility(
-    filter: HomeFilter,
-): HomeSectionVisibility {
-    val showsMusicSections = filter == HomeFilter.Music
-    val showsPersonalizedSections = filter == HomeFilter.Music || filter == HomeFilter.MadeForYou
+internal fun HomeUiState.toHomeSectionVisibility(filter: HomeFilter): HomeSectionVisibility {
+    val music = filter == HomeFilter.Music
+    val personalized = filter != HomeFilter.NewReleases
     return HomeSectionVisibility(
-        recentlyPlayed = showsMusicSections && recentlyPlayed.isNotEmpty(),
-        editorialShelves = showsMusicSections && catalog.editorialShelves.isNotEmpty(),
-        newReleases = (showsMusicSections || filter == HomeFilter.NewReleases) &&
-            derivedSections.newReleaseTracks.isNotEmpty(),
-        allTracks = showsMusicSections && catalog.tracks.isNotEmpty(),
-        smartRecommendations = showsPersonalizedSections && recommendations.isNotEmpty(),
-        mixes = showsPersonalizedSections && mixes.isNotEmpty(),
-        radioStations = showsPersonalizedSections && radioStations.isNotEmpty(),
-        personalizationControls = showsPersonalizedSections && catalog.tracks.isNotEmpty(),
+        recentlyPlayed = music && recentlyPlayed.isNotEmpty(),
+        editorialShelves = music && catalog.editorialShelves.isNotEmpty(),
+        newReleases = filter != HomeFilter.MadeForYou && derivedSections.newReleaseTracks.isNotEmpty(),
+        allTracks = music && catalog.tracks.isNotEmpty(),
+        smartRecommendations = personalized && recommendations.isNotEmpty(),
+        mixes = personalized && mixes.isNotEmpty(),
+        radioStations = personalized && radioStations.isNotEmpty(),
+        personalizationControls = personalized && catalog.tracks.isNotEmpty(),
     )
 }
 
@@ -153,49 +179,24 @@ internal data class HomeLayoutSpec(
     val useStackedFeaturedCard: Boolean,
 ) {
     companion object {
-        val Standard = HomeLayoutSpec(
-            horizontalPadding = 20.dp,
-            trackCardWidth = 156.dp,
-            trackTextMaxLines = 1,
-            useStackedFeaturedCard = false,
-        )
+        val Standard = HomeLayoutSpec(20.dp, 156.dp, 1, false)
     }
 }
 
-internal fun resolveHomeLayoutSpec(
-    availableWidth: Dp,
-    fontScale: Float,
-): HomeLayoutSpec {
-    val isCompactScreen = availableWidth < 360.dp
-    val usesLargeText = fontScale >= 1.3f
-    val isExpandedScreen = availableWidth >= 840.dp
-    val isMediumScreen = availableWidth >= 600.dp
-    if (!isCompactScreen && !usesLargeText) {
-        return when {
-            isExpandedScreen -> HomeLayoutSpec(
-                horizontalPadding = 48.dp,
-                trackCardWidth = 196.dp,
-                trackTextMaxLines = 2,
-                useStackedFeaturedCard = false,
-            )
-            isMediumScreen -> HomeLayoutSpec(
-                horizontalPadding = 32.dp,
-                trackCardWidth = 180.dp,
-                trackTextMaxLines = 2,
-                useStackedFeaturedCard = false,
-            )
-            else -> HomeLayoutSpec.Standard
-        }
+internal fun resolveHomeLayoutSpec(availableWidth: Dp, fontScale: Float): HomeLayoutSpec {
+    val compact = availableWidth < 360.dp
+    val largeText = fontScale >= 1.3f
+    return when {
+        availableWidth >= 840.dp && !largeText -> HomeLayoutSpec(48.dp, 196.dp, 2, false)
+        availableWidth >= 600.dp && !largeText -> HomeLayoutSpec(32.dp, 180.dp, 2, false)
+        compact || largeText -> HomeLayoutSpec(
+            if (compact) 16.dp else 20.dp,
+            (availableWidth - if (compact) 32.dp else 40.dp).coerceIn(156.dp, 220.dp),
+            2,
+            true,
+        )
+        else -> HomeLayoutSpec.Standard
     }
-
-    val horizontalPadding = if (isCompactScreen) 16.dp else 20.dp
-    val availableCardWidth = availableWidth - (horizontalPadding * 2)
-    return HomeLayoutSpec(
-        horizontalPadding = horizontalPadding,
-        trackCardWidth = availableCardWidth.coerceIn(156.dp, 220.dp),
-        trackTextMaxLines = 2,
-        useStackedFeaturedCard = true,
-    )
 }
 
 @Composable
@@ -211,6 +212,11 @@ fun HomeRoute(
     modifier: Modifier = Modifier,
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = onProfileClick,
+    canManageEditorial: Boolean = false,
+    onDeleteGlobalCard: (EditorialShelf) -> Unit = {},
+    onDeleteGlobalCardArtwork: (EditorialShelf) -> Unit = {},
+    onSaveGlobalCard: (EditorialGroupMutation, ByteArray?) -> Unit = { _, _ -> },
     likedTrackIds: Set<String> = emptySet(),
     savedAlbumIds: Set<String> = emptySet(),
     followedArtistIds: Set<String> = emptySet(),
@@ -239,6 +245,7 @@ fun HomeRoute(
         HomeScreen(
             versionName = versionName,
             displayName = displayName,
+            personalizationSeed = userId,
             avatarId = userId.takeIf { avatarAvailable },
             profileArtworkRequestProvider = profileArtworkRequestProvider,
             state = state,
@@ -247,7 +254,13 @@ fun HomeRoute(
             modifier = modifier,
             onRetryCatalog = homeViewModel::refresh,
             onTrackPlay = onTrackPlay,
+            onEditorialGroupOpen = homeViewModel::recordEditorialGroupOpen,
             onProfileClick = onProfileClick,
+            onSettingsClick = onSettingsClick,
+            canManageEditorial = canManageEditorial,
+            onDeleteGlobalCard = onDeleteGlobalCard,
+            onDeleteGlobalCardArtwork = onDeleteGlobalCardArtwork,
+            onSaveGlobalCard = onSaveGlobalCard,
             likedTrackIds = likedTrackIds,
             savedAlbumIds = savedAlbumIds,
             followedArtistIds = followedArtistIds,
@@ -257,573 +270,327 @@ fun HomeRoute(
             onTrackLikeChange = onTrackLikeChange,
             onAlbumSaveChange = onAlbumSaveChange,
             onArtistFollowChange = onArtistFollowChange,
-            onPersonalizationEnabledChange = homeViewModel::setPersonalizationEnabled,
-            onDiscoveryModeChange = homeViewModel::setDiscoveryMode,
-            onRecommendationHidden = { homeViewModel.hideRecommendation(it.id) },
-            onTasteSignalExcluded = { track, excluded ->
-                homeViewModel.setTasteSignalExcluded(track.id, excluded)
-            },
-            onClearPersonalizationData = homeViewModel::clearPersonalizationData,
-            onPersonalizationMessageConsumed = homeViewModel::clearPersonalizationMessage,
         )
     }
 }
 
+private enum class HomeSection { Continue, TopMixes, Recent, Shows }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    versionName: String,
+    @Suppress("UNUSED_PARAMETER") versionName: String,
     displayName: String = "Rakyzu Listener",
+    personalizationSeed: String = "preview",
     avatarId: String? = null,
     state: HomeUiState = HomeUiState(),
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(bottom = 84.dp),
+    contentPadding: PaddingValues = PaddingValues(bottom = 28.dp),
     onRetryCatalog: () -> Unit = {},
     onTrackPlay: (List<Track>, Int) -> Unit = { _, _ -> },
+    onEditorialGroupOpen: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = onProfileClick,
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     recommendationArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     profileArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
-    likedTrackIds: Set<String> = emptySet(),
-    savedAlbumIds: Set<String> = emptySet(),
-    followedArtistIds: Set<String> = emptySet(),
-    pendingTrackIds: Set<String> = emptySet(),
-    pendingAlbumIds: Set<String> = emptySet(),
-    pendingArtistIds: Set<String> = emptySet(),
-    onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
-    onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
-    onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
-    onPersonalizationEnabledChange: (Boolean) -> Unit = {},
-    onDiscoveryModeChange: (DiscoveryMode) -> Unit = {},
-    onRecommendationHidden: (Track) -> Unit = {},
-    onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
-    onClearPersonalizationData: () -> Unit = {},
-    onPersonalizationMessageConsumed: () -> Unit = {},
+    canManageEditorial: Boolean = false,
+    onDeleteGlobalCard: (EditorialShelf) -> Unit = {},
+    onDeleteGlobalCardArtwork: (EditorialShelf) -> Unit = {},
+    onSaveGlobalCard: (EditorialGroupMutation, ByteArray?) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") likedTrackIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") savedAlbumIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") followedArtistIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") pendingTrackIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") pendingAlbumIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") pendingArtistIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onPersonalizationEnabledChange: (Boolean) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onDiscoveryModeChange: (DiscoveryMode) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onRecommendationHidden: (Track) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onClearPersonalizationData: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onPersonalizationMessageConsumed: () -> Unit = {},
 ) {
-    var selectedFilterKey by rememberSaveable {
-        mutableStateOf(HomeFilter.Music.storageKey)
+    val listState = rememberLazyListState()
+    var showAnalytics by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
+    var notificationsViewed by remember { mutableStateOf(false) }
+    val continueTracks = remember(state.listeningHistory, state.recommendations) {
+        buildList {
+            addAll(state.listeningHistory.sortedByDescending { it.lastPlayedAtEpochMillis }.map { it.track })
+            addAll(state.recommendations.map { it.track })
+        }.distinctBy(Track::id).take(MAX_CONTINUE_TRACKS)
     }
-    val selectedFilter = HomeFilter.restore(selectedFilterKey)
-    val sectionVisibility = state.toHomeSectionVisibility(selectedFilter)
-    val homeListState = rememberLazyListState()
-    val featuredQueue = state.derivedSections.featuredQueue
-    val onFeaturedTrackPlay = remember(featuredQueue, onTrackPlay) {
-        { onTrackPlay(featuredQueue, 0) }
+    val publishedShelves = remember(state.catalog.editorialShelves) {
+        state.catalog.editorialShelves.filter { it.tracks.isNotEmpty() }
+    }
+    val topMixes = remember(publishedShelves) {
+        publishedShelves.filter { it.position in TOP_MIX_POSITION_RANGE }
+            .globalSmartOrder()
+            .take(MAX_TOP_MIXES)
+    }
+    val recentGroups = remember(publishedShelves) {
+        publishedShelves.filter { it.position in RECENT_GROUP_POSITION_RANGE }
+            .globalSmartOrder()
+            .take(MAX_RECENT_GROUPS)
+    }
+    val shows = remember(state.radioStations) {
+        state.radioStations.filter { it.tracks.isNotEmpty() }.take(MAX_SHOWS)
+    }
+    val visibleSections = remember(
+        continueTracks, topMixes, recentGroups, shows, personalizationSeed, state.tasteProfile.signalCount,
+    ) {
+        buildList {
+            if (continueTracks.isNotEmpty()) add(HomeSection.Continue)
+            if (topMixes.isNotEmpty()) add(HomeSection.TopMixes)
+            if (recentGroups.isNotEmpty()) add(HomeSection.Recent)
+            if (shows.isNotEmpty()) add(HomeSection.Shows)
+        }.smartOrderFor(
+            seed = personalizationSeed,
+            history = state.listeningHistory,
+            topMixes = topMixes,
+            listeningGroups = recentGroups,
+            shows = shows,
+        )
+    }
+
+    if (showAnalytics) {
+        ListeningAnalyticsSheet(state.listeningHistory) { showAnalytics = false }
+    }
+    if (showNotifications) {
+        HomeNotificationsSheet(state.derivedSections.newReleaseTracks) {
+            showNotifications = false
+        }
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val fontScale = LocalDensity.current.fontScale
-        val layoutSpec = remember(maxWidth, fontScale) {
-            resolveHomeLayoutSpec(
-                availableWidth = maxWidth,
-                fontScale = fontScale,
-            )
-        }
+        val horizontalPadding = if (maxWidth < 360.dp) 16.dp else 20.dp
         LazyColumn(
-            state = homeListState,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to Color(0xFF211240),
-                            0.28f to RakyzuBlack,
-                            1f to RakyzuBlack,
-                        ),
-                    ),
-                )
-                .testTag("home-list"),
+            state = listState,
+            modifier = Modifier.fillMaxSize().background(HomeBackground).testTag("home-list"),
             contentPadding = contentPadding,
         ) {
             item(key = "home-header") {
-                HomeHeader(
-                    versionName = versionName,
+                ModernHomeHeader(
                     displayName = displayName,
                     avatarId = avatarId,
                     profileArtworkRequestProvider = profileArtworkRequestProvider,
-                    horizontalPadding = layoutSpec.horizontalPadding,
+                    horizontalPadding = horizontalPadding,
+                    hasNotification = !notificationsViewed && state.derivedSections.newReleaseTracks.isNotEmpty(),
                     onProfileClick = onProfileClick,
-                )
-            }
-            if (state.hasPlayableContent) {
-                item(key = "home-filters") {
-                    FilterRow(
-                        selectedFilter = selectedFilter,
-                        horizontalPadding = layoutSpec.horizontalPadding,
-                        onFilterSelected = { selectedFilterKey = it.storageKey },
-                    )
-                }
-                item(key = "catalog-freshness") {
-                    CatalogFreshnessMetadata(
-                        freshness = state.catalogFreshness,
-                        horizontalPadding = layoutSpec.horizontalPadding,
-                    )
-                }
-                item(key = "featured-track") {
-                    FeaturedCard(
-                        track = state.derivedSections.featuredTrack,
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onFeaturedTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                    )
-                }
-            }
-            if (state.isRefreshing || state.refreshMessage != null) {
-                item(key = "catalog-status") {
-                    CatalogStatus(
-                        isRefreshing = state.isRefreshing,
-                        isWaitingForConnection = state.isWaitingForConnection,
-                        hasPlayableContent = state.hasPlayableContent,
-                        isShowingStaleSavedCatalog = state.isShowingStaleSavedCatalog,
-                        isShowingSavedCatalog = state.isShowingSavedCatalog,
-                        refreshMessage = state.refreshMessage,
-                        horizontalPadding = layoutSpec.horizontalPadding,
-                        onRetry = onRetryCatalog,
-                    )
-                }
-            }
-            if (state.isEmptyAfterRefresh) {
-                item(key = "empty-home") {
-                    EmptyHomeState(
-                        horizontalPadding = layoutSpec.horizontalPadding,
-                        onRefresh = onRetryCatalog,
-                    )
-                }
-            }
-            if (sectionVisibility.recentlyPlayed) {
-                item(key = "recently-played") {
-                    TrackShelf(
-                        title = "Listening history",
-                        subtitle = "Continue from your private listening activity on this device.",
-                        tracks = state.recentlyPlayed,
-                        recommendationReasons = state.listeningHistory.associate { item ->
-                            item.track.id to if (item.playCount == 1) {
-                                "Played once"
-                            } else {
-                                "Played ${item.playCount} times"
-                            }
-                        },
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
-                        allowTasteExclusion = true,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                        onRecommendationHidden = onRecommendationHidden,
-                        onTasteSignalExcluded = onTasteSignalExcluded,
-                    )
-                }
-            }
-            if (sectionVisibility.personalizationControls) {
-                item(key = "personalization-controls") {
-                    PersonalizationControls(
-                        enabled = state.tasteProfile.enabled,
-                        mode = state.tasteProfile.discoveryMode,
-                        signalCount = state.tasteProfile.signalCount,
-                        message = state.personalizationMessage,
-                        horizontalPadding = layoutSpec.horizontalPadding,
-                        onEnabledChange = onPersonalizationEnabledChange,
-                        onModeChange = onDiscoveryModeChange,
-                        onClearData = onClearPersonalizationData,
-                        onMessageConsumed = onPersonalizationMessageConsumed,
-                    )
-                }
-            }
-            if (sectionVisibility.mixes) {
-                items(
-                    items = state.mixes,
-                    key = { "mix-${it.id}" },
-                ) { mix ->
-                    TrackShelf(
-                        title = mix.title,
-                        subtitle = mix.subtitle,
-                        tracks = mix.tracks,
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
-                        allowRecommendationHide = true,
-                        allowTasteExclusion = true,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                        onRecommendationHidden = onRecommendationHidden,
-                        onTasteSignalExcluded = onTasteSignalExcluded,
-                    )
-                }
-            }
-            if (sectionVisibility.smartRecommendations) {
-                item(key = "smart-recommendations") {
-                    TrackShelf(
-                        title = "Made for you",
-                        subtitle = "Private recommendations ranked on this device from your Library and listening.",
-                        tracks = state.recommendations.map { it.track },
-                        recommendationReasons = state.recommendations.associate {
-                            it.track.id to it.reason
-                        },
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
-                        allowRecommendationHide = true,
-                        allowTasteExclusion = true,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                        onRecommendationHidden = onRecommendationHidden,
-                        onTasteSignalExcluded = onTasteSignalExcluded,
-                    )
-                }
-            }
-            if (sectionVisibility.radioStations) {
-                items(
-                    items = state.radioStations,
-                    key = { "radio-${it.id}" },
-                ) { station ->
-                    TrackShelf(
-                        title = station.title,
-                        subtitle = station.subtitle,
-                        tracks = station.tracks,
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        excludedTasteTrackIds = state.tasteProfile.excludedTrackIds,
-                        allowRecommendationHide = true,
-                        allowTasteExclusion = true,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                        onRecommendationHidden = onRecommendationHidden,
-                        onTasteSignalExcluded = onTasteSignalExcluded,
-                    )
-                }
-            }
-            if (sectionVisibility.editorialShelves) {
-                items(
-                    items = state.catalog.editorialShelves,
-                    key = { "editorial-${it.id}" },
-                ) { shelf ->
-                    TrackShelf(
-                        title = shelf.title,
-                        subtitle = shelf.subtitle,
-                        tracks = shelf.tracks,
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        featuredArtworkId = shelf.id.takeIf { shelf.hasCustomArtwork },
-                        featuredArtworkRequestProvider = recommendationArtworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                    )
-                }
-            }
-            if (sectionVisibility.newReleases) {
-                item(key = "new-releases") {
-                    TrackShelf(
-                        title = "New releases",
-                        subtitle = "The latest published sounds on Rakyzu Music.",
-                        tracks = state.derivedSections.newReleaseTracks,
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                    )
-                }
-            }
-            if (sectionVisibility.allTracks) {
-                item(key = "all-tracks") {
-                    TrackShelf(
-                        title = "All tracks",
-                        subtitle = "Explore the complete verified catalog.",
-                        tracks = state.catalog.tracks,
-                        layoutSpec = layoutSpec,
-                        artworkRequestProvider = artworkRequestProvider,
-                        onTrackPlay = onTrackPlay,
-                        likedTrackIds = likedTrackIds,
-                        savedAlbumIds = savedAlbumIds,
-                        followedArtistIds = followedArtistIds,
-                        pendingTrackIds = pendingTrackIds,
-                        pendingAlbumIds = pendingAlbumIds,
-                        pendingArtistIds = pendingArtistIds,
-                        onTrackLikeChange = onTrackLikeChange,
-                        onAlbumSaveChange = onAlbumSaveChange,
-                        onArtistFollowChange = onArtistFollowChange,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PersonalizationControls(
-    enabled: Boolean,
-    mode: DiscoveryMode,
-    signalCount: Int,
-    message: String?,
-    horizontalPadding: Dp,
-    onEnabledChange: (Boolean) -> Unit,
-    onModeChange: (DiscoveryMode) -> Unit,
-    onClearData: () -> Unit,
-    onMessageConsumed: () -> Unit,
-) {
-    var confirmClear by remember { mutableStateOf(false) }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = 12.dp)
-            .semantics { isTraversalGroup = true },
-        color = RakyzuSurfaceRaised.copy(alpha = 0.94f),
-        shape = RoundedCornerShape(22.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Your private taste profile",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                    Text(
-                        text = "$signalCount account-scoped signals · processed only on this device",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = onEnabledChange,
-                    modifier = Modifier.semantics {
-                        contentDescription = "Private recommendations"
+                    onAnalyticsClick = { showAnalytics = true },
+                    onNotificationsClick = {
+                        notificationsViewed = true
+                        showNotifications = true
                     },
+                    onSettingsClick = onSettingsClick,
                 )
             }
-            Text(
-                text = "Choose how familiar or exploratory Made for you should feel.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(items = DiscoveryMode.entries, key = DiscoveryMode::storageValue) { item ->
-                    FilterChip(
-                        selected = item == mode,
-                        enabled = enabled,
-                        onClick = { onModeChange(item) },
-                        modifier = Modifier.heightIn(min = 48.dp),
-                        label = { Text(item.name) },
+            if (state.isRefreshing && !state.hasPlayableContent) {
+                item(key = "home-loading") {
+                    HomeStatus(
+                        "Loading your Home feed",
+                        "Syncing your private listening signals and Rakyzu catalog.",
+                        true,
+                        horizontalPadding,
                     )
                 }
-            }
-            message?.let {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = it,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RakyzuAqua,
+            } else if (state.isEmptyAfterRefresh) {
+                item(key = "home-empty") {
+                    HomeStatus(
+                        "Your Home feed is empty",
+                        "Published music will appear here as soon as it is available.",
+                        false,
+                        horizontalPadding,
+                        onRetryCatalog,
                     )
-                    TextButton(onClick = onMessageConsumed) { Text("Dismiss") }
                 }
-            }
-            TextButton(
-                onClick = { confirmClear = true },
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Reset listening history and taste controls")
-            }
-        }
-    }
-    if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text("Reset private personalization?") },
-            text = {
-                Text(
-                    "This removes listening history, hidden recommendations, and excluded taste " +
-                        "signals stored for this account on this device. Your Library is unchanged.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmClear = false
-                        onClearData()
-                    },
-                ) { Text("Reset") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
-            },
-        )
-    }
-}
-
-@Composable
-private fun CatalogFreshnessMetadata(
-    freshness: CatalogFreshness,
-    horizontalPadding: Dp,
-) {
-    val statusColor = if (freshness.isStale) Color(0xFFFFC857) else RakyzuAqua
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding)
-            .padding(top = 8.dp)
-            .semantics {
-                contentDescription = "Catalog freshness: ${freshness.label}"
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(7.dp)
-                .clip(CircleShape)
-                .background(statusColor),
-        )
-        Text(
-            text = freshness.label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium,
-        )
-    }
-}
-
-@Composable
-private fun CatalogStatus(
-    isRefreshing: Boolean,
-    isWaitingForConnection: Boolean,
-    hasPlayableContent: Boolean,
-    isShowingStaleSavedCatalog: Boolean,
-    isShowingSavedCatalog: Boolean,
-    refreshMessage: String?,
-    horizontalPadding: Dp,
-    onRetry: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding)
-            .padding(bottom = 18.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite },
-        shape = RoundedCornerShape(18.dp),
-        color = RakyzuSurfaceRaised.copy(alpha = 0.92f),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = RakyzuAqua,
-                    strokeWidth = 2.dp,
-                )
             } else {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    tint = RakyzuAqua,
-                )
+                items(visibleSections, key = { "home-section-${it.name}" }) { section ->
+                    when (section) {
+                        HomeSection.Continue -> CompactSongSection(
+                            if (state.listeningHistory.isEmpty()) "Recomendation For You" else "Continue Listening",
+                            continueTracks,
+                            artworkRequestProvider,
+                            horizontalPadding,
+                            onTrackPlay,
+                        )
+                        HomeSection.TopMixes -> GlobalGroupSection(
+                            title = "Top Mixes",
+                            shelves = topMixes,
+                            cardSize = 150.dp,
+                            horizontalPadding = horizontalPadding,
+                            imageOnly = false,
+                            artworkRequestProvider = artworkRequestProvider,
+                            recommendationArtworkRequestProvider = recommendationArtworkRequestProvider,
+                            canManageEditorial = canManageEditorial,
+                            catalogTracks = state.catalog.tracks,
+                            placement = EditorialPlacement.HomeTopMix,
+                            onPlay = {
+                                onEditorialGroupOpen(it.id)
+                                onTrackPlay(it.tracks.take(MAX_GROUP_TRACKS), 0)
+                            },
+                            onDelete = onDeleteGlobalCard,
+                            onDeleteArtwork = onDeleteGlobalCardArtwork,
+                            onSave = onSaveGlobalCard,
+                        )
+                        HomeSection.Recent -> GlobalGroupSection(
+                            title = "Based on your recent listening",
+                            shelves = recentGroups,
+                            cardSize = 182.dp,
+                            horizontalPadding = horizontalPadding,
+                            imageOnly = true,
+                            artworkRequestProvider = artworkRequestProvider,
+                            recommendationArtworkRequestProvider = recommendationArtworkRequestProvider,
+                            canManageEditorial = canManageEditorial,
+                            catalogTracks = state.catalog.tracks,
+                            placement = EditorialPlacement.HomeListening,
+                            onPlay = {
+                                onEditorialGroupOpen(it.id)
+                                onTrackPlay(it.tracks.take(MAX_GROUP_TRACKS), 0)
+                            },
+                            onDelete = onDeleteGlobalCard,
+                            onDeleteArtwork = onDeleteGlobalCardArtwork,
+                            onSave = onSaveGlobalCard,
+                        )
+                        HomeSection.Shows -> ShowsSection(
+                            shows, horizontalPadding, artworkRequestProvider, onTrackPlay,
+                        )
+                    }
+                }
+            }
+            if (state.refreshMessage != null && state.hasPlayableContent) {
+                item(key = "home-refresh-message") {
+                    HomeStatus(
+                        if (state.isWaitingForConnection) "Waiting for connection" else "Saved catalog",
+                        state.refreshMessage,
+                        state.isRefreshing,
+                        horizontalPadding,
+                        onRetryCatalog,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModernHomeHeader(
+    displayName: String,
+    avatarId: String?,
+    profileArtworkRequestProvider: ArtworkRequestProvider,
+    horizontalPadding: Dp,
+    hasNotification: Boolean,
+    onProfileClick: () -> Unit,
+    onAnalyticsClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth().background(
+            Brush.verticalGradient(listOf(Color(0xFF0E5660).copy(alpha = 0.56f), Color.Transparent)),
+        ).statusBarsPadding().padding(horizontal = horizontalPadding).padding(top = 12.dp, bottom = 24.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onProfileClick,
+                modifier = Modifier.size(48.dp).semantics { contentDescription = "Profile" },
+            ) {
+                if (avatarId != null) {
+                    AlbumArtwork(
+                        albumId = avatarId,
+                        colors = listOf(Color(0xFF155C65), HomeAqua),
+                        artworkRequestProvider = profileArtworkRequestProvider,
+                        shape = CircleShape,
+                        modifier = Modifier.size(34.dp),
+                    )
+                } else {
+                    Surface(
+                        modifier = Modifier.size(34.dp),
+                        shape = CircleShape,
+                        color = Color(0xFF254A50),
+                        border = androidx.compose.foundation.BorderStroke(2.5.dp, HomeAqua),
+                    ) {
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = "Profile",
+                            tint = Color.White,
+                            modifier = Modifier.padding(6.dp),
+                        )
+                    }
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = when {
-                        isRefreshing && !hasPlayableContent -> "Loading your Home feed"
-                        isRefreshing -> "Updating your saved catalog"
-                        isWaitingForConnection -> "Waiting for connection"
-                        isShowingStaleSavedCatalog -> "Saved catalog may be out of date"
-                        isShowingSavedCatalog -> "Showing your saved catalog"
-                        else -> "Catalog unavailable"
-                    },
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleSmall,
+                    "Welcome back !",
+                    color = Color.White,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
-                refreshMessage?.let { message ->
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
+                Text(
+                    displayName,
+                    color = Color.White.copy(alpha = 0.58f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            HeaderAction(Icons.Rounded.Analytics, "Listening analytics", onAnalyticsClick)
+            Box {
+                HeaderAction(Icons.Rounded.NotificationsNone, "Notifications", onNotificationsClick)
+                if (hasNotification) {
+                    Box(
+                        modifier = Modifier.align(Alignment.TopEnd).size(7.dp).clip(CircleShape).background(HomeAqua),
                     )
                 }
             }
-            if (!isRefreshing) {
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = RakyzuAqua,
-                        contentColor = RakyzuBlack,
-                    ),
-                ) {
-                    Text("Retry")
+            HeaderAction(Icons.Rounded.Settings, "Settings", onSettingsClick)
+        }
+    }
+}
+
+@Composable
+private fun HeaderAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+        Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun CompactSongSection(
+    title: String,
+    tracks: List<Track>,
+    artworkRequestProvider: ArtworkRequestProvider,
+    horizontalPadding: Dp,
+    onTrackPlay: (List<Track>, Int) -> Unit,
+) {
+    HomeSectionTitle(title, horizontalPadding)
+    val columns = remember(tracks) { tracks.chunked(3) }
+    LazyRow(
+        state = rememberLazyListState(),
+        modifier = Modifier.padding(bottom = 24.dp).semantics { isTraversalGroup = true }
+            .testTag("track-shelf-list-$title"),
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        itemsIndexed(columns, key = { index, chunk -> "compact-$index-${chunk.first().id}" }) { column, chunk ->
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                chunk.forEachIndexed { row, track ->
+                    val trackIndex = column * 3 + row
+                    CompactSongCard(
+                        track,
+                        trackIndex,
+                        artworkRequestProvider,
+                    ) { onTrackPlay(tracks, trackIndex) }
                 }
             }
         }
@@ -831,54 +598,524 @@ private fun CatalogStatus(
 }
 
 @Composable
-private fun EmptyHomeState(
-    horizontalPadding: Dp,
-    onRefresh: () -> Unit,
+private fun CompactSongCard(
+    track: Track,
+    index: Int,
+    artworkRequestProvider: ArtworkRequestProvider,
+    onClick: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = 22.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite },
-        shape = RoundedCornerShape(24.dp),
-        color = RakyzuSurfaceRaised.copy(alpha = 0.92f),
+    Row(
+        modifier = Modifier.width(182.dp).height(55.dp).clip(RoundedCornerShape(10.dp))
+            .background(CompactCard)
+            .clickable(role = Role.Button, onClickLabel = track.homePlayActionLabel(), onClick = onClick)
+            .semantics { traversalIndex = index.toFloat() },
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.MusicNote,
-                contentDescription = null,
-                tint = RakyzuAqua,
-                modifier = Modifier.size(40.dp),
+        AlbumArtwork(
+            albumId = track.albumId,
+            colors = artworkGradients[index % artworkGradients.size],
+            artworkRequestProvider = artworkRequestProvider,
+            shape = RoundedCornerShape(3.dp),
+            modifier = Modifier.size(54.dp),
+        )
+        Text(
+            track.title,
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.35.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GlobalGroupSection(
+    title: String,
+    shelves: List<EditorialShelf>,
+    cardSize: Dp,
+    horizontalPadding: Dp,
+    imageOnly: Boolean,
+    artworkRequestProvider: ArtworkRequestProvider,
+    recommendationArtworkRequestProvider: ArtworkRequestProvider,
+    canManageEditorial: Boolean,
+    catalogTracks: List<Track>,
+    placement: EditorialPlacement,
+    onPlay: (EditorialShelf) -> Unit,
+    onDelete: (EditorialShelf) -> Unit,
+    onDeleteArtwork: (EditorialShelf) -> Unit,
+    onSave: (EditorialGroupMutation, ByteArray?) -> Unit,
+) {
+    var editing by remember { mutableStateOf<EditorialShelf?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    HomeSectionTitle(title, horizontalPadding)
+    LazyRow(
+        state = rememberLazyListState(),
+        modifier = Modifier.padding(bottom = 26.dp).semantics { isTraversalGroup = true },
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        items(shelves, key = EditorialShelf::id) { shelf ->
+            GlobalGroupCard(
+                shelf,
+                cardSize,
+                imageOnly,
+                artworkRequestProvider,
+                recommendationArtworkRequestProvider,
+                Modifier.combinedClickable(
+                    role = Role.Button,
+                    onClickLabel = "Play ${shelf.title}",
+                    onLongClickLabel = if (canManageEditorial) "Manage ${shelf.title}" else null,
+                    onClick = { onPlay(shelf) },
+                    onLongClick = { if (canManageEditorial) editing = shelf },
+                ),
             )
-            Text(
-                text = "Your Home feed is empty",
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics { heading() },
+        }
+        if (canManageEditorial && shelves.size < placement.maximumCards) {
+            item(key = "add-${placement.name}") {
+                AddHomeGroupCard(size = cardSize, onClick = { adding = true })
+            }
+        }
+    }
+    editing?.let { shelf ->
+        HomeEditorialGroupEditor(
+            existing = shelf,
+            placement = placement,
+            catalogTracks = catalogTracks,
+            onDismiss = { editing = null },
+            onSave = { mutation, bytes -> editing = null; onSave(mutation, bytes) },
+            onDelete = { editing = null; onDelete(shelf) },
+            onDeleteArtwork = if (shelf.hasCustomArtwork) {
+                { editing = null; onDeleteArtwork(shelf) }
+            } else null,
+        )
+    }
+    if (adding) {
+        HomeEditorialGroupEditor(
+            existing = null,
+            placement = placement,
+            catalogTracks = catalogTracks,
+            initialDisplayPosition = shelves.size + 1,
+            onDismiss = { adding = false },
+            onSave = { mutation, bytes -> adding = false; onSave(mutation, bytes) },
+        )
+    }
+}
+
+@Composable
+private fun AddHomeGroupCard(size: Dp, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(size).clip(RoundedCornerShape(10.dp)).drawBehind {
+            drawRoundRect(
+                color = HomeAqua.copy(alpha = 0.82f),
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+                ),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()),
             )
-            Text(
-                text = "Published music will appear here when it is available.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
+        }.clickable(role = Role.Button, onClickLabel = "Add Card Group", onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.Add, contentDescription = null, tint = HomeAqua, modifier = Modifier.size(36.dp))
+    }
+}
+
+@Composable
+private fun HomeEditorialGroupEditor(
+    existing: EditorialShelf?,
+    placement: EditorialPlacement,
+    catalogTracks: List<Track>,
+    initialDisplayPosition: Int = 1,
+    onDismiss: () -> Unit,
+    onSave: (EditorialGroupMutation, ByteArray?) -> Unit,
+    onDelete: (() -> Unit)? = null,
+    onDeleteArtwork: (() -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var title by remember(existing?.id) { mutableStateOf(existing?.title.orEmpty()) }
+    var cardLabel by remember(existing?.id) { mutableStateOf(existing?.cardLabel.orEmpty()) }
+    var subtitle by remember(existing?.id) { mutableStateOf(existing?.subtitle.orEmpty()) }
+    var colorHex by remember(existing?.id) { mutableStateOf(existing?.colorHex ?: "#4A558F") }
+    var position by remember(existing?.id) {
+        mutableStateOf(
+            existing?.let { placement.displayPosition(it.position).toString() }
+                ?: initialDisplayPosition.toString(),
+        )
+    }
+    var published by remember(existing?.id) { mutableStateOf(true) }
+    var selectedTrackIds by remember(existing?.id) {
+        mutableStateOf(existing?.tracks?.map(Track::id)?.toSet().orEmpty())
+    }
+    var artworkBytes by remember(existing?.id) { mutableStateOf<ByteArray?>(null) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var pickAfterPermission by remember { mutableStateOf(false) }
+    val artworkPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) scope.launch {
+            val result = withContext(Dispatchers.IO) { readHomeArtwork(context, uri) }
+            if (result != null) {
+                artworkBytes = result.first
+                colorHex = result.second
+            }
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted && pickAfterPermission) {
+            artworkPicker.launch(arrayOf("image/jpeg", "image/png", "image/webp"))
+        }
+        pickAfterPermission = false
+    }
+    fun pickArtwork() {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            artworkPicker.launch(arrayOf("image/jpeg", "image/png", "image/webp"))
+        } else {
+            pickAfterPermission = true
+            permissionLauncher.launch(permission)
+        }
+    }
+    if (showDeleteConfirmation && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete ${existing?.title}?") },
+            text = { Text("This removes the global Card Group for every listener. Songs stay in the catalog.") },
+            confirmButton = { TextButton(onClick = onDelete) { Text("Delete") } },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel") }
+            },
+        )
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (existing == null) "Add Card Group" else "Edit Card Group") },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 570.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it.take(80) },
+                    label = { Text("Card Group name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (placement == EditorialPlacement.HomeTopMix) {
+                    OutlinedTextField(
+                        value = cardLabel,
+                        onValueChange = { cardLabel = it.take(40) },
+                        label = { Text("Header in front of image") },
+                        supportingText = { Text("Example: Pop Mix. The group name remains synchronized inside.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                OutlinedTextField(
+                    value = subtitle,
+                    onValueChange = { subtitle = it.take(160) },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = colorHex,
+                    onValueChange = { colorHex = it.take(7).uppercase() },
+                    label = { Text("Color #RRGGBB") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MixAccents.forEach { color ->
+                        val hex = color.toHomeHex()
+                        Surface(
+                            color = color,
+                            shape = CircleShape,
+                            onClick = { colorHex = hex },
+                            modifier = Modifier.size(42.dp),
+                        ) {
+                            if (colorHex.equals(hex, true)) {
+                                Icon(Icons.Rounded.Check, null, tint = Color.Black, modifier = Modifier.padding(10.dp))
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = position,
+                    onValueChange = { position = it.filter(Char::isDigit).take(2) },
+                    label = { Text("Position (1-${placement.maximumCards})") },
+                    supportingText = { Text("Cards with higher global engagement are promoted automatically.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Visible globally", modifier = Modifier.weight(1f))
+                    Switch(checked = published, onCheckedChange = { published = it })
+                }
+                Text("Songs (${selectedTrackIds.size}/50)", fontWeight = FontWeight.Bold)
+                if (catalogTracks.isEmpty()) {
+                    Text("Upload and publish songs before creating a Card Group.")
+                }
+                catalogTracks.take(80).forEach { track ->
+                    FilterChip(
+                        selected = track.id in selectedTrackIds,
+                        onClick = {
+                            selectedTrackIds = if (track.id in selectedTrackIds) {
+                                selectedTrackIds - track.id
+                            } else if (selectedTrackIds.size < MAX_GROUP_TRACKS) {
+                                selectedTrackIds + track.id
+                            } else {
+                                selectedTrackIds
+                            }
+                        },
+                        label = { Text("${track.title} · ${track.artist}", maxLines = 1) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Button(onClick = ::pickArtwork, modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        if (existing?.hasCustomArtwork == true || artworkBytes != null) {
+                            Icons.Rounded.Edit
+                        } else {
+                            Icons.Rounded.Image
+                        },
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (existing?.hasCustomArtwork == true || artworkBytes != null) {
+                            "Change image"
+                        } else {
+                            "Add image"
+                        },
+                    )
+                }
+                if (artworkBytes != null) {
+                    TextButton(onClick = { artworkBytes = null }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Remove selected image")
+                    }
+                }
+                onDeleteArtwork?.let { callback ->
+                    TextButton(onClick = callback, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Rounded.Delete, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete current image")
+                    }
+                }
+                onDelete?.let {
+                    TextButton(
+                        onClick = { showDeleteConfirmation = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Rounded.Delete, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete Card Group")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            val displayPosition = position.toIntOrNull()
+            TextButton(
+                enabled = title.isNotBlank() &&
+                    selectedTrackIds.isNotEmpty() &&
+                    displayPosition != null && displayPosition in 1..placement.maximumCards &&
+                    HOME_COLOR_HEX.matches(colorHex) &&
+                    (placement != EditorialPlacement.HomeTopMix || cardLabel.isNotBlank()),
+                onClick = {
+                    onSave(
+                        EditorialGroupMutation(
+                            id = existing?.id ?: UUID.randomUUID().toString(),
+                            title = title.trim(),
+                            subtitle = subtitle.trim().ifBlank { null },
+                            placement = placement,
+                            displayPosition = requireNotNull(displayPosition),
+                            cardLabel = cardLabel.trim().takeIf {
+                                it.isNotBlank() && placement == EditorialPlacement.HomeTopMix
+                            },
+                            colorHex = colorHex.uppercase(),
+                            published = published,
+                            trackIds = selectedTrackIds.toList(),
+                        ),
+                        artworkBytes,
+                    )
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun GlobalGroupCard(
+    shelf: EditorialShelf,
+    size: Dp,
+    imageOnly: Boolean,
+    artworkRequestProvider: ArtworkRequestProvider,
+    recommendationArtworkRequestProvider: ArtworkRequestProvider,
+    modifier: Modifier = Modifier,
+) {
+    val accent = shelf.colorHex.toHomeColor()
+    Box(
+        modifier = modifier.size(size).clip(RoundedCornerShape(10.dp))
+            .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.55f)))),
+    ) {
+        val firstTrack = shelf.tracks.first()
+        AlbumArtwork(
+            albumId = if (shelf.hasCustomArtwork) shelf.id else firstTrack.albumId,
+            colors = listOf(accent, accent.copy(alpha = 0.55f)),
+            artworkRequestProvider = if (shelf.hasCustomArtwork) {
+                recommendationArtworkRequestProvider
+            } else {
+                artworkRequestProvider
+            },
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = if (imageOnly) 0.72f else 0.42f),
+                    ),
+                ),
+            ),
+        )
+        if (!imageOnly) {
+            Box(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(7.dp)
+                    .background(accent),
             )
-            Button(
-                onClick = onRefresh,
-                modifier = Modifier.heightIn(min = 48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = RakyzuAqua,
-                    contentColor = RakyzuBlack,
+        }
+        Text(
+            if (imageOnly) shelf.title else shelf.cardLabel ?: shelf.title,
+            color = Color.White,
+            fontSize = 15.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+        )
+    }
+}
+
+@Composable
+private fun ShowsSection(
+    shows: List<PersonalizedCollection>,
+    horizontalPadding: Dp,
+    artworkRequestProvider: ArtworkRequestProvider,
+    onTrackPlay: (List<Track>, Int) -> Unit,
+) {
+    HomeSectionTitle("Your Shows", horizontalPadding)
+    LazyRow(
+        state = rememberLazyListState(),
+        modifier = Modifier.padding(bottom = 26.dp).semantics { isTraversalGroup = true },
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        itemsIndexed(shows, key = { _, show -> show.id }) { index, show ->
+            Box(
+                modifier = Modifier.size(182.dp).clip(RoundedCornerShape(10.dp)).clickable(
+                    role = Role.Button,
+                    onClickLabel = "Play ${show.title}",
+                    onClick = { onTrackPlay(show.tracks, 0) },
                 ),
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                AlbumArtwork(
+                    albumId = show.tracks.first().albumId,
+                    colors = artworkGradients[(index + 3) % artworkGradients.size],
+                    artworkRequestProvider = artworkRequestProvider,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxSize(),
                 )
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.76f))),
+                    ),
+                )
+                Column(modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+                    Text(
+                        show.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        show.subtitle,
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSectionTitle(title: String, horizontalPadding: Dp) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding)
+            .padding(top = 4.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            color = Color.White,
+            fontSize = if (title == "Your Shows") 22.sp else 20.sp,
+            lineHeight = if (title == "Your Shows") 26.sp else 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
+        )
+        if (title == "Top Mixes") {
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.34f)))
+        }
+    }
+}
+
+@Composable
+private fun HomeStatus(
+    title: String,
+    detail: String?,
+    loading: Boolean,
+    horizontalPadding: Dp,
+    onRetry: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 28.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (loading) CircularProgressIndicator(color = HomeAqua, modifier = Modifier.size(26.dp))
+        Text(
+            title,
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() },
+        )
+        detail?.let { Text(it, color = Color.White.copy(alpha = 0.62f), textAlign = TextAlign.Center) }
+        onRetry?.let {
+            Button(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Refresh")
             }
@@ -886,262 +1123,127 @@ private fun EmptyHomeState(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeHeader(
-    versionName: String,
-    displayName: String,
-    avatarId: String?,
-    profileArtworkRequestProvider: ArtworkRequestProvider,
-    horizontalPadding: Dp,
-    onProfileClick: () -> Unit,
+private fun ListeningAnalyticsSheet(
+    history: List<ListeningHistoryItem>,
+    onDismiss: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = horizontalPadding, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(listOf(RakyzuPurple, RakyzuAqua)),
-                ),
-            contentAlignment = Alignment.Center,
+    var selected by remember(history) { mutableStateOf(history.maxByOrNull { it.playCount }) }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF172124)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                text = "R",
-                color = RakyzuBlack,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Good evening, ${displayName.substringBefore(' ')}",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                text = "Rakyzu Music · v$versionName",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        IconButton(
-            onClick = onProfileClick,
-            modifier = Modifier.size(48.dp),
-        ) {
-            if (avatarId != null) {
-                AlbumArtwork(
-                    albumId = avatarId,
-                    colors = listOf(RakyzuPurple, RakyzuAqua),
-                    artworkRequestProvider = profileArtworkRequestProvider,
-                    modifier = Modifier.size(42.dp).clip(CircleShape),
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, tint = HomeAqua)
+                Spacer(Modifier.width(10.dp))
+                Text("Your listening analytics", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            }
+            if (history.isEmpty()) {
+                Text(
+                    "Your private graph will appear after you listen to music.",
+                    color = Color.White.copy(alpha = 0.68f),
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Rounded.Person,
-                    contentDescription = "Profile",
-                    tint = MaterialTheme.colorScheme.onBackground,
+                val chartItems = history.sortedByDescending { it.playCount }.take(7)
+                Text(
+                    "${history.sumOf { it.playCount }} plays · ${history.size} unique tracks",
+                    color = Color.White.copy(alpha = 0.68f),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterRow(
-    selectedFilter: HomeFilter,
-    horizontalPadding: Dp,
-    onFilterSelected: (HomeFilter) -> Unit,
-) {
-    val filterListState = rememberLazyListState()
-    LazyRow(
-        state = filterListState,
-        contentPadding = PaddingValues(horizontal = horizontalPadding),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(
-            items = homeFilters,
-            key = HomeFilter::storageKey,
-        ) { filter ->
-            val selected = filter == selectedFilter
-            FilterChip(
-                selected = selected,
-                onClick = { onFilterSelected(filter) },
-                modifier = Modifier.heightIn(min = 48.dp),
-                label = { Text(filter.label) },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = RakyzuSurfaceRaised.copy(alpha = 0.82f),
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedContainerColor = RakyzuAqua,
-                    selectedLabelColor = RakyzuBlack,
-                ),
-                border = null,
-            )
-        }
-    }
-}
-
-@Composable
-private fun FeaturedCard(
-    track: Track?,
-    layoutSpec: HomeLayoutSpec,
-    artworkRequestProvider: ArtworkRequestProvider,
-    onTrackPlay: () -> Unit,
-    likedTrackIds: Set<String>,
-    savedAlbumIds: Set<String>,
-    followedArtistIds: Set<String>,
-    pendingTrackIds: Set<String>,
-    pendingAlbumIds: Set<String>,
-    pendingArtistIds: Set<String>,
-    onTrackLikeChange: (Track, Boolean) -> Unit,
-    onAlbumSaveChange: (Track, Boolean) -> Unit,
-    onArtistFollowChange: (Track, Boolean) -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = layoutSpec.horizontalPadding, vertical = 22.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-    ) {
-        val contentModifier = Modifier
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF4B248A), Color(0xFF1E6572)),
-                ),
-            )
-            .padding(18.dp)
-        if (layoutSpec.useStackedFeaturedCard) {
-            Column(modifier = contentModifier) {
-                AlbumArtwork(
-                    albumId = track?.albumId.orEmpty(),
-                    colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
-                    artworkRequestProvider = artworkRequestProvider,
-                    modifier = Modifier.size(128.dp),
-                )
-                Spacer(Modifier.height(16.dp))
-                FeaturedDetails(
-                    track = track,
-                    onTrackPlay = onTrackPlay,
-                    libraryActions = track?.let {
-                        {
-                            TrackLibraryMenu(
-                                track = it,
-                                likedTrackIds = likedTrackIds,
-                                savedAlbumIds = savedAlbumIds,
-                                followedArtistIds = followedArtistIds,
-                                pendingTrackIds = pendingTrackIds,
-                                pendingAlbumIds = pendingAlbumIds,
-                                pendingArtistIds = pendingArtistIds,
-                                onTrackLikeChange = onTrackLikeChange,
-                                onAlbumSaveChange = onAlbumSaveChange,
-                                onArtistFollowChange = onArtistFollowChange,
-                            )
-                        }
-                    },
-                )
-            }
-        } else {
-            Row(
-                modifier = contentModifier,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AlbumArtwork(
-                    albumId = track?.albumId.orEmpty(),
-                    colors = listOf(RakyzuPurpleSoft, RakyzuAqua),
-                    artworkRequestProvider = artworkRequestProvider,
-                    modifier = Modifier.size(112.dp),
-                )
-                Spacer(Modifier.width(18.dp))
-                FeaturedDetails(
-                    track = track,
-                    onTrackPlay = onTrackPlay,
-                    libraryActions = track?.let {
-                        {
-                            TrackLibraryMenu(
-                                track = it,
-                                likedTrackIds = likedTrackIds,
-                                savedAlbumIds = savedAlbumIds,
-                                followedArtistIds = followedArtistIds,
-                                pendingTrackIds = pendingTrackIds,
-                                pendingAlbumIds = pendingAlbumIds,
-                                pendingArtistIds = pendingArtistIds,
-                                onTrackLikeChange = onTrackLikeChange,
-                                onAlbumSaveChange = onAlbumSaveChange,
-                                onArtistFollowChange = onArtistFollowChange,
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FeaturedDetails(
-    track: Track?,
-    onTrackPlay: () -> Unit,
-    modifier: Modifier = Modifier,
-    libraryActions: (@Composable () -> Unit)? = null,
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = "RAKYZU ORIGINAL",
-            color = RakyzuAqua,
-            style = MaterialTheme.typography.labelLarge,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Sound without limits",
-            color = Color.White,
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            text = "Your new listening space starts here.",
-            color = Color.White.copy(alpha = 0.78f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .clickable(
-                        enabled = track != null,
-                        onClickLabel = track?.homePlayActionLabel(),
-                        role = Role.Button,
-                        onClick = onTrackPlay,
-                    ),
-                shape = CircleShape,
-                color = RakyzuAqua,
-            ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom,
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = RakyzuBlack,
-                        modifier = Modifier.size(18.dp),
-                    )
+                    val maxPlayCount = chartItems.maxOf { it.playCount }.coerceAtLeast(1)
+                    chartItems.forEach { item ->
+                        val selectedBar = selected?.track?.id == item.track.id
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxHeight().clickable { selected = item },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom,
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth()
+                                    .height((132f * item.playCount / maxPlayCount).dp.coerceAtLeast(12.dp))
+                                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                    .background(if (selectedBar) HomeAqua else HomeAqua.copy(alpha = 0.38f)),
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                item.track.title.take(3).uppercase(),
+                                color = Color.White.copy(alpha = 0.62f),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+                selected?.let {
+                    Surface(color = Color.White.copy(alpha = 0.06f), shape = RoundedCornerShape(14.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                            Text(it.track.title, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(
+                                "${it.track.artist} · ${it.playCount} ${if (it.playCount == 1) "play" else "plays"}",
+                                color = Color.White.copy(alpha = 0.66f),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeNotificationsSheet(
+    releases: List<Track>,
+    onDismiss: () -> Unit,
+) {
+    val notificationItems = remember(releases) {
+        buildList {
+            releases.take(4).forEach { add("New song · ${it.title}" to it.artist) }
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF172124)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item {
+                Text("Notifications", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Events, app updates, song releases, and radio releases.",
+                    color = Color.White.copy(alpha = 0.62f),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                )
+            }
+            if (notificationItems.isEmpty()) {
+                item {
                     Text(
-                        text = "Play",
-                        color = RakyzuBlack,
-                        style = MaterialTheme.typography.labelLarge,
+                        "No new notifications.",
+                        color = Color.White.copy(alpha = 0.64f),
+                        modifier = Modifier.padding(vertical = 18.dp),
                     )
                 }
             }
-            libraryActions?.invoke()
+            items(notificationItems, key = { it.first + it.second }) { notification ->
+                Surface(color = Color.White.copy(alpha = 0.06f), shape = RoundedCornerShape(14.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.NotificationsNone, contentDescription = null, tint = HomeAqua)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(notification.first, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(notification.second, color = Color.White.copy(alpha = 0.64f), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(18.dp)) }
         }
     }
 }
@@ -1153,232 +1255,70 @@ internal fun TrackShelf(
     tracks: List<Track>,
     layoutSpec: HomeLayoutSpec = HomeLayoutSpec.Standard,
     artworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
-    featuredArtworkId: String? = null,
-    featuredArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
+    @Suppress("UNUSED_PARAMETER") featuredArtworkId: String? = null,
+    @Suppress("UNUSED_PARAMETER") featuredArtworkRequestProvider: ArtworkRequestProvider = unavailableArtworkRequestProvider,
     onTrackPlay: (List<Track>, Int) -> Unit,
-    likedTrackIds: Set<String> = emptySet(),
-    savedAlbumIds: Set<String> = emptySet(),
-    followedArtistIds: Set<String> = emptySet(),
-    pendingTrackIds: Set<String> = emptySet(),
-    pendingAlbumIds: Set<String> = emptySet(),
-    pendingArtistIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") likedTrackIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") savedAlbumIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") followedArtistIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") pendingTrackIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") pendingAlbumIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") pendingArtistIds: Set<String> = emptySet(),
     recommendationReasons: Map<String, String> = emptyMap(),
-    excludedTasteTrackIds: Set<String> = emptySet(),
-    allowRecommendationHide: Boolean = false,
-    allowTasteExclusion: Boolean = false,
-    onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
-    onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
-    onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
-    onRecommendationHidden: (Track) -> Unit = {},
-    onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") excludedTasteTrackIds: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") allowRecommendationHide: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") allowTasteExclusion: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") onTrackLikeChange: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onAlbumSaveChange: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onArtistFollowChange: (Track, Boolean) -> Unit = { _, _ -> },
+    @Suppress("UNUSED_PARAMETER") onRecommendationHidden: (Track) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
 ) {
-    val shelfListState = rememberLazyListState()
-    Column(
-        modifier = Modifier
-            .padding(bottom = 28.dp)
-            .semantics { isTraversalGroup = true },
-    ) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onBackground,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier
-                .padding(horizontal = layoutSpec.horizontalPadding, vertical = 10.dp)
-                .semantics { heading() },
-        )
-        if (!subtitle.isNullOrBlank()) {
+    Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        HomeSectionTitle(title, layoutSpec.horizontalPadding)
+        subtitle?.takeIf(String::isNotBlank)?.let {
             Text(
-                text = subtitle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .padding(horizontal = layoutSpec.horizontalPadding)
-                    .padding(bottom = 10.dp),
+                it,
+                color = Color.White.copy(alpha = 0.62f),
+                modifier = Modifier.padding(horizontal = layoutSpec.horizontalPadding).padding(bottom = 10.dp),
             )
         }
         LazyRow(
-            state = shelfListState,
-            modifier = Modifier
-                .semantics { isTraversalGroup = true }
-                .testTag("track-shelf-list-$title"),
+            state = rememberLazyListState(),
+            modifier = Modifier.testTag("track-shelf-list-$title"),
             contentPadding = PaddingValues(horizontal = layoutSpec.horizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            itemsIndexed(
-                items = tracks,
-                key = { _, track -> track.id },
-            ) { index, track ->
-                val playActionLabel = remember(track.id, track.title) {
-                    track.homePlayActionLabel()
-                }
-                val subtitle = remember(track.artist, track.albumTitle) {
-                    track.homeSubtitle()
-                }
-                Card(
-                    modifier = Modifier
-                        .width(layoutSpec.trackCardWidth)
-                        .heightIn(min = 48.dp)
-                        .clickable(
-                            onClickLabel = playActionLabel,
-                            role = Role.Button,
-                            onClick = { onTrackPlay(tracks, index) },
-                        )
-                        .semantics { traversalIndex = index.toFloat() },
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                Column(
+                    modifier = Modifier.width(layoutSpec.trackCardWidth).heightIn(min = 48.dp).clickable(
+                        role = Role.Button,
+                        onClickLabel = track.homePlayActionLabel(),
+                        onClick = { onTrackPlay(tracks, index) },
+                    ).semantics { traversalIndex = index.toFloat() },
                 ) {
-                    Box {
-                        Column {
-                            AlbumArtwork(
-                                albumId = if (index == 0 && featuredArtworkId != null) {
-                                    featuredArtworkId
-                                } else track.albumId,
-                                colors = catalogGradients[index % catalogGradients.size],
-                                artworkRequestProvider = if (index == 0 && featuredArtworkId != null) {
-                                    featuredArtworkRequestProvider
-                                } else artworkRequestProvider,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f),
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                text = track.title,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = layoutSpec.trackTextMaxLines,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = subtitle,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = layoutSpec.trackTextMaxLines,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            recommendationReasons[track.id]?.let { reason ->
-                                Text(
-                                    text = reason,
-                                    color = RakyzuAqua,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        TrackLibraryMenu(
-                            track = track,
-                            likedTrackIds = likedTrackIds,
-                            savedAlbumIds = savedAlbumIds,
-                            followedArtistIds = followedArtistIds,
-                            pendingTrackIds = pendingTrackIds,
-                            pendingAlbumIds = pendingAlbumIds,
-                            pendingArtistIds = pendingArtistIds,
-                            onTrackLikeChange = onTrackLikeChange,
-                            onAlbumSaveChange = onAlbumSaveChange,
-                            onArtistFollowChange = onArtistFollowChange,
-                            excludedFromTaste = track.id in excludedTasteTrackIds,
-                            allowRecommendationHide = allowRecommendationHide,
-                            allowTasteExclusion = allowTasteExclusion,
-                            onRecommendationHidden = onRecommendationHidden,
-                            onTasteSignalExcluded = onTasteSignalExcluded,
-                            modifier = Modifier.align(Alignment.TopEnd),
-                        )
-                    }
+                    AlbumArtwork(
+                        albumId = track.albumId,
+                        colors = artworkGradients[index % artworkGradients.size],
+                        artworkRequestProvider = artworkRequestProvider,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(layoutSpec.trackCardWidth),
+                    )
+                    Text(
+                        track.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = layoutSpec.trackTextMaxLines,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Text(
+                        recommendationReasons[track.id] ?: track.homeSubtitle(),
+                        color = Color.White.copy(alpha = 0.58f),
+                        maxLines = layoutSpec.trackTextMaxLines,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrackLibraryMenu(
-    track: Track,
-    likedTrackIds: Set<String>,
-    savedAlbumIds: Set<String>,
-    followedArtistIds: Set<String>,
-    pendingTrackIds: Set<String>,
-    pendingAlbumIds: Set<String>,
-    pendingArtistIds: Set<String>,
-    onTrackLikeChange: (Track, Boolean) -> Unit,
-    onAlbumSaveChange: (Track, Boolean) -> Unit,
-    onArtistFollowChange: (Track, Boolean) -> Unit,
-    excludedFromTaste: Boolean = false,
-    allowRecommendationHide: Boolean = false,
-    allowTasteExclusion: Boolean = false,
-    onRecommendationHidden: (Track) -> Unit = {},
-    onTasteSignalExcluded: (Track, Boolean) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        IconButton(
-            onClick = { expanded = true },
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(
-                Icons.Rounded.MoreVert,
-                contentDescription = "Library actions for ${track.title}",
-            )
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            val liked = track.id in likedTrackIds
-            DropdownMenuItem(
-                text = { Text(if (liked) "Remove from Liked Songs" else "Add to Liked Songs") },
-                leadingIcon = { Icon(Icons.Rounded.Favorite, contentDescription = null) },
-                enabled = track.id !in pendingTrackIds,
-                onClick = {
-                    expanded = false
-                    onTrackLikeChange(track, !liked)
-                },
-            )
-            if (track.albumId.isNotBlank()) {
-                val saved = track.albumId in savedAlbumIds
-                DropdownMenuItem(
-                    text = { Text(if (saved) "Remove album from Library" else "Save album") },
-                    leadingIcon = { Icon(Icons.Rounded.Bookmark, contentDescription = null) },
-                    enabled = track.albumId !in pendingAlbumIds,
-                    onClick = {
-                        expanded = false
-                        onAlbumSaveChange(track, !saved)
-                    },
-                )
-            }
-            if (track.artistId.isNotBlank()) {
-                val followed = track.artistId in followedArtistIds
-                DropdownMenuItem(
-                    text = { Text(if (followed) "Unfollow artist" else "Follow artist") },
-                    leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
-                    enabled = track.artistId !in pendingArtistIds,
-                    onClick = {
-                        expanded = false
-                        onArtistFollowChange(track, !followed)
-                    },
-                )
-            }
-            if (allowRecommendationHide) {
-                DropdownMenuItem(
-                    text = { Text("Hide this recommendation") },
-                    leadingIcon = { Icon(Icons.Rounded.Block, contentDescription = null) },
-                    onClick = {
-                        expanded = false
-                        onRecommendationHidden(track)
-                    },
-                )
-            }
-            if (allowTasteExclusion) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (excludedFromTaste) "Use this in my taste profile" else
-                                "Don't use this in my taste profile",
-                        )
-                    },
-                    leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null) },
-                    onClick = {
-                        expanded = false
-                        onTasteSignalExcluded(track, !excludedFromTaste)
-                    },
-                )
             }
         }
     }
@@ -1386,20 +1326,130 @@ private fun TrackLibraryMenu(
 
 internal fun Track.homePlayActionLabel(): String = "Play ${title.trim()}"
 
-internal fun Track.homeSubtitle(): String {
-    val artistLabel = artist.trim()
-    val albumLabel = albumTitle.trim()
-    return when {
-        artistLabel.isEmpty() -> albumLabel
-        albumLabel.isEmpty() -> artistLabel
-        else -> "$artistLabel · $albumLabel"
+internal fun Track.homeSubtitle(): String = when {
+    artist.isNotBlank() && albumTitle.isNotBlank() -> "$artist · $albumTitle"
+    artist.isNotBlank() -> artist
+    albumTitle.isNotBlank() -> albumTitle
+    else -> "Rakyzu Music"
+}
+
+private fun List<EditorialShelf>.globalSmartOrder(): List<EditorialShelf> =
+    sortedWith(compareByDescending<EditorialShelf> { it.globalScore }.thenBy { it.position })
+
+private fun List<HomeSection>.smartOrderFor(
+    seed: String,
+    history: List<ListeningHistoryItem>,
+    topMixes: List<EditorialShelf>,
+    listeningGroups: List<EditorialShelf>,
+    shows: List<PersonalizedCollection>,
+): List<HomeSection> {
+    if (history.isEmpty()) return this
+    val plays = history.associate { it.track.id to it.playCount }
+    fun shelfSignal(shelves: List<EditorialShelf>): Int = shelves.maxOfOrNull { shelf ->
+        shelf.tracks.sumOf { plays[it.id] ?: 0 }
+    } ?: 0
+    fun showSignal(): Int = shows.maxOfOrNull { show ->
+        show.tracks.sumOf { plays[it.id] ?: 0 }
+    } ?: 0
+    val scores = mapOf(
+        HomeSection.Continue to history.sumOf(ListeningHistoryItem::playCount),
+        HomeSection.TopMixes to shelfSignal(topMixes),
+        HomeSection.Recent to shelfSignal(listeningGroups),
+        HomeSection.Shows to showSignal(),
+    )
+    return sortedWith(
+        compareByDescending<HomeSection> { scores[it] ?: 0 }
+            .thenBy { stablePersonalizedScore(seed, it.name, history.size) },
+    )
+}
+
+private fun String.toHomeColor(): Color = runCatching {
+    Color(android.graphics.Color.parseColor(this))
+}.getOrDefault(Color(0xFF4A558F))
+
+private fun Color.toHomeHex(): String = String.format(
+    "#%02X%02X%02X",
+    (red * 255).toInt(),
+    (green * 255).toInt(),
+    (blue * 255).toInt(),
+)
+
+private fun Bitmap.homeDominantColorHex(): String {
+    val stepX = (width / 32).coerceAtLeast(1)
+    val stepY = (height / 32).coerceAtLeast(1)
+    val buckets = linkedMapOf<Int, Int>()
+    for (y in 0 until height step stepY) {
+        for (x in 0 until width step stepX) {
+            val pixel = getPixel(x, y)
+            if (android.graphics.Color.alpha(pixel) < 160) continue
+            val red = android.graphics.Color.red(pixel)
+            val green = android.graphics.Color.green(pixel)
+            val blue = android.graphics.Color.blue(pixel)
+            if (red + green + blue < 42 || red + green + blue > 720) continue
+            val key = ((red / 32) shl 10) or ((green / 32) shl 5) or (blue / 32)
+            buckets[key] = (buckets[key] ?: 0) + 1
+        }
+    }
+    val key = buckets.maxByOrNull { it.value }?.key ?: return "#4A558F"
+    val red = (((key shr 10) and 31) * 32 + 16).coerceAtMost(255)
+    val green = (((key shr 5) and 31) * 32 + 16).coerceAtMost(255)
+    val blue = ((key and 31) * 32 + 16).coerceAtMost(255)
+    return String.format("#%02X%02X%02X", red, green, blue)
+}
+
+private fun stablePersonalizedScore(seed: String, value: String, signal: Int): Int =
+    "$seed:$value:$signal".hashCode().absoluteValue
+
+private fun readHomeArtwork(context: android.content.Context, uri: Uri): Pair<ByteArray, String>? {
+    val source = context.contentResolver.openInputStream(uri)?.use { input ->
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8_192)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            if (output.size() + read > MAX_ARTWORK_SOURCE_BYTES) return@use null
+            output.write(buffer, 0, read)
+        }
+        output.toByteArray()
+    } ?: return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
+    if (bounds.outWidth !in 1..12_000 || bounds.outHeight !in 1..12_000) return null
+    var sample = 1
+    while (bounds.outWidth / sample > 2_048 || bounds.outHeight / sample > 2_048) sample *= 2
+    val bitmap = BitmapFactory.decodeByteArray(
+        source, 0, source.size, BitmapFactory.Options().apply { inSampleSize = sample },
+    ) ?: return null
+    return try {
+        val colorHex = bitmap.homeDominantColorHex()
+        val output = ByteArrayOutputStream()
+        if (!bitmap.compress(webpFormat(), 82, output)) null else
+            output.toByteArray().takeIf { it.size in 12..MAX_ARTWORK_BYTES }?.let { it to colorHex }
+    } finally {
+        bitmap.recycle()
     }
 }
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Suppress("DEPRECATION")
+private fun webpFormat(): Bitmap.CompressFormat =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
+    else Bitmap.CompressFormat.WEBP
+
+private const val MAX_CONTINUE_TRACKS = 18
+private const val MAX_TOP_MIXES = 7
+private const val MAX_RECENT_GROUPS = 7
+private const val MAX_SHOWS = 7
+private val TOP_MIX_POSITION_RANGE = 0..6
+private val RECENT_GROUP_POSITION_RANGE = 100..106
+private const val MAX_GROUP_TRACKS = 50
+private const val MAX_ARTWORK_BYTES = 5 * 1024 * 1024
+private const val MAX_ARTWORK_SOURCE_BYTES = 15 * 1024 * 1024
+private val HOME_COLOR_HEX = Regex("^#[0-9A-Fa-f]{6}$")
+
+@Preview(showBackground = true, widthDp = 422, heightDp = 922)
 @Composable
 private fun HomeScreenPreview() {
     RakyzuMusicTheme(darkTheme = true) {
-        HomeScreen(versionName = "0.8.8.1")
+        HomeScreen(versionName = "0.8.8.2")
     }
 }

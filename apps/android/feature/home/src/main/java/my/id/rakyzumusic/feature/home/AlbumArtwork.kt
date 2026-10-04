@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -66,6 +67,7 @@ internal fun AlbumArtwork(
     colors: List<Color>,
     artworkRequestProvider: ArtworkRequestProvider,
     modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(18.dp),
 ) {
     val deliveryResult = remember(albumId, artworkRequestProvider) {
         if (albumId.isBlank()) {
@@ -86,7 +88,7 @@ internal fun AlbumArtwork(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(Brush.linearGradient(colors))
             .testTag("album-artwork-${visualState.testTagSegment}-$albumId"),
         contentAlignment = Alignment.Center,

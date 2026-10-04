@@ -71,6 +71,14 @@ internal data class EditorialShelfEntity(
     val title: String,
     val subtitle: String?,
     val position: Int,
+    @ColumnInfo(name = "has_custom_artwork", defaultValue = "0")
+    val hasCustomArtwork: Boolean = false,
+    @ColumnInfo(name = "card_label", defaultValue = "NULL")
+    val cardLabel: String? = null,
+    @ColumnInfo(name = "color_hex", defaultValue = "'#4A558F'")
+    val colorHex: String = "#4A558F",
+    @ColumnInfo(name = "global_score", defaultValue = "0")
+    val globalScore: Long = 0L,
 )
 
 @Entity(

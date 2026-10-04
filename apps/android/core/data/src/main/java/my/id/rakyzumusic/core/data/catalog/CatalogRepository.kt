@@ -17,6 +17,8 @@ interface CatalogRepository {
 
     suspend fun recordRecentlyPlayed(userId: String, trackId: String): Boolean
 
+    suspend fun recordEditorialGroupOpen(shelfId: String): Boolean = false
+
     suspend fun setPersonalizationEnabled(userId: String, enabled: Boolean): Boolean = false
 
     suspend fun setDiscoveryMode(userId: String, mode: DiscoveryMode): Boolean = false
